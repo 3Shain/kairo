@@ -1,0 +1,19 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "preserve",
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "allowSyntheticDefaultImports": true,
+        "types": ["node"]
+    },
+    "files": [],
+    "references": [
+        {
+            "path": "./tsconfig.lib.json"
+        },
+        {
+            "path": "./tsconfig.spec.json"
+        }
+    ]
+}

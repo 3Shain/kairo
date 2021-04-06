@@ -1,0 +1,33 @@
+{
+  "implicitDependencies": {
+    "angular.json": "*",
+    "package.json": { "dependencies": "*", "devDependencies": "*" },
+    "tsconfig.base.json": "*",
+    "tslint.json": "*",
+    ".eslintrc.json": "*",
+    "nx.json": "*"
+  },
+  "affected": { "defaultBase": "master" },
+  "npmScope": "kairo",
+  "tasksRunnerOptions": {
+    "default": {
+      "runner": "@nrwl/workspace/tasks-runners/default",
+      "options": { "cacheableOperations": ["build", "lint", "test", "e2e"] }
+    }
+  },
+  "projects": {
+    "ng-app": { "tags": [] },
+    "ng-app-e2e": { "tags": [], "implicitDependencies": ["ng-app"] },
+    "kairo": { "tags": [] },
+    "ng-lib": { "tags": [] },
+    "react-app": { "tags": [] },
+    "react-app-e2e": { "tags": [], "implicitDependencies": ["react-app"] },
+    "react-lib": { "tags": [] },
+    "vue-lib": { "tags": [] },
+    "solid-lib": { "tags": [] },
+    "svelte-app": { "tags": [] },
+    "svelte-app-e2e": { "tags": [], "implicitDependencies": ["svelte-app"] },
+    "solid-app": { "tags": [] },
+    "vite-vue-app": { "tags": [] }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "allowJs": true,
+    "checkJs": true, //vite-tsconfig-paths need this when import from .vue
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ESNext",
+    "module": "ESNext"
+  },
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ]
+}

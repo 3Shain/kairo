@@ -1,0 +1,561 @@
+{
+  "version": 1,
+  "cli": {
+    "defaultCollection": "@nrwl/angular",
+    "packageManager": "yarn"
+  },
+  "defaultProject": "ng-app",
+  "schematics": {
+    "@nrwl/angular": {
+      "application": {
+        "linter": "eslint"
+      },
+      "library": {
+        "linter": "eslint"
+      },
+      "storybook-configuration": {
+        "linter": "eslint"
+      }
+    },
+    "@nrwl/angular:application": {
+      "style": "scss",
+      "linter": "eslint",
+      "unitTestRunner": "jest",
+      "e2eTestRunner": "cypress"
+    },
+    "@nrwl/angular:library": {
+      "style": "scss",
+      "linter": "eslint",
+      "unitTestRunner": "jest"
+    },
+    "@nrwl/angular:component": {
+      "style": "scss"
+    },
+    "@nrwl/react": {
+      "application": {
+        "style": "css",
+        "linter": "eslint",
+        "babel": true
+      },
+      "component": {
+        "style": "css"
+      },
+      "library": {
+        "style": "css",
+        "linter": "eslint"
+      }
+    }
+  },
+  "projects": {
+    "ng-app": {
+      "projectType": "application",
+      "root": "apps/ng-app",
+      "sourceRoot": "apps/ng-app/src",
+      "prefix": "realkairo",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:browser",
+          "options": {
+            "outputPath": "dist/apps/ng-app",
+            "index": "apps/ng-app/src/index.html",
+            "main": "apps/ng-app/src/main.ts",
+            "polyfills": "apps/ng-app/src/polyfills.ts",
+            "tsConfig": "apps/ng-app/tsconfig.app.json",
+            "aot": true,
+            "assets": ["apps/ng-app/src/favicon.ico", "apps/ng-app/src/assets"],
+            "styles": ["apps/ng-app/src/styles.scss"],
+            "scripts": []
+          },
+          "configurations": {
+            "production": {
+              "fileReplacements": [
+                {
+                  "replace": "apps/ng-app/src/environments/environment.ts",
+                  "with": "apps/ng-app/src/environments/environment.prod.ts"
+                }
+              ],
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "buildOptimizer": true,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kb",
+                  "maximumError": "10kb"
+                }
+              ]
+            }
+          }
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "browserTarget": "ng-app:build"
+          },
+          "configurations": {
+            "production": {
+              "browserTarget": "ng-app:build:production"
+            }
+          }
+        },
+        "extract-i18n": {
+          "builder": "@angular-devkit/build-angular:extract-i18n",
+          "options": {
+            "browserTarget": "ng-app:build"
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "apps/ng-app/src/**/*.ts",
+              "apps/ng-app/src/**/*.html"
+            ]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/ng-app"],
+          "options": {
+            "jestConfig": "apps/ng-app/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "ng-app-e2e": {
+      "root": "apps/ng-app-e2e",
+      "sourceRoot": "apps/ng-app-e2e/src",
+      "projectType": "application",
+      "architect": {
+        "e2e": {
+          "builder": "@nrwl/cypress:cypress",
+          "options": {
+            "cypressConfig": "apps/ng-app-e2e/cypress.json",
+            "tsConfig": "apps/ng-app-e2e/tsconfig.e2e.json",
+            "devServerTarget": "ng-app:serve"
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "ng-app:serve:production"
+            }
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/ng-app-e2e/**/*.{js,ts}"]
+          }
+        }
+      }
+    },
+    "kairo": {
+      "root": "libs/kairo",
+      "sourceRoot": "libs/kairo/src",
+      "projectType": "library",
+      "architect": {
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["libs/kairo/**/*.ts"]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/kairo"],
+          "options": {
+            "jestConfig": "libs/kairo/jest.config.js",
+            "passWithNoTests": true
+          }
+        },
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": ["tslib"],
+            "bundleName": "kairo"
+          }
+        }
+      }
+    },
+    "ng-lib": {
+      "projectType": "library",
+      "root": "libs/ng-lib",
+      "sourceRoot": "libs/ng-lib/src",
+      "prefix": "kairo",
+      "architect": {
+        "build": {
+          "builder": "@nrwl/angular:package",
+          "options": {
+            "tsConfig": "libs/ng-lib/tsconfig.lib.json",
+            "project": "libs/ng-lib/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "libs/ng-lib/tsconfig.lib.prod.json"
+            }
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/ng-lib/src/**/*.ts",
+              "libs/ng-lib/src/**/*.html"
+            ]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/ng-lib"],
+          "options": {
+            "jestConfig": "libs/ng-lib/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "react-app": {
+      "root": "apps/react-app",
+      "sourceRoot": "apps/react-app/src",
+      "projectType": "application",
+      "architect": {
+        "build": {
+          "builder": "@nrwl/web:build",
+          "outputs": ["{options.outputPath}"],
+          "options": {
+            "outputPath": "dist/apps/react-app",
+            "index": "apps/react-app/src/index.html",
+            "main": "apps/react-app/src/main.tsx",
+            "polyfills": "apps/react-app/src/polyfills.ts",
+            "tsConfig": "apps/react-app/tsconfig.app.json",
+            "assets": [
+              "apps/react-app/src/favicon.ico",
+              "apps/react-app/src/assets"
+            ],
+            "styles": [],
+            "scripts": [],
+            "webpackConfig": "@nrwl/react/plugins/webpack"
+          },
+          "configurations": {
+            "production": {
+              "fileReplacements": [
+                {
+                  "replace": "apps/react-app/src/environments/environment.ts",
+                  "with": "apps/react-app/src/environments/environment.prod.ts"
+                }
+              ],
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false,
+              "extractCss": true,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "5mb"
+                }
+              ]
+            }
+          }
+        },
+        "serve": {
+          "builder": "@nrwl/web:dev-server",
+          "options": {
+            "buildTarget": "react-app:build"
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "react-app:build:production"
+            }
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/react-app/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/react-app"],
+          "options": {
+            "jestConfig": "apps/react-app/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "react-app-e2e": {
+      "root": "apps/react-app-e2e",
+      "sourceRoot": "apps/react-app-e2e/src",
+      "projectType": "application",
+      "architect": {
+        "e2e": {
+          "builder": "@nrwl/cypress:cypress",
+          "options": {
+            "cypressConfig": "apps/react-app-e2e/cypress.json",
+            "tsConfig": "apps/react-app-e2e/tsconfig.e2e.json",
+            "devServerTarget": "react-app:serve"
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "react-app:serve:production"
+            }
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/react-app-e2e/**/*.{js,ts}"]
+          }
+        }
+      }
+    },
+    "react-lib": {
+      "root": "libs/react-lib",
+      "sourceRoot": "libs/react-lib/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": ["kairo","react"],
+            "bundleName": "kairo-react"
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["libs/react-lib/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/react-lib"],
+          "options": {
+            "jestConfig": "libs/react-lib/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "vue-lib": {
+      "projectType": "library",
+      "architect": {
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["libs/vue-lib/**/*.{ts,tsx,vue}"]
+          }
+        },
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": ["kairo","vue"],
+            "bundleName": "kairo-vue"
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/vue-lib"],
+          "options": {
+            "jestConfig": "libs/vue-lib/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      },
+      "root": "libs/vue-lib",
+      "sourceRoot": "libs/vue-lib/src"
+    },
+    "solid-lib": {
+      "projectType": "library",
+      "architect": {
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["libs/solid-lib/**/*.{ts,tsx}"]
+          }
+        },
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": ["kairo","solid-js"],
+            "bundleName": "kairo-solid"
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/solid-lib"],
+          "options": {
+            "jestConfig": "libs/solid-lib/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      },
+      "root": "libs/solid-lib",
+      "sourceRoot": "libs/solid-lib/src"
+    },
+    "svelte-app": {
+      "root": "apps/svelte-app",
+      "sourceRoot": "apps/svelte-app/src",
+      "projectType": "application",
+      "architect": {
+        "build": {
+          "builder": "@nxext/svelte:build",
+          "outputs": ["{options.outputPath}"],
+          "options": {
+            "outputPath": "dist/apps/svelte-app",
+            "entryFile": "apps/svelte-app/src/main.ts",
+            "tsConfig": "apps/svelte-app/tsconfig.app.json",
+            "svelteConfig": "apps/svelte-app/svelte.config.js",
+            "assets": [
+              {
+                "glob": "/*",
+                "input": "apps/svelte-app/public/**",
+                "output": "./"
+              }
+            ]
+          },
+          "configurations": {
+            "production": {
+              "dev": false
+            }
+          }
+        },
+        "serve": {
+          "builder": "@nxext/svelte:build",
+          "options": {
+            "outputPath": "dist/apps/svelte-app",
+            "entryFile": "apps/svelte-app/src/main.ts",
+            "tsConfig": "apps/svelte-app/tsconfig.app.json",
+            "svelteConfig": "apps/svelte-app/svelte.config.js",
+            "assets": [
+              {
+                "glob": "/*",
+                "input": "apps/svelte-app/public/**",
+                "output": "./"
+              }
+            ],
+            "watch": true,
+            "serve": true
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/svelte-app/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "check": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "svelte-check",
+            "cwd": "apps/svelte-app"
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/svelte-app"],
+          "options": {
+            "jestConfig": "apps/svelte-app/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "svelte-app-e2e": {
+      "root": "apps/svelte-app-e2e",
+      "sourceRoot": "apps/svelte-app-e2e/src",
+      "projectType": "application",
+      "architect": {
+        "e2e": {
+          "builder": "@nrwl/cypress:cypress",
+          "options": {
+            "cypressConfig": "apps/svelte-app-e2e/cypress.json",
+            "tsConfig": "apps/svelte-app-e2e/tsconfig.e2e.json",
+            "devServerTarget": "svelte-app:serve"
+          },
+          "configurations": {
+            "production": {
+              "devServerTarget": "svelte-app:serve:production"
+            }
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/svelte-app-e2e/**/*.{js,ts}"]
+          }
+        }
+      }
+    },
+    "solid-app": {
+      "root": "apps/solid-app",
+      "sourceRoot": "apps/solid-app/src",
+      "projectType": "application",
+      "architect": {
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/solid-app/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "serve": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "npx vite",
+            "cwd": "apps/solid-app"
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/solid-app"],
+          "options": {
+            "jestConfig": "apps/solid-app/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "vite-vue-app": {
+      "root": "apps/vite-vue-app",
+      "sourceRoot": "apps/vite-vue-app/src",
+      "projectType": "application",
+      "architect": {
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["apps/solid-app/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "serve": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "npx vite",
+            "cwd": "apps/vite-vue-app"
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/vite-vue-app"],
+          "options": {
+            "jestConfig": "apps/vite-vue-app/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
+    }
+  }
+}

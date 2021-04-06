@@ -1,0 +1,9 @@
+{
+  "name": "@kairo/vue",
+  "version": "0.0.0",
+  "description": "Vue.js integration for kairo",
+  "peerDependencies": {
+    "vue": "^3.0.0",
+    "kairo": "0.0.0"
+  }
+}

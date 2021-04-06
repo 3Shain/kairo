@@ -1,0 +1,6 @@
+{
+    "name": "@kairo/svelte",
+    "dependencies": {
+        "kairo": "0.0.0"
+    }
+}
