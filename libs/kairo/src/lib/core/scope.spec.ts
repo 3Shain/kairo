@@ -1,7 +1,7 @@
 import {
     createScope,
     inject,
-    InjectionToken,
+    InjectToken,
     provide
 } from './scope';
 
@@ -9,7 +9,7 @@ describe('core/scope', () => {
 
     const MockValue = {};
 
-    const MockToken = new InjectionToken("mock_token");
+    const MockToken = new InjectToken("mock_token");
 
     function MockService() {
         return MockValue;

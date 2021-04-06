@@ -24,7 +24,6 @@ class EventReader<T> implements ReadableChannel<T> {
         until: EventStream<any>
     ) {
         until.listenNext((next) => {
-            console.log('papapa');
             // This listener is never unsubscribe manully?
             // potential mem leak?
             if (!this.closed) {

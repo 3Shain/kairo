@@ -1,6 +1,8 @@
 
+import { resumeScope } from "../core/scope";
 import { TeardownLogic } from "../types";
-import { executeTask } from "./task";
+import { nextTick } from "../utils/next-tick";
+import { executeTask, taskExecutor } from "./task";
 import { InteropObservable, Task } from "./types";
 
 const observableSymbol = Symbol.observable ?? '@@observable';
@@ -21,7 +23,7 @@ function* callback<T>(
                 }
                 settled = true;
                 if (syncFlag) {
-                    queueMicrotask(() => resolve(v)) // TODO: scheduler?
+                    nextTick(() => resolve(v)) // TODO: scheduler?
                 } else {
                     resolve(v);
                 }
@@ -31,7 +33,7 @@ function* callback<T>(
                 }
                 settled = true;
                 if (syncFlag) {
-                    queueMicrotask(() => reject(v)); // 
+                    nextTick(() => reject(v)); // 
                 } else {
                     reject(v);
                 }
@@ -95,26 +97,120 @@ function* resolve(obj: unknown): Task<unknown> {
     }
 }
 
-function any(
-    ...args: (Promise<unknown> | Task<unknown>)[]
-) {
-
+type ResolveAll<T> = {
+    [P in keyof T]: T[P] extends Task<infer D> ? D : unknown
 }
 
-function all(
-    ...args: (Promise<unknown> | Task<unknown>)[]
-) {
+type Union<T extends any[]> = T[number];
+
+function* any<R extends Array<Task<any>>>(
+    array: R
+): Task<Union<ResolveAll<R>>> {
+    return yield* callback((resolve, reject) => {
+        let taskNum = array.length;
+        const disposors = array.map(task => taskExecutor(task, resumeScope(),
+            (v: unknown) => {
+                resolve(v as any);
+                // should dispose other ?
+            },
+            () => {
+                taskNum--;
+                if (taskNum === 0) {
+                    reject(Error('All task failed'));
+                }
+            }));
+        return () => disposors.forEach(x => x());
+    })
 }
 
-function race(
-    ...args: (Promise<unknown> | Task<unknown>)[]
-) {
-
+function* race<R extends Array<Task<any>>>(
+    array: R
+): Task<Union<ResolveAll<R>>> {
+    return yield* callback((resolve, reject) => {
+        const disposors = array.map(task => taskExecutor(task, resumeScope(),
+            (v: unknown) => {
+                resolve(v as any);
+                // should dispose other ?
+            },
+            (e: unknown) => {
+                reject(e);
+                // should dispose other ?
+            }));
+        return () => disposors.forEach(x => x());
+    })
 }
+
+function* all<R extends Array<any>>(
+    array: R
+): Task<ResolveAll<R>> {
+    return yield* callback((resolve, reject) => {
+        let remains = array.length;
+        let result = new Array(remains);
+        const disposors = array.map((task, index) => taskExecutor(task, resumeScope(),
+            (v: unknown) => {
+                result[index] = v;
+                remains--;
+                if (remains === 0) {
+                    resolve(result as any);
+                }
+            },
+            (e: unknown) => {
+                reject(e);
+                // should dispose other?
+            }));
+        return () => disposors.forEach(x => x());
+    });
+}
+
+type ResolveAllSettled<T> = {
+    [P in keyof T]: T[P] extends Task<infer D> ? {
+        success: true,
+        value: D
+    } | {
+        success: false,
+        value: any
+    } : unknown
+}
+
+function* allSettled<R extends Array<any>>(
+    array: R
+): Task<ResolveAllSettled<R>> {
+    return yield* callback((resolve, reject) => {
+        let remains = array.length;
+        let result = new Array(remains);
+        const disposors = array.map((task, index) => taskExecutor(task, resumeScope(),
+            (v: unknown) => {
+                result[index] = {
+                    success: true,
+                    value: v
+                };
+                remains--;
+                if (remains === 0) {
+                    resolve(result as any);
+                }
+            },
+            (e: unknown) => {
+                result[index] = {
+                    success: false,
+                    value: e
+                };
+                remains--;
+                if (remains === 0) {
+                    reject(Error('All task failed.'));
+                }
+            }));
+        return () => disposors.forEach(x => x());
+    });
+}
+
 
 export {
     delay,
     nextFrame,
     callback,
-    resolve
+    resolve,
+    all,
+    allSettled,
+    any,
+    race
 }

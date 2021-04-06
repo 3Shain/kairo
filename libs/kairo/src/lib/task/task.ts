@@ -9,6 +9,7 @@ import {
     scopedWith,
 } from '../core/scope';
 import { action, EventStream } from '../public-api';
+import { callback } from './utils';
 
 let inside_runner = false;
 
@@ -21,14 +22,14 @@ export const executeTask = Symbol.for('executeTask');
  * dispose should not raise error!
  */
 
-function taskExecutor(
+export function taskExecutor(
     gen: Generator,
     parentScope: Scope,
     onSuccess: Function,
     onFailure: Function
 ) {
     let currentDisposer: Function | null = null;
-    let scope = createScope(() => {
+    let { scope } = createScope(() => {
         // noop
     }); // TODO: Parent might be not sealed?
 
@@ -39,21 +40,20 @@ function taskExecutor(
             performed = scopedWith(
                 // TODO: as well as transaction!
                 () => (error ? gen.throw(error) : gen.next(resumed)),
-                scope.scope
+                scope
             );
-            // console.log(performed);
         } catch (e) {
             if (e instanceof ObjectDisposedError) {
             } else {
                 onFailure(e);
             }
-            disposeScope(scope.scope);
+            disposeScope(scope);
             return;
         }
 
         if (performed.done == true) {
             onSuccess(performed.value);
-            disposeScope(scope.scope);
+            disposeScope(scope);
             return;
         }
         const toHandle = performed.value;
@@ -66,14 +66,14 @@ function taskExecutor(
                 execute(payload, undefined);
             });
         } else if (executeTask in toHandle) {
-            currentDisposer = (toHandle as any)[executeTask](
+            currentDisposer = scopedWith(() => (toHandle as any)[executeTask](
                 (value: unknown) => {
                     execute(value, undefined);
                 },
                 (error: unknown) => {
                     execute(undefined, error);
                 }
-            );
+            ), scope);
         } else {
         }
     }

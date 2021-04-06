@@ -1,4 +1,5 @@
 import { TeardownLogic } from "../types";
+import { nextTick } from "../utils/next-tick";
 
 interface Scheduler<T> {
     (next: (payload: T) => void): (payload: T) => (void | TeardownLogic)
@@ -6,7 +7,7 @@ interface Scheduler<T> {
 
 const asap: Scheduler<any> = (next) => {
     return (payload) => {
-        queueMicrotask(() => {
+        nextTick(() => {
             next(payload);
         });
     }
@@ -14,7 +15,7 @@ const asap: Scheduler<any> = (next) => {
 
 const asapInTransaction: Scheduler<any> = (next) => {
     return (payload) => {
-        queueMicrotask(() => {
+        nextTick(() => {
             next(payload);
         });
     }
