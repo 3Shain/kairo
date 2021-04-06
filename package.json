@@ -10,7 +10,7 @@
         "url": "https://github.com/3Shain/kairo"
     },
     "description": "Universal webapp reactive model across frameworks.",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "license": "MIT",
     "scripts": {
         "ng": "nx",
@@ -39,8 +39,7 @@
         "build-tools": "tsc --build ./tools/tsconfig.tools.json",
         "bench": "tsc --build ./benchmarks/tsconfig.json --clean && tsc --build ./benchmarks/tsconfig.json  && node --expose-gc ./benchmarks/out/benchmarks/bench.js",
         "build-all": "nx build kairo && nx build react-lib && nx build vue-lib && nx build solid-lib",
-        "publish-all": 
-        "npm publish dist/libs/kairo --access public && npm publish dist/libs/react-lib --access public && npm publish dist/libs/vue-lib --access public && npm publish dist/libs/solid-lib --access public"
+        "publish-all": "npm publish dist/libs/kairo --access public && npm publish dist/libs/react-lib --access public && npm publish dist/libs/vue-lib --access public && npm publish dist/libs/solid-lib --access public"
     },
     "private": true,
     "dependencies": {
