@@ -1,6 +1,6 @@
 export const nextTick =
    (function(){
-       if('process' in globalThis){
+       if(typeof process !== 'undefined'){
            return process.nextTick;
        }
        return queueMicrotask;

@@ -55,9 +55,11 @@ export function isEventStream<T>(value: unknown): value is EventStream<T> {
     return value instanceof EventStream;
 }
 
-export type ExtractBehaviorProperty<T> = {
-    [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
-};
+export type ExtractBehaviorProperty<T> = T extends object
+    ? {
+          [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
+      }
+    : T;
 
 export function combine<A extends Array<Behavior<any>>[]>(
     array: A
@@ -275,7 +277,7 @@ export {
     inject,
     provide,
     resumeScope,
-    InjectToken
+    InjectToken,
 } from './core/scope';
 export type { Scope, Provider, Factory } from './core/scope';
 export { runInTransaction as transaction } from './core/behavior';

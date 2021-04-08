@@ -10,8 +10,8 @@ import {
     isBehavior,
     runIfScopeExist,
 } from 'kairo';
-import { onCleanup, useContext } from 'solid-js';
-import { KairoContext } from './context';
+import { inject as vueInject, ref, reactive, onUnmounted, Ref } from 'vue';
+import { SCOPE } from './context';
 
 export function useInject<T>(
     fn: Factory<T>,
@@ -19,7 +19,7 @@ export function useInject<T>(
         optional?: boolean;
         skipSelf?: boolean;
     }
-): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
+): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject<T>(
     token: InjectToken<T>,
     options?: {
@@ -27,19 +27,18 @@ export function useInject<T>(
         skipSelf?: boolean;
         defaultValue: T;
     }
-): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
+): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject<T>(
     token: InjectToken<T>,
     options?: {
         optional?: boolean;
         skipSelf?: boolean;
     }
-): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
+): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject(token: any, options: any): any {
     runIfScopeExist(() => {
         throw Error('Use `inject` instead of `useInject` if inside a scope.');
     });
-    const context = useContext(KairoContext);
     let expose = {};
     const { scope } = createScope(() => {
         const resolve = inject(token, options);
@@ -47,26 +46,28 @@ export function useInject(token: any, options: any): any {
             return resolve;
         }
         if (isBehavior(resolve)) {
-            return () => resolve.value;
+            const tRef = ref(resolve.value);
+            resolve.watch((updated) => {
+                tRef.value = updated;
+            });
+            return tRef;
         }
         for (const [key, value] of Object.entries(resolve)) {
             if (typeof value === 'function') {
-                expose[key] = action(value);
+                expose[key] = action(value as any);
             } else if (isBehavior(value)) {
-                Object.defineProperty(expose, key, {
-                    get() {
-                        return value.value;
-                    },
-                    enumerable: true,
-                    configurable: true,
+                const tRef = ref(value.value);
+                value.watch((updated) => {
+                    tRef.value = updated;
                 });
+                expose[key] = tRef;
             } else {
                 expose[key] = value;
             }
         }
-    }, context);
-    onCleanup(() => {
+    }, vueInject(SCOPE));
+    onUnmounted(() => {
         disposeScope(scope);
     });
-    return expose;
+    return reactive(expose);
 }

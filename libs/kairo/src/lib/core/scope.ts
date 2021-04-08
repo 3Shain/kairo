@@ -1,10 +1,11 @@
-import { BloomFilter } from "../utils/bloom-filter";
+import { Behavior, ExtractBehaviorProperty } from '../public-api';
+import { BloomFilter } from '../utils/bloom-filter';
 
 interface Scope {
     disposers: {
-        index: number,
-        disposeFn: () => void,
-        cancelled: boolean
+        index: number;
+        disposeFn: () => void;
+        cancelled: boolean;
     }[];
     sealed: boolean;
     parent: Scope | null;
@@ -14,7 +15,11 @@ interface Scope {
     disposed: boolean;
 }
 
-function createScope<T>(fn: () => T, parentScope: Scope | null = null, rootScope: Scope | null = null) {
+function createScope<T>(
+    fn: () => T,
+    parentScope: Scope | null = null,
+    rootScope: Scope | null = null
+) {
     if (parentScope && !parentScope.sealed) {
         throw Error('Parent scope is not sealed.');
     }
@@ -24,15 +29,19 @@ function createScope<T>(fn: () => T, parentScope: Scope | null = null, rootScope
         parent: parentScope,
         root: rootScope ?? parentScope?.root ?? null,
         injections: new Map(),
-        injection_bloom: new BloomFilter(8, 4, parentScope?.injection_bloom.buckets),
-        disposed: false
+        injection_bloom: new BloomFilter(
+            8,
+            4,
+            parentScope?.injection_bloom.buckets
+        ),
+        disposed: false,
     };
     const exposed = scopedWith(fn, scope);
     scope.sealed = true; // WTF
     return {
         scope,
-        exposed
-    }
+        exposed,
+    };
 }
 
 function runIfScopeExist(fn: () => void) {
@@ -47,8 +56,8 @@ function registerDisposer(disposer: () => void) {
     const disposeObj = {
         index: scope.disposers.length,
         disposeFn: disposer,
-        cancelled: false
-    }
+        cancelled: false,
+    };
     scope.disposers.push(disposeObj);
     return () => {
         if (disposeObj.cancelled) {
@@ -60,7 +69,7 @@ function registerDisposer(disposer: () => void) {
             scope.disposers[disposeObj.index] = popped;
             popped.index = disposeObj.index;
         }
-    }
+    };
 }
 
 let currentScope: Scope | null = null;
@@ -104,7 +113,7 @@ function scopedWith<T>(fn: () => T, scope: Scope) {
 }
 
 class InjectToken<T> {
-    constructor(public readonly name: string) { }
+    constructor(public readonly name: string) {}
 
     toString() {
         return this.name;
@@ -117,16 +126,16 @@ interface Factory<T> {
 }
 
 type Provider<T> = (
-    {
-        useValue: T;
-    }
     | {
-        useFactory: (...args: []) => T;
-        deps?: any[];
-    }
+          useValue: T;
+      }
     | {
-        useAlias: Factory<T> | InjectToken<T>;
-    }
+          useFactory: (...args: []) => T;
+          deps?: any[];
+      }
+    | {
+          useAlias: Factory<T> | InjectToken<T>;
+      }
 ) & {
     provide: Factory<T> | InjectToken<T>;
     multi?: boolean;
@@ -163,7 +172,7 @@ function provide<T>(arg0: any, arg1?: any): any {
             return aliased;
         } else if ('useValue' in arg0) {
             scope.injection_bloom.add(arg0.provide.name);
-            scope.injections.set(arg0.provide, arg0.useValue)
+            scope.injections.set(arg0.provide, arg0.useValue);
 
             return arg0.useValue;
         } else if ('useFactory' in arg0) {
@@ -194,9 +203,12 @@ function inject<T>(
         skipSelf?: boolean;
     }
 ): T;
-function inject(token: {
-    name: string
-}, options?: any): any {
+function inject(
+    token: {
+        name: string;
+    },
+    options?: any
+): any {
     let scope: Scope | null = resumeScope();
     if (options?.skipSelf) {
         scope = scope.parent;
@@ -217,7 +229,7 @@ function inject(token: {
     if (options?.optional) {
         return options.defaultValue ?? undefined;
     }
-    throw Error(`Injection token '${(token.name)}' is not found.`);
+    throw Error(`Injection token '${token.name}' is not found.`);
 }
 
 export {
@@ -230,6 +242,6 @@ export {
     inject,
     provide,
     InjectToken,
-    runIfScopeExist
+    runIfScopeExist,
 };
 export type { Scope, Provider, Factory };

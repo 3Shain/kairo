@@ -11,7 +11,7 @@ module.exports = {
     // **optional** default: `[{ root: './' }]`
     // support monorepos
     projects: [
-        './apps/vue-app', // shorthand for only root.
+        './apps/vite-vue-app', // shorthand for only root.
         // {
         //     // **required**
         //     // Where is your project?

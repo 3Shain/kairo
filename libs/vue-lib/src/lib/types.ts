@@ -1,4 +1,4 @@
-import { Behavior } from "kairo";
+import { Behavior } from 'kairo';
 import { Ref } from 'vue';
 
 export type GetBehaviors<T> = {

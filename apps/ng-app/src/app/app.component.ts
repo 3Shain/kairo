@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, Input } from '@angular/core';
-import { KairoComponent } from '@kairo/angular';
+import { WithKairo } from '@kairo/angular';
 import { Action, computed, stream, task, resolve as $, Behavior } from 'kairo';
 
 @Component({
@@ -8,7 +8,7 @@ import { Action, computed, stream, task, resolve as $, Behavior } from 'kairo';
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss'],
 })
-@KairoComponent()
+@WithKairo()
 export class AppComponent {
     @Input()
     input: string;

@@ -4,7 +4,7 @@ import {
     disposeScope,
     Scope,
     transaction,
-    data,
+    mutable as data,
     Behavior,
 } from 'kairo';
 import React, { useEffect, useRef, useState } from 'react';
@@ -22,11 +22,17 @@ export const KairoApp: React.FunctionComponent<{
     const kContext = useRef<Scope | null>(null);
     if (kContext.current === null) {
         // it's the first rendering
-        const scope = createScope(() => {
+        const { scope } = createScope(() => {
             props.globalSetup(); // TODO: setup props...
         });
-        kContext.current = scope.scope;
+        kContext.current = scope;
     }
+
+    useEffect(() => {
+        return () => {
+            disposeScope(kContext.current!);
+        };
+    }, []);
 
     return (
         <KairoContext.Provider value={kContext.current}>
@@ -100,12 +106,6 @@ export function withKairo<Props, c = any>(
         }
 
         currentTick.current++;
-        /**
-         * next time this function is invoked:
-         * if it is from react world: tick!==currentTick, then trigger a update
-         * if it is from watch: tick===currentTick
-         */
-        console.log('one formal renderer');
 
         useEffect(() => {
             return () => {

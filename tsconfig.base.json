@@ -15,6 +15,7 @@
         "lib": ["esnext", "dom"],
         "skipLibCheck": true,
         "skipDefaultLibCheck": true,
+        "types": ["node"],
         "baseUrl": ".",
         "paths": {
             "kairo": ["libs/kairo/src/index.ts"],

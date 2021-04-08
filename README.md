@@ -413,6 +413,7 @@ Kairo becomes the common language of reactive pieces.
 * Full API Documentation
 * Common interface of common features (like ajax, frontend-routing, webapi)
 * A tutorial about debug.
+* Unit tests
 
 ## Credit
 

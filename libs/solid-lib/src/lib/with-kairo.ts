@@ -1,8 +1,30 @@
-import { Component, onCleanup, getListener, createContext as solidCreateContext, createComponent, useContext, createEffect, createSignal } from 'solid-js';
-import { Behavior, data, createScope, disposeScope } from 'kairo';
+import {
+    Component,
+    onCleanup,
+    getListener,
+    createComponent,
+    useContext,
+    createSignal,
+    createComputed,
+} from 'solid-js';
+import {
+    Behavior,
+    createScope,
+    disposeScope,
+    ComputationalBehavior,
+    mutable,
+} from 'kairo';
 import type { JSX } from 'solid-js';
+import { KairoContext } from './context';
 
-const originalGetter = Object.getOwnPropertyDescriptor(Behavior.prototype, 'value').get;
+/**
+ * side effects
+ * patches prototype of Behavior
+ */
+const originalGetter = Object.getOwnPropertyDescriptor(
+    Behavior.prototype,
+    'value'
+).get;
 
 Object.defineProperty(Behavior.prototype, 'value', {
     get(this: Behavior & { signal?: [Function, Function] }) {
@@ -16,15 +38,25 @@ Object.defineProperty(Behavior.prototype, 'value', {
             this.signal[0](); // trigger a solid read
         }
         return originalGetter.call(this);
-    }
+    },
 });
 
-const KairoContext = solidCreateContext(null);
+Object.defineProperty(ComputationalBehavior.prototype, 'value', {
+    get(this: Behavior & { signal?: [Function, Function] }) {
+        if (!this.signal) {
+            this.signal = createSignal(originalGetter);
+            this.watch((v) => {
+                this.signal[1](v);
+            });
+        }
+        if (getListener() !== null) {
+            this.signal[0](); // trigger a solid read
+        }
+        return originalGetter.call(this);
+    },
+});
 
-function KairoApp(props: {
-    globalSetup: () => void,
-    children: JSX.Element
-}) {
+function KairoApp(props: { globalSetup: () => void; children: JSX.Element }) {
     const scope = createScope(props.globalSetup, null);
 
     onCleanup(() => {
@@ -35,36 +67,36 @@ function KairoApp(props: {
         value: scope.scope,
         get children() {
             return props.children;
-        }
-    })
-}
-
-type PropsInBehavior<T> = {
-    [P in keyof T]: Behavior<T[P]>;
+        },
+    });
 }
 
 function withKairo<Props>(
-    component: (props: PropsInBehavior<Props>) => Component<{}>
+    component: (
+        props: Props,
+        useProp: <P>(selector: (x: Props) => P) => Behavior<P>
+    ) => Component<{}>
 ): Component<Props> {
-    return (props: Props & {
-        children?: JSX.Element;
-    }) => {
-
+    return (
+        props: Props & {
+            children?: JSX.Element;
+        }
+    ) => {
         const parent = useContext(KairoContext);
 
         const { scope, exposed: realComponent } = createScope(() => {
-            const behaviors = [];
-            for (const key of Object.keys(props)) {
-                if (key === 'children') {
-                    continue;
+            return component(
+                {
+                    ...props,
+                } as any,
+                (thunk) => {
+                    const [prop, setProp] = mutable(thunk(props));
+                    createComputed(() => {
+                        setProp(thunk(props));
+                    });
+                    return prop;
                 }
-                const [behavior, setBehavior] = data(props[key]);  //TODO: schedule asap
-                createEffect(() => {
-                    setBehavior(props[key]);
-                });
-                behaviors.push([key, behavior]);
-            }
-            return component(Object.fromEntries(behaviors) as any);
+            );
         }, parent);
 
         onCleanup(() => {
@@ -77,11 +109,11 @@ function withKairo<Props>(
                 return createComponent(realComponent, {
                     get children() {
                         return props.children;
-                    }
+                    },
                 });
-            }
+            },
         });
-    }
+    };
 }
 
 export { KairoApp, withKairo };

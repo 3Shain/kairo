@@ -1,55 +1,63 @@
 import {
     createScope,
-    data,
     disposeScope,
-    transaction,
     isBehavior,
     action,
+    Behavior,
+    mutable,
 } from 'kairo';
 import {
     ref,
     watch,
-    toRefs,
     inject,
     provide,
-    InjectionKey,
     onUnmounted,
+    SetupContext,
+    ComponentPublicInstance,
+    App,
 } from 'vue';
+import { SCOPE } from './context';
 import { RemoveBehaviors } from './types';
 
-const SCOPE = Symbol('kairo scope') as InjectionKey<any>;
+export function kairoApp(setup?: (app: App) => void) {
+    return (app: App) => {
+        const { scope } = createScope(() => {
+            setup?.(app);
+        });
 
-export function setupKairo<Props extends object, Bindings>(
-    setup: (props: Props) => Bindings
-): (props: Props) => RemoveBehaviors<Bindings> {
-    return (props: Props) => {
+        app.provide(SCOPE, scope);
+    };
+}
+
+export function setupKairo<Props, Bindings>(
+    setup: (
+        props: Props,
+        useProp: <T>(thunk: (props: Props) => T) => Behavior<T>,
+        ctx: SetupContext
+    ) => Bindings
+): (props: Props, ctx: SetupContext) => RemoveBehaviors<Bindings> {
+    return function (props: Props, setupContext: SetupContext) {
         const { scope, exposed } = createScope(() => {
-            const propRefs = toRefs(props);
-            const propBehaviors = Object.fromEntries(
-                Object.keys(propRefs).map((key) => [
-                    key,
-                    data(propRefs[key].value),
-                ])
-            );
-            watch(
-                () => props,
-                (newValue, ov) => {
-                    transaction(function updateProps() {
-                        // TODO: make this scheduled.
-                        // run in transaction
-                        for (const [k, v] of Object.entries(newValue)) {
-                            propBehaviors[k][1][1](v); // ...
-                        }
-                    });
-                },
-                { flush: 'sync' }
-            );
-
             const exposed = setup(
-                Object.fromEntries(
-                    Object.entries(propBehaviors).map((s) => [s[0], s[1][0]])
-                ) as any
+                {
+                    ...props,
+                },
+                (thunk: (_: Props) => any) => {
+                    const [prop, setProp] = mutable(thunk(props));
+                    watch(
+                        () => thunk(props),
+                        (value) => {
+                            setProp(value);
+                        }
+                    );
+                    return prop;
+                },
+                setupContext
             );
+            if (typeof exposed !== 'object' || exposed === null) {
+                console.log('?');
+                return exposed; // let vue handle this.
+            }
             return Object.fromEntries(
                 Object.entries(exposed).map(([key, value]) => {
                     if (isBehavior(value)) {
@@ -58,10 +66,7 @@ export function setupKairo<Props extends object, Bindings>(
                         return [key, _ref];
                     }
                     if (typeof value === 'function') {
-                        return [
-                            key,
-                            action(value),
-                        ];
+                        return [key, action(value as any)];
                     }
                     return [key, value];
                 })

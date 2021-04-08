@@ -1,7 +1,7 @@
 import { withKairo } from '@kairo/vue';
 import { renderSlot } from 'vue';
 import {
-    data,
+    mutable as data,
     readEvents,
     stream,
     task,
@@ -14,8 +14,14 @@ import {
 } from 'kairo';
 import './Test.css';
 
-const Component = withKairo(() => {
+const Component = withKairo<{
+    test: number;
+}>((_, useprop) => {
     const [position, setPosition] = data([0, 0]);
+
+    const prop = useprop((x) => x.test);
+
+    // prop.watch(console.log);
 
     let ref: HTMLDivElement | null = null;
 
@@ -51,8 +57,10 @@ const Component = withKairo(() => {
         }
     });
 
-    return () => (
+    return ({ children }) => (
         <div>
+            {children}
+            <p>{prop.value}</p>
             <p>{`x:${position.value[0]},y:${position.value[1]}`}</p>
             <div class="box">
                 <div
@@ -70,6 +78,8 @@ const Component = withKairo(() => {
         </div>
     );
 });
+
+Component.props = ['test'];
 
 export default Component;
 
