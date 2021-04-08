@@ -156,6 +156,7 @@ export const MobxBridge: Bridge = {
     },
     watch: (read, effect) => {
         reaction(read, effect, { fireImmediately: true });
+        // bug: fireImmediately doesn't really fire...
         return () => {
             // no disposor
         }
