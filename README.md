@@ -17,7 +17,7 @@ Three primitives, with some helper functions.
 * An architecture and abstraction of reactive frontend app at an application- as well as component-level.
 * **Simple mental model** and **Great readability** of asynchronous programming.
 * Logic composition & reuse.
-* IoC with not only Dependency injection.
+* IoC with Dependency injection.
 * State Management.
 * All features above is avaliable **ACROSS FRAMEWORKS/LIBRARIES**.
     > Currently react,angular and vue integrations are provided.
@@ -29,16 +29,16 @@ We introduce **reactive programming** for two things: **small changes can make b
 ## Primitive#1 **Behavior**
 
 ```ts
-import { data, computed } from 'kairo';
+import { mutable, computed } from 'kairo';
 
-const [count,setCount] = data(0); 
+const [count,setCount] = mutable(0); 
 // `count` is a Behavior<number> object, `setCount` is a function.
 
 const snap = count.value; // read 
 setCount(1); // mutate
 ```
 
-__Behavior__ stores a varying value. We can access the value by `.value`. By `data(initialValue)` we can create a Behavior that is mutable.
+__Behavior__ stores a varying value. We can access the value by `.value`. By `mutable(initialValue)` we can create a Behavior that is mutable.
 
 
 **There are reasons to read by getter and write by a separate function**
@@ -49,7 +49,7 @@ __Behavior__ stores a varying value. We can access the value by `.value`. By `da
 
 **But keep in mind, not all Behavior is mutable. By definition Behavior just store a varying value.**
 
-Behaviors can derive Behaviors, this is called computation.
+Behaviors can derive Behaviors, this is called Computation.
 
 ```ts
 const doubled = computed(()=>count.value*2); // create by a thunk.
@@ -101,7 +101,7 @@ count.watch((current)=>{
  * by just copy&paste!
  */
 const Counter = withKairo(()=>{
-    const [count,setCount] = data(0);
+    const [count,setCount] = mutable(0);
     return () => <>
         <span>{count.value}</span>
         <button onClick={()=>setCount(count.value + 1)}>
@@ -142,19 +142,42 @@ EventStream can derive EventStream.
 
 ```ts
 
-// 1. transform
+const dataStream = event.transform(x=>x.data)
+/**
+ * just like Behavior.map 
+ * the reason for a different name is:
+ * map is valid all the time,
+ * but transform happens at a perticular time.
+ */
 
-// 2. filter
-
-// 3. schedule
+const notNullStream = event.filter(x=>x!=null);
+/**
+ * filter receive a function returning bool value
+ * and only 'true' payloads are emitted.
+ */
 
 ```
+
+Schedule is a kind of derivation that make an occurance of event filtered or delayed asynchronously. It receives a scheduler.
+```ts
+
+const debounceStream = event.schedule(debounce(100)); //
+
+```
+
+There are some built in schedulers:
+* `asap`: Emit event in next microtask.
+* `async`: Emit event in next microtask.
+* `animation`: Emit event in next requestAnimationFrame call.
+* `debounce(time)`
+* `threshold(time)`
+
 
 EventStreams can be `merge`d into a EventStream, just like you can `combine` Behaviors
 
 ```ts
 
-
+const mergedStream = merge([eventA,eventB,eventC])
 
 ```
 
@@ -166,50 +189,24 @@ const [plusEvent, plus] = stream<number>();
 
 const count = plusEvent.reduce((a,b)=>a+b,0);
 
+const lastEvent = plusEvent.hold(0);
+
 ```
 
 And Behavior `.changes(scheduler)` can gives a EventStream, but you must provide a `Scheduler`, 
 
 Like Behavior can be `watch`ed, you can `listen` an EventStream.
 
-```ts
-
-```
-
 Here is a table comparing the conceps of Behavior and EventStream
 
 |  | Behavior | EventStream |
 | -- | -- | -- |  
 | definition | a varying value | future occurrences of an event |
-| the 'atom' | data(`initial`) | stream() |
+| the 'atom' | mutable(`initial`) | stream() |
 | derivation | .map() / .switch() / computed() | .transform() / .filter() / .schedule() |
 | composition | combine() | merge() |
 | notification | .watch() | .listen() |
-| convert | .changes(scheduler) | .reduce() / .hold() |
-
-
-// some example of behavior + eventstream
-
-```ts
-function Todo(){
-
-    const [addTodoEvent,addTodo] = stream();
-    const [removeTodoEvent,removeTodo] = stream();
-
-    const todos = merge([addTodoEvent,removeTodoEvent]).reduce(
-        (cur,newa)=>{
-
-        },
-        []
-    );
- 
-    return {
-        addTodo,
-        removeTodo,
-        todos
-    };
-}
-```
+| convert | .changes() | .reduce() / .hold() |
 
 ## Primitive#3 **Task**
 
@@ -218,9 +215,6 @@ Now you can already build a reactive system using Behavior & EventStream. They a
 Recall our basic idea of 'reactive' again. The first point is already brought by Behavior and EventStream, but how about the second point: schedule things to happen __in order__? To make it clear, let's see an example: now we have job A, which depends on job B and job C. job B depends on settlement of any job D,E,F, and job C depends on two occurrances of event G. It seems not easy to build this using only Behavior and EventStream (and I think it's possibe but it would be buggy and unreadable). Actually Behavior & EventStream is not the right tool, and we need another tool. Thus the third primitive: Task is introduced.
 
 Task is based on generator function of ES6, and have a similar syntax with async/await. The differences expect for syntax are that Task is cancellable, and it has its own schedule strategy (other than microtasks). Task can solve the example above is because it is imperative, and imperative guarantees order in natural. 
-
-
-// task should start after a tick
 
 Writing a task is almost the same as writing a ordinary function, and the main differences is:
 1. There must be an asterisk(*) after the keyword `function`
@@ -302,8 +296,7 @@ Error handling: just use try-catch.
 
 As Task is cancellable, a `yield*` statement will throw an `DISPOSED` object, so that you can get notified and do cleanup logics. 
 
-By the way, you can have `immediately invoked task expression` like IIFE. It makes sense, I will explain this later.
-
+By the way, you can have `immediately invoked task expression` like IIFE.
 
 ```ts
 
@@ -328,24 +321,24 @@ We have four functions to deal with concurency, they all receives an iterable of
 
 | | | |
 |--|--|--|
-| all | | |
-| allSettled | | |
-| race | | |
-| any| | |
+| all | When all tasks success. It will throw if any task throw. | |
+| allSettled | When all tasks settled. It will throw if all tasks throw. | |
+| race | When any task settled. It will throw if the first settled task throw. | |
+| any| When any task success. It will throw if all tasks throw. | |
 
 Channel:
 ```ts
 const channel = readEvents({
     from: event1
     until: event2
-})
+});
 ```
 
 ## Lifecycle and Scope
 
-You can derive and watch a Behavior, you can listen an EventStream, and you can start and cancel a task. But at some point you don't need to watch a Behavior or listen an EventStream anymore, and we might. Manage them manually is painful, that's one of the reason why Scope comes here.
+You can derive and watch a Behavior, you can listen an EventStream, and you can start and cancel a task. But at some point you don't need to watch a Behavior or listen an EventStream anymore. Manage them manually is painful, that's one of the reason why Scope comes here.
 
-A Scope contains a . It usually attaches to a outside world object such as a Component (of any front-end frameworks), and when this object disposes (Component destroyed), the Scope disposes.
+A Scope usually attaches to a outside world object such as a Component (of any front-end frameworks), and when this object disposes (Component destroyed), the Scope disposes (and all subscriptions, on-going tasks collected by scope).
 
 Scopes can have a hierarchy, just like we usually model application as a tree of component. A Scope has a parent Scope, and a Scope is always initialize after and dispose before its parent Scope. There is a root Scope, and it might attach to the whole application.
 
@@ -353,13 +346,19 @@ Because Scopes have a hierarchy, thus its suitable and reasonable to have a depe
 
 ```ts
 
-import { provide, inject } from 'kairo';
+import { provide, inject, InjectToken } from 'kairo';
+
+const THE_TOKEN = new InjectToken('A meaningful name.');
 
 // In parent Scope
 
+const theObject = ...; // the object you want to provide
 
+provide(THE_TOKEN,theObject);
 
 // In children Scope
+
+const theObject = inject(THE_TOKEN);
 
 ```
 
@@ -369,21 +368,25 @@ Besides `InjectToken`, a function can be also treat as a token, such that we cal
 
 function FooService() {
 
-    //
-    //
+    // declear your Behaviors, EventStream as well as Task here
+
     return {
-        
+        // and expose them in an object literal
     }
 }
 
 // In parent Scope
-provide(FooService)
+const foo = provide(FooService);
+// the function is eager-executed and the return value is provided to children scope.
 
 // In children Scope
 
-const foo = inject(FooService)
+const foo = inject(FooService);
+// now you can access the object exposed.
 
 ```
+
+But how can I create a Scope? Well this should be done by integrations already, but you can still check the documentation. 
 
 ## Integrations
 
@@ -397,6 +400,13 @@ Kairo becomes the common language of reactive pieces.
 
 [Vue](https://github.com/3shain/kairo/tree/master/libs/vue-lib)
 
+
+## Documentation(TBD)
+
+* Behavior related
+* EventStreams related
+* Task related
+* Scope related
 
 ## Todos
 
