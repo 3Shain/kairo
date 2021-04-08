@@ -10,7 +10,7 @@ import {
     watch,
     disposeWatcher,
     cleanupComputation,
-    runInTransaction
+    runInTransaction,
 } from './core/behavior';
 import { Scheduler } from './core/schedule';
 import { registerDisposer, runIfScopeExist } from './core/scope';
@@ -25,7 +25,7 @@ import {
 } from './core/stream';
 import { TeardownLogic } from './types';
 
-export function data<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
+export function mutable<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
     const internal = createData(initialValue);
     return [new Behavior(internal), (v) => setData(internal, v)];
 }
@@ -57,7 +57,7 @@ export function isEventStream<T>(value: unknown): value is EventStream<T> {
 
 export type ExtractBehaviorProperty<T> = {
     [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
-}
+};
 
 export function combine<A extends Array<Behavior<any>>[]>(
     array: A
@@ -85,7 +85,9 @@ export function combine(obj: object): Behavior<any> {
     }, true);
 }
 
-export function action<Fn extends (...args: any[]) => any>(fn: Fn): (...args: Parameters<Fn>) => ReturnType<Fn> {
+export function action<Fn extends (...args: any[]) => any>(
+    fn: Fn
+): (...args: Parameters<Fn>) => ReturnType<Fn> {
     const ret = (...args: any[]) => runInTransaction(() => fn(...args));
     // ret.name = fn.name;
     return ret;
@@ -109,9 +111,9 @@ export function merge<A extends EventStream<any>[]>(
 }
 
 export class Behavior<T = any> {
-    constructor(protected internal: Data<T>) { }
+    constructor(protected internal: Data<T>) {}
 
-    get value() {
+    get value(): T {
         return accessData(this.internal);
     }
 
@@ -171,13 +173,13 @@ export class ComputationalBehavior<T> extends Behavior<T> {
         super(internal);
     }
 
-    get value() {
+    get value(): T {
         return accessComputation(this.internal as Computation);
     }
 }
 
 export class EventStream<Payload> {
-    constructor(private internal: Emitter<Payload>) { }
+    constructor(private internal: Emitter<Payload>) {}
 
     *[Symbol.iterator]() {
         const resoved = (yield this) as Payload;
@@ -209,9 +211,9 @@ export class EventStream<Payload> {
         const emitter = emitEvent.bind(internal as any);
         const next = scheduler(emitter);
         const disposor = {
-            current: undefined
+            current: undefined,
         } as {
-            current: Function | void
+            current: Function | void;
         };
         this.listen((payload) => {
             disposor.current = next(payload);
@@ -273,11 +275,8 @@ export {
     inject,
     provide,
     resumeScope,
+    InjectToken
 } from './core/scope';
-export type {
-    Scope,
-    Provider,
-    Factory
-} from './core/scope';
+export type { Scope, Provider, Factory } from './core/scope';
 export { runInTransaction as transaction } from './core/behavior';
 export * from './core/schedule';

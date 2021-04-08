@@ -9,15 +9,13 @@ import {
     Flag,
     setData,
     runInTransaction,
-    untrack
+    untrack,
 } from './behavior';
 
 describe('core/behavior', () => {
+    var noop = () => {};
 
-    var noop = () => { };
-
-    it('should establish a reactive relation', done => {
-
+    it('should establish a reactive relation', (done) => {
         const a = createData(0);
         const b = createData(0);
         const c = createComputation(() => accessData(a) + accessData(b));
@@ -33,7 +31,7 @@ describe('core/behavior', () => {
             result2 = d.value;
         });
         const e = createComputation(() => accessData(c) + accessData(d), {
-            static: true
+            static: true,
         });
         const watcher3 = watch(e, noop);
 
@@ -45,7 +43,7 @@ describe('core/behavior', () => {
         expect(result).toEqual(3);
         expect(result2).toEqual(3);
 
-        expect(e.value).toEqual(6)
+        expect(e.value).toEqual(6);
 
         disposeWatcher(watcher3);
         disposeWatcher(watcher);
@@ -54,7 +52,7 @@ describe('core/behavior', () => {
         done();
     });
 
-    it('cleanupComputaion do clean up', done => {
+    it('cleanupComputaion do clean up', (done) => {
         const a = createData(0);
         const b = createData(0);
         const c = createComputation(() => accessData(a) + accessData(b));
@@ -90,7 +88,6 @@ describe('core/behavior', () => {
 
         disposeWatcher(watcher);
     });
-
 
     it('cleanupComputaion do clean up for single source computation', () => {
         const a = createData(0);
@@ -147,7 +144,9 @@ describe('core/behavior', () => {
         const b = createData(0);
         const c = createComputation(() => accessData(a) + accessData(b));
 
-        const watcher = watch(c, () => { /**noop */ });
+        const watcher = watch(c, () => {
+            /**noop */
+        });
 
         runInTransaction(() => {
             setData(a, 1);
@@ -173,7 +172,9 @@ describe('core/behavior', () => {
         const b = createData(2);
         const c = createComputation(() => accessData(a) + accessData(b));
         const d = createComputation(() => accessData(a));
-        const e = createComputation(() => accessComputation(c) + accessComputation(d));
+        const e = createComputation(
+            () => accessComputation(c) + accessComputation(d)
+        );
         expect(c.flags & Flag.NotReady).toBeTruthy();
         expect(accessComputation(c)).toEqual(3);
         expect(accessComputation(d)).toEqual(1);
@@ -185,18 +186,19 @@ describe('core/behavior', () => {
         // expect(c.flags & Flag.MaybeStable).toBeTruthy();
     });
 
-
     it('2', () => {
         const a = createData(1);
         const b = createData(2);
         const c = createComputation(() => {
             if (accessData(a)) {
-                return accessData(b)
+                return accessData(b);
             }
             return 0;
         });
-        const d = createComputation(() => a.value ? accessData(a) : 0);
-        const e = createComputation(() => accessComputation(c) + accessComputation(d));
+        const d = createComputation(() => (a.value ? accessData(a) : 0));
+        const e = createComputation(
+            () => accessComputation(c) + accessComputation(d)
+        );
         const watcher = watch(e, noop);
         setData(a, 0);
         disposeWatcher(watcher);
@@ -207,54 +209,55 @@ describe('core/behavior', () => {
         const b = createData(2);
         const c = createComputation(() => {
             if (!accessData(a)) {
-                return accessData(b)
+                return accessData(b);
             }
             return 0;
         });
-        const d = createComputation(() => a.value ? 0 : accessData(a));
-        const e = createComputation(() => accessComputation(c) + accessComputation(d));
+        const d = createComputation(() => (a.value ? 0 : accessData(a)));
+        const e = createComputation(
+            () => accessComputation(c) + accessComputation(d)
+        );
         const watcher = watch(e, noop);
         setData(a, 0);
         disposeWatcher(watcher);
     });
 
-    it('2', () => {
+    it('4', () => {
         const a = createData(1);
         const b = createData(2);
         const c = createComputation(() => {
             if (!accessData(a)) {
-                return accessData(b)
+                return accessData(b);
             }
             return accessData(a);
         });
-        const d = createComputation(() => a.value ? accessData(b) : accessData(a));
-        const e = createComputation(() => accessComputation(c) + accessComputation(d));
+        const d = createComputation(() =>
+            a.value ? accessData(b) : accessData(a)
+        );
+        const e = createComputation(
+            () => accessComputation(c) + accessComputation(d)
+        );
         const watcher = watch(e, noop);
         setData(a, 0);
         setData(b, 0);
         disposeWatcher(watcher);
     });
 
+    // it('', done => {
+
+    // });
 
     // it('', done => {
 
     // });
 
-
     // it('', done => {
 
     // });
 
-
     // it('', done => {
 
     // });
-
-
-    // it('', done => {
-
-    // });
-
 
     // it('', done => {
 

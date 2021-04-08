@@ -1,4 +1,3 @@
-import { ObjectDisposedError } from '../utils';
 import { Task, TaskFunction } from './types';
 import {
     createScope,
@@ -14,6 +13,8 @@ import { callback } from './utils';
 let inside_runner = false;
 
 export const executeTask = Symbol.for('executeTask');
+
+export const DISPOSED = {};
 
 /**
  *
@@ -43,8 +44,8 @@ export function taskExecutor(
                 scope
             );
         } catch (e) {
-            if (e instanceof ObjectDisposedError) {
-            } else {
+            if (e === DISPOSED) {
+            } else { 
                 onFailure(e);
             }
             disposeScope(scope);
@@ -66,14 +67,18 @@ export function taskExecutor(
                 execute(payload, undefined);
             });
         } else if (executeTask in toHandle) {
-            currentDisposer = scopedWith(() => (toHandle as any)[executeTask](
-                (value: unknown) => {
-                    execute(value, undefined);
-                },
-                (error: unknown) => {
-                    execute(undefined, error);
-                }
-            ), scope);
+            currentDisposer = scopedWith(
+                () =>
+                    (toHandle as any)[executeTask](
+                        (value: unknown) => {
+                            execute(value, undefined);
+                        },
+                        (error: unknown) => {
+                            execute(undefined, error);
+                        }
+                    ),
+                scope
+            );
         } else {
         }
     }
@@ -82,7 +87,7 @@ export function taskExecutor(
 
     return () => {
         currentDisposer?.();
-        execute(undefined, new ObjectDisposedError());
+        execute(undefined, DISPOSED);
     };
 }
 

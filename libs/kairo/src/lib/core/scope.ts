@@ -136,10 +136,10 @@ function assertType<T>(value: unknown): value is T {
     return true;
 }
 
-function provide<T>(providers: Provider<T>): void;
-function provide<T>(factory: Factory<T>, args?: any[]): void;
-function provide<T>(provide: InjectToken<T>, value: T): void;
-function provide<T>(arg0: any, arg1?: any): void {
+function provide<T>(providers: Provider<T>): T;
+function provide<T>(factory: Factory<T>, args?: any[]): T;
+function provide<T>(provide: InjectToken<T>, value: T): T;
+function provide<T>(arg0: any, arg1?: any): any {
     const scope = resumeScope();
     if (scope.sealed) {
         throw Error('Sealed');
@@ -147,19 +147,25 @@ function provide<T>(arg0: any, arg1?: any): void {
     if (arg0 instanceof InjectToken) {
         scope.injection_bloom.add(arg0.name);
         scope.injections.set(arg0, arg1);
+        return arg1;
     } else if (typeof arg0 === 'function' && assertType<Factory<any>>(arg0)) {
         const exposed = arg1 != undefined ? arg0(...arg1) : arg0(); //TODO: PBP
         scope.injection_bloom.add(arg0.name);
         scope.injections.set(arg0, exposed);
+        return exposed;
     } else if (arg0.provide && assertType<Provider<any>>(arg0)) {
         if ('useAlias' in arg0) {
             const aliased = inject(arg0.useAlias);
 
             scope.injection_bloom.add(arg0.provide.name);
             scope.injections.set(arg0.provide, aliased);
+
+            return aliased;
         } else if ('useValue' in arg0) {
             scope.injection_bloom.add(arg0.provide.name);
             scope.injections.set(arg0.provide, arg0.useValue)
+
+            return arg0.useValue;
         } else if ('useFactory' in arg0) {
             throw Error('not implemented');
         }
