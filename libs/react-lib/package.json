@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "React integration for kairo",
   "peerDependencies": {
-    "react": "^17.0.0",
+    "react": ">=16.8.0",
     "kairo": "0.0.0"
   }
 }
