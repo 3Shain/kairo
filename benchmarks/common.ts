@@ -1,18 +1,22 @@
-import { computed, data, createScope, transaction } from '../libs/kairo/src';
+import { computed, mutable as data, createScope, transaction } from '../libs/kairo/src';
 import {
     ref,
     computed as vComputed,
     effect as vEffect
 } from '@vue/reactivity';
 import S from 's-js';
+
 import {
     createRoot,
     createSignal,
     createMemo,
     batch as sBatch,
     createComputed
-} from 'solid-js';
+}
+// @ts-ignore 
+from '../../../node_modules/solid-js/dist/solid.cjs';
 import { accessComputation, accessData, createComputation, createData, runInTransaction, setData, watch } from '../libs/kairo/src/lib/core/behavior';
+
 import { observable, computed as mbxComputed, reaction, transaction as mtrs, action } from 'mobx';
 
 

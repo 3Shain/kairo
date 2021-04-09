@@ -20,7 +20,7 @@ Three primitives, with some helper functions.
 * IoC with Dependency injection.
 * State Management.
 * All features above is avaliable **ACROSS FRAMEWORKS/LIBRARIES**.
-    > Currently react,angular and vue integrations are provided.
+    > Currently react, angular, solid and vue integrations are provided.
 
 ## Basic Idea
 
