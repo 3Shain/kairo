@@ -47,6 +47,14 @@ const enum Flag {
     LongDeps = 0x2000,
 }
 
+interface WatcherNode {
+    fn: Function;
+    prev: WatcherNode | null;
+    next: WatcherNode | null;
+    disposed: boolean;
+    data: Data;
+}
+
 interface SourceLinkNode<T> {
     prev_source: SourceLinkNode<T> | null;
     next_source: SourceLinkNode<T> | null;
@@ -65,8 +73,7 @@ interface ObserverLinkNode<T> {
 interface Data<T = any> {
     flags: Flag;
     value: T | null;
-    effect: Watcher | null;
-    effects: Watcher[] | null;
+    last_effect: WatcherNode | null;
     last_observer: ObserverLinkNode<Computation> | null;
 }
 
@@ -303,14 +310,12 @@ function propagate(computation: Data) {
         // now remove changed mark.
         computation.flags -= Flag.Changed;
 
-        if (computation.flags & Flag.HasSideEffect) {
-            // do effect
-            effects.push(computation.effect!.effectFn);
+        if (computation.last_effect) {
+            let wnode: WatcherNode | null = computation.last_effect;
 
-            if (computation.effects) {
-                for (const watcher of computation.effects) {
-                    effects.push(watcher.effectFn);
-                }
+            while (wnode !== null) {
+                effects.push(wnode.fn);
+                wnode = wnode.prev;
             }
         } else if (!hasObserver) {
             computation.flags |= Flag.Zombie;
@@ -334,61 +339,42 @@ function propagate(computation: Data) {
 }
 
 function watch(data: Data, sideEffect: Function) {
-    if (!(data.flags & Flag.HasSideEffect)) {
-        data.flags |= Flag.HasSideEffect;
-    }
     if (data.flags & Flag.Zombie) {
         data.flags -= Flag.Zombie;
     }
     if (data.flags & Flag.Data) {
-        accessData(data);
+        accessData(data); // TODO: is it necessary?
     } else {
         accessComputation(data as Computation); // because it maybe stale?
     }
-    if (data.effect) {
-        data.effects ?? (data.effects = []);
-        const watcher = {
-            effectFn: sideEffect,
-            data: data,
-            index: data.effects.length,
-            disposed: false,
-        } as Watcher;
-        data.effects.push(watcher);
-        return watcher;
-    } else {
-        data.effect = {
-            effectFn: sideEffect,
-            data: data,
-            index: -1,
-            disposed: false,
-        };
-        return data.effect;
+
+    const node: WatcherNode = {
+        fn: sideEffect,
+        prev: data.last_effect,
+        next: null,
+        disposed: false,
+        data: data,
+    };
+    if (data.last_effect) {
+        data.last_effect.next = node;
     }
+    data.last_effect = node;
+    return node;
 }
 
-function disposeWatcher(watcher: Watcher) {
+function disposeWatcher(watcher: WatcherNode) {
     if (watcher.disposed) {
         return;
     }
     watcher.disposed = true;
-    const data = watcher.data; // definitely effective
-    if (watcher.index === -1) {
-        data.effect = data.effects?.pop() ?? null;
-        if (data.effect) {
-            data.effect.index = -1;
-        } else {
-            data.flags -= Flag.HasSideEffect;
-        }
+    if (watcher.next === null) {
+        // it is the last.
+        watcher.data.last_effect = watcher.prev;
     } else {
-        const last = data.effects!.pop()!;
-        if (watcher != last) {
-            data.effects![watcher.index] = last;
-        }
-        if (data.effects!.length == 1) {
-            data.effect = data.effects![0];
-            data.effects = null;
-            data.effect.index = -1;
-        }
+        watcher.next.prev = watcher.prev;
+    }
+    if (watcher.prev) {
+        watcher.prev.next = watcher.next;
     }
 }
 
@@ -473,8 +459,7 @@ function insertNewObserver(
 function createData<T>(value: T): Data<T> {
     return {
         flags: Flag.Data | Flag.Zombie,
-        effect: null,
-        effects: null,
+        last_effect: null,
         last_observer: null,
         value,
     };
@@ -490,8 +475,7 @@ function createComputation<T>(
     const ret: Computation<T> = {
         flags:
             Flag.Computation | Flag.Zombie | Flag.MaybeStale | Flag.MaybeStable,
-        effect: null,
-        effects: null,
+        last_effect: null,
         last_observer: null,
         value: null,
         first_source: null,
