@@ -1,12 +1,11 @@
-import { callback } from "./utils";
-import { ReadableChannel, Task } from "./types";
-import { EventStream } from "../public-api";
+import { callback } from './task';
+import { ReadableChannel, Task } from './types';
+import { EventStream } from '../public-api';
 
 const END = {};
 
 class EventReader<T> implements ReadableChannel<T> {
-
-    private closed = false
+    private closed = false;
 
     private bufferQueue: any[] = [];
 
@@ -19,10 +18,7 @@ class EventReader<T> implements ReadableChannel<T> {
             this.bufferQueue.push(next);
         }
     });
-    constructor(
-        private from: EventStream<T>,
-        until: EventStream<any>
-    ) {
+    constructor(private from: EventStream<T>, until: EventStream<any>) {
         until.listenNext((next) => {
             // This listener is never unsubscribe manully?
             // potential mem leak?
@@ -46,7 +42,9 @@ class EventReader<T> implements ReadableChannel<T> {
 
     *next(): Task<T> {
         if (this.continuation) {
-            throw new Error(`There exists a Task waiting for this channel already.`);
+            throw new Error(
+                `There exists a Task waiting for this channel already.`
+            );
         }
         if (this.closed) {
             throw new Error(`Closed`); // TODO: catchable error
@@ -57,7 +55,8 @@ class EventReader<T> implements ReadableChannel<T> {
         return yield* callback((resolve, reject) => {
             const continuation = (value: T) => {
                 if (value === END) {
-                    reject(new Error(`Closed`) // TODO: catchable error
+                    reject(
+                        new Error(`Closed`) // TODO: catchable error
                     );
                     return;
                 }
@@ -67,13 +66,15 @@ class EventReader<T> implements ReadableChannel<T> {
             this.continuation = continuation;
             return () => {
                 this.continuation = null;
-            }
+            };
         });
     }
 
     *hasNext(): Task<boolean> {
         if (this.continuation) {
-            throw new Error(`There exists a Task waiting for this channel already.`);
+            throw new Error(
+                `There exists a Task waiting for this channel already.`
+            );
         }
         if (this.closed) {
             return false;
@@ -85,7 +86,7 @@ class EventReader<T> implements ReadableChannel<T> {
             const continuation = (value: unknown) => {
                 if (value === END) {
                     this.continuation = null;
-                    resolve(false)
+                    resolve(false);
                     return;
                 }
                 this.bufferQueue.push(value);
@@ -95,14 +96,14 @@ class EventReader<T> implements ReadableChannel<T> {
             this.continuation = continuation;
             return () => {
                 this.continuation = null;
-            }
+            };
         });
     }
 }
 
 export function readEvents<TF, TU>(props: {
-    from: EventStream<TF>,
-    until: EventStream<TU>
+    from: EventStream<TF>;
+    until: EventStream<TU>;
 }): ReadableChannel<TF> {
     return new EventReader(props.from, props.until);
     // TODO: auto dispose

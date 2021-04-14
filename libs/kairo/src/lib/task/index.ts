@@ -1,9 +1,11 @@
-export { Semaphore } from './semaphore';
+export { readEvents } from './channel';
 export {
-    readEvents
-} from './channel';
-export {
-    task
+    task,
+    switchedTask,
+    lockedTask,
+    callback,
+    DISPOSED,
+    Semaphore,
 } from './task';
 export * from './types';
 export * from './utils';

@@ -4,7 +4,6 @@ import {
     inject,
     onUnmounted,
     provide,
-    Ref,
     ref,
     renderSlot,
     SetupContext,
@@ -13,53 +12,16 @@ import {
 } from 'vue';
 import {
     Behavior,
-    ComputationalBehavior,
     createScope,
     disposeScope,
     mutable,
+    registerDisposer,
+    __cleanupRenderEffect,
+    __createRenderEffect,
+    __executeRenderEffect,
 } from 'kairo';
+import { track, TrackOpTypes, triggerRef } from '@vue/reactivity';
 import { SCOPE } from './context';
-
-/**
- * side effects
- * patches prototype of Behavior
- */
-const originalGetter = Object.getOwnPropertyDescriptor(
-    Behavior.prototype,
-    'value'
-).get;
-
-Object.defineProperty(Behavior.prototype, 'value', {
-    get(this: Behavior & { ref?: Ref<any> }) {
-        if (VUE_RENDERING) {
-            if (!this.ref) {
-                this.ref = ref(this['internal'].value);
-                this.watch((current) => {
-                    this.ref.value = current;
-                });
-            }
-            this.ref.value; // trigger vue read.
-        }
-        return originalGetter.call(this);
-    },
-});
-
-Object.defineProperty(ComputationalBehavior.prototype, 'value', {
-    get(this: Behavior & { ref?: Ref<any> }) {
-        if (VUE_RENDERING) {
-            if (!this.ref) {
-                this.ref = ref(this['internal'].value);
-                this.watch((current) => {
-                    this.ref.value = current;
-                });
-            }
-            this.ref.value; // trigger vue read.
-        }
-        return originalGetter.call(this);
-    },
-});
-
-let VUE_RENDERING = false;
 
 export function withKairo<Props>(
     setup: (
@@ -73,12 +35,11 @@ export function withKairo<Props>(
 ) {
     return defineComponent<Props>(function (props, ctx) {
         const { scope, exposed } = createScope(() => {
-            const renderFn = setup.call(
-                void 0,
+            const renderFn = setup(
                 {
                     ...props,
                 },
-                (thunk: (_: Props) => unknown) => {
+                (thunk: (_: Props) => any) => {
                     const [prop, setProp] = mutable(thunk(props));
                     watch(
                         () => thunk(props),
@@ -90,16 +51,23 @@ export function withKairo<Props>(
                 },
                 ctx
             );
+            let trigger = ref(0);
+            const renderEffect = __createRenderEffect(() => {
+                triggerRef(trigger);
+            });
+            registerDisposer(() => {
+                __cleanupRenderEffect(renderEffect);
+            });
             return function (this: ComponentPublicInstance) {
-                VUE_RENDERING = true;
                 const _this = this;
-                const vnodes = (renderFn as Function).call(this, {
-                    get children() {
-                        return renderSlot(_this.$slots, 'default');
-                    },
-                });
-                VUE_RENDERING = false;
-                return vnodes;
+                track(trigger, 'get' as TrackOpTypes, 'value');
+                return __executeRenderEffect(renderEffect, () =>
+                    renderFn.call(this, {
+                        get children() {
+                            return renderSlot(_this.$slots, 'default');
+                        },
+                    })
+                );
             };
         }, inject(SCOPE, undefined));
 

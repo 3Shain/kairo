@@ -77,9 +77,10 @@ function emitEvent<T>(this: Emitter<T>, payload: T): void {
     this.nextSubscribers = [];
     while (nextSubs.length) {
         const sub = nextSubs.pop()!;
-        sub.next(payload);
         sub.closed = true;
+        sub.next(payload);
     }
+    return;
 }
 
 export {

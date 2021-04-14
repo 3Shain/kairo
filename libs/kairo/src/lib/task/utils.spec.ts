@@ -1,21 +1,18 @@
 import { any, all, allSettled, race, delay } from './utils';
-import { taskExecutor } from './task';
+import { task, taskExecutor } from './task';
 
 describe('task/utils', () => {
-    function runTask() {}
-
     it('race should return the first settled task: when success', (done) => {
         taskExecutor(
             (function* () {
                 return yield* race([
                     delay(100),
-                    (function* () {
+                    task(function* () {
                         yield* delay(150);
                         throw Error();
                     })(),
                 ]);
             })(),
-            null,
             (success) => {
                 done();
             },
@@ -30,13 +27,12 @@ describe('task/utils', () => {
             (function* () {
                 return yield* race([
                     delay(100),
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         throw Error();
                     })(),
                 ]);
             })(),
-            null,
             (success) => {
                 // done(success);
             },
@@ -50,21 +46,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* any([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         return 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         return 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         throw Error();
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {
                 expect(success).toBe(1);
                 done();
@@ -79,21 +74,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* any([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         throw Error();
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         throw Error();
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         throw Error();
                     })(),
                 ]);
             })(),
-            null,
             (success) => {},
             (error) => {
                 done();
@@ -105,21 +99,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* all([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         return 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         return 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         return 3;
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {
                 expect(success).toStrictEqual([1, 2, 3]);
                 done();
@@ -134,21 +127,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* all([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         return 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         return 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         throw Error();
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {},
             (error) => {
                 done();
@@ -160,21 +152,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* allSettled([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         return 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         return 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         return 3;
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {
                 expect(success).toStrictEqual([
                     {
@@ -202,21 +193,20 @@ describe('task/utils', () => {
         taskExecutor(
             (function* () {
                 return yield* allSettled([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         return 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         return 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         throw 3;
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {
                 expect(success).toStrictEqual([
                     {
@@ -241,26 +231,26 @@ describe('task/utils', () => {
     });
 
     it('allSettled should fail when all task fail', (done) => {
+
         taskExecutor(
             (function* () {
                 return yield* allSettled([
-                    (function* () {
+                    task(function* () {
                         yield* delay(50);
                         throw 1;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(100);
                         throw 2;
                     })(),
-                    (function* () {
+                    task(function* () {
                         yield* delay(20);
                         throw 3;
                     })(),
                 ]);
             })(),
-            null,
             (success: number) => {
-               done(success);
+                done(success);
             },
             (error) => {
                 done();

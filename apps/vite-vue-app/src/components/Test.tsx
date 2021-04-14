@@ -30,6 +30,7 @@ const Component = withKairo<{
         [mouseleave, onmouseleave] = stream<MouseEvent>();
 
     position.changes(animation).listen(([x, y]) => {
+        // console.log(ref);
         if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
     });
 

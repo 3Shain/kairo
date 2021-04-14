@@ -3,6 +3,7 @@
     <!-- <HelloWorld msg="Welcome to Your Vue.js + TypeScript App" /> -->
     <CC :test="counter">
       <HelloWorld msg="Welcome to Your Vue.js + TypeScript App" :count="counter" />
+      <!-- <p v-if="counter%2==0">show</p> -->
     </CC>
   </div>
 </template>

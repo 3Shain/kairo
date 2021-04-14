@@ -1,51 +1,42 @@
-import { Task, TaskFunction } from './types';
 import {
     createScope,
     disposeScope,
+    getCurrentScope,
     registerDisposer,
-    resumeScope,
-    Scope,
     scopedWith,
+    unscoped,
 } from '../core/scope';
 import { action, EventStream } from '../public-api';
-import { callback } from './utils';
-
-let inside_runner = false;
+import { TeardownLogic } from '../types';
+import { noop } from '../utils';
+import { nextTick } from '../utils/next-tick';
+import { Task } from './types';
 
 export const executeTask = Symbol.for('executeTask');
 
 export const DISPOSED = {};
 
-/**
- *
- *
- * Dispose is always an idempotent action
- * dispose should not raise error!
- */
-
 export function taskExecutor(
     gen: Generator,
-    parentScope: Scope,
     onSuccess: Function,
     onFailure: Function
 ) {
     let currentDisposer: Function | null = null;
-    let { scope } = createScope(() => {
-        // noop
-    }); // TODO: Parent might be not sealed?
+    let { scope } = createScope(() => {});
+
+    let iter = gen[Symbol.iterator]();
 
     function execute(resumed: unknown, error: unknown) {
         let performed: IteratorResult<unknown>;
         try {
-            /** there should be task context: to create a new zone which has inner event  */
             performed = scopedWith(
-                // TODO: as well as transaction!
-                () => (error ? gen.throw(error) : gen.next(resumed)),
+                action(() => (error ? iter.throw(error) : iter.next(resumed))),
                 scope
             );
         } catch (e) {
             if (e === DISPOSED) {
-            } else { 
+                // user doesn't handle this.
+            } else {
                 onFailure(e);
             }
             disposeScope(scope);
@@ -58,10 +49,13 @@ export function taskExecutor(
             return;
         }
         const toHandle = performed.value;
-        if (typeof toHandle !== 'object') {
-            execute(undefined, Error('You should yield an object.'));
-        } else if (toHandle === null) {
-            execute(undefined, Error('null is yielded.'));
+        if (typeof toHandle !== 'object' || toHandle === null) {
+            execute(
+                undefined,
+                new Error(
+                    'Invalid object yielded. Are you missing an asterisk(*) after `yield`?'
+                )
+            );
         } else if (toHandle instanceof EventStream) {
             currentDisposer = toHandle.listenNext((payload) => {
                 execute(payload, undefined);
@@ -80,64 +74,208 @@ export function taskExecutor(
                 scope
             );
         } else {
+            execute(
+                undefined,
+                new Error(
+                    'Invalid object yielded. Are you missing an asterisk(*) after `yield`?'
+                )
+            );
         }
     }
 
     execute(undefined, undefined);
 
     return () => {
-        currentDisposer?.();
         execute(undefined, DISPOSED);
+        currentDisposer?.();
     };
 }
 
 export function task<TaskFn extends (...args: any[]) => Generator>(
-    tasnFn: TaskFn
+    taskFn: TaskFn
 ): (...params: Parameters<TaskFn>) => ReturnType<TaskFn> {
-    // get current disposor?
-    const scope = resumeScope();
+    const inScope = getCurrentScope();
     const fn = function (...args: unknown[]) {
-        if (inside_runner) {
-            // if inside a taskrunner? just return the wrapped task.
-            // (but it's ok if raise a new runner ahaha)
-            return tasnFn(...args);
-        }
-        // otherwise, initiate a new task runner and 'fire&forget'
         let initialized = false;
-        let cancelDisposor: () => void;
+        let cancelDisposer: (() => void) | undefined;
+        let resolveHandler: ((v: any) => void) | undefined;
+        let rejectHandler: ((v: any) => void) | undefined;
+        let settled = false;
         const disposor = taskExecutor(
-            tasnFn(...args),
-            scope,
-            () => {
-                // cleanup the disposor
-                // it is a valid action (before scope is disposed)
+            taskFn(...args),
+            (v: any) => {
                 if (initialized) {
-                    cancelDisposor(); //
+                    cancelDisposer?.();
                 } else {
                     initialized = true;
                 }
+                resolveHandler?.(v);
+                settled = true;
             },
             (e: any) => {
-                const errorOutput = new Error(`Uncaught (in task) ${e}`);
-                errorOutput.stack = e?.stack;
-                console.error(errorOutput);
                 // TODO: try finally? make sure disposor is canceled?
                 if (initialized) {
-                    // cancelDisposor();
+                    cancelDisposer?.();
                 } else {
                     initialized = true;
+                }
+                settled = true;
+                if (rejectHandler) {
+                    rejectHandler(e);
+                } else {
+                    console.error(`Uncaught (in task)`, e);
                 }
             }
         );
         // register disposor?
         if (!initialized) {
-            cancelDisposor = scopedWith(
-                () => registerDisposer(disposor),
-                scope
-            );
+            if (inScope) {
+                cancelDisposer = scopedWith(
+                    () => registerDisposer(disposor),
+                    inScope
+                );
+            }
             initialized = true;
         }
-    }; // make sure this is inside an action.
+        return callback<any>(function (resolve: Function, reject: Function) {
+            if (settled) {
+                throw Error('not avaliable');
+            } else {
+                resolveHandler = resolve as any;
+                rejectHandler = reject as any;
+            }
+            return disposor;
+        }) as ReturnType<TaskFn>;
+    };
 
-    return action(fn.bind(fn as any) as any);
+    return action(fn);
+}
+
+export function lockedTask<TaskFn extends (...args: any[]) => Generator>(
+    taskFn: TaskFn,
+    options?: {
+        maxConcurrency?: number;
+        throwThanWait?: boolean;
+    }
+) {
+    const semaphore = new Semaphore(options?.maxConcurrency ?? 1);
+    return task(function* () {
+        if (!semaphore.free()) {
+            if (options?.throwThanWait) {
+                throw Error('Task is unaccessable.');
+            }
+        }
+        yield* semaphore.waitOne();
+        const ret = yield* taskFn();
+        semaphore.release();
+        return ret;
+    });
+}
+
+export function switchedTask<TaskFn extends (...args: any[]) => Generator>(
+    taskFn: TaskFn,
+    options?: {
+        maxConcurrency: number;
+    }
+): (...params: Parameters<TaskFn>) => ReturnType<TaskFn> {
+    const maxConcurrency = options?.maxConcurrency ?? 1;
+
+    const disposeQueue: Function[] = [];
+
+    const startTask = task(taskFn);
+
+    return (...args) => {
+        if (disposeQueue.length >= maxConcurrency) {
+            disposeQueue.shift()!();
+        }
+        const ret = startTask(...args);
+        disposeQueue.push(
+            ret
+                .next()
+                .value[executeTask](noop, (e: unknown) =>
+                    console.error(`Uncaught (in task)`, e)
+                )
+        ); // TODO: should remove from queue to avoid mem leak?
+        return ret;
+    };
+}
+
+export function* callback<T>(
+    executor: (
+        resolve: (value: T) => void,
+        reject: (reason: any) => void
+    ) => TeardownLogic | void
+): Task<T> {
+    return yield {
+        [executeTask](resolve: any, reject: any) {
+            let settled = false;
+            let syncFlag = true;
+            const dispose = executor(
+                (v) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    if (syncFlag) {
+                        nextTick(() => resolve(v)); // TODO: scheduler?
+                    } else {
+                        resolve(v);
+                    }
+                },
+                (v) => {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    if (syncFlag) {
+                        nextTick(() => reject(v)); //
+                    } else {
+                        reject(v);
+                    }
+                }
+            );
+            syncFlag = false;
+            return () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                if (typeof dispose === 'function') {
+                    dispose();
+                }
+            };
+        },
+    };
+}
+
+export class Semaphore {
+    private currentNum = 0;
+    private queue: Function[] = [];
+
+    constructor(private maxConcurrency: number) {}
+
+    free() {
+        return this.currentNum < this.maxConcurrency;
+    }
+
+    *waitOne(): Task<void> {
+        if (this.currentNum >= this.maxConcurrency) {
+            yield* callback((resolve) => {
+                this.queue.push(resolve as any);
+                return () => this.queue.splice(this.queue.indexOf(resolve), 1); // resolve definitely exist.
+            });
+            // a free space is gurantted.
+        }
+        this.currentNum++;
+        return;
+    }
+
+    // this is an action
+    release() {
+        this.currentNum--;
+        // trigger?
+        if (this.queue.length) {
+            this.queue.shift()!();
+        }
+    }
 }

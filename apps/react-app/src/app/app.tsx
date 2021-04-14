@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { KairoApp, useInject, withKairo } from '@kairo/react';
-import { stream, provide } from 'kairo';
+import { stream, provide, inject, InjectToken, Behavior } from 'kairo';
+import AC from './joystick';
 
 interface Props {
     uid: number;
@@ -19,15 +20,33 @@ const TestComponent = withKairo<Props>((_, useProp) => {
     const uid = useProp((x) => x.uid);
     const { plus, count } = provide(Counter);
 
+    provide(testtoken, uid);
+    // uid.watch(console.log);
+
     return ({ children }) => (
         <div>
             <button onClick={() => plus(-1)}>minus</button>
             <span>{count.value}</span>
             <button onClick={() => plus(1)}>plus</button>
             <span>{uid.value}</span>
+            <FukcingComponent />
+            <AC />
             {children}
         </div>
     );
+});
+
+const testtoken = new InjectToken<Behavior<number>>('test');
+
+const FukcingComponent = withKairo<{}>((_, useProp) => {
+    // const uid = useProp((x) => x.uid);
+    // const { plus, count } = provide(Counter);
+    const { count } = inject(Counter);
+
+    const uidd = inject(testtoken);
+    // uid.watch(console.log);
+
+    return ({ children }) => <p>{` ${uidd.value}`}</p>;
 });
 
 const NormalComponent: React.FC<{}> = () => {
@@ -40,11 +59,12 @@ export function App() {
     const [state, setstate] = useState(0);
     return (
         <>
-            <KairoApp globalSetup={() => {}}></KairoApp>
-            <TestComponent uid={state}>
-                <NormalComponent />
-            </TestComponent>
-            <button onClick={() => setstate(state + 1)}>set uid</button>
+            <KairoApp globalSetup={() => {}}>
+                <TestComponent uid={state}>
+                    {/* <NormalComponent /> */}
+                </TestComponent>
+                <button onClick={() => setstate(state + 1)}>set uid</button>
+            </KairoApp>
         </>
     );
 }

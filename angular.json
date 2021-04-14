@@ -235,6 +235,13 @@
             "cwd": "apps/react-app"
           }
         },
+        "build": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "npx vite build",
+            "cwd": "apps/react-app"
+          }
+        },
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
@@ -492,6 +499,13 @@
           "builder": "@nrwl/linter:eslint",
           "options": {
             "lintFilePatterns": ["apps/solid-app/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "build": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "npx vite build",
+            "cwd": "apps/vite-vue-app"
           }
         },
         "serve": {

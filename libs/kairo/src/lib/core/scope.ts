@@ -1,12 +1,14 @@
-import { Behavior, ExtractBehaviorProperty } from '../public-api';
 import { BloomFilter } from '../utils/bloom-filter';
 
+interface DisposeNode {
+    prev: DisposeNode | null;
+    next: DisposeNode | null;
+    disposeFn: () => void;
+    settled: boolean;
+}
+
 interface Scope {
-    disposers: {
-        index: number;
-        disposeFn: () => void;
-        cancelled: boolean;
-    }[];
+    last_disposer: DisposeNode | null;
     sealed: boolean;
     parent: Scope | null;
     root: Scope | null;
@@ -24,7 +26,7 @@ function createScope<T>(
         throw Error('Parent scope is not sealed.');
     }
     const scope: Scope = {
-        disposers: [],
+        last_disposer: null,
         sealed: false,
         parent: parentScope,
         root: rootScope ?? parentScope?.root ?? null,
@@ -37,7 +39,7 @@ function createScope<T>(
         disposed: false,
     };
     const exposed = scopedWith(fn, scope);
-    scope.sealed = true; // WTF
+    scope.sealed = true;
     return {
         scope,
         exposed,
@@ -50,24 +52,30 @@ function runIfScopeExist(fn: () => void) {
     }
 }
 
-// TODO: potential bug: FILO dispose
 function registerDisposer(disposer: () => void) {
     const scope = resumeScope();
-    const disposeObj = {
-        index: scope.disposers.length,
+    if (scope.disposed) {
+        throw Error('Scope has been disposed.');
+    }
+    const disposeObj: DisposeNode = {
+        prev: scope.last_disposer,
+        next: null,
         disposeFn: disposer,
-        cancelled: false,
+        settled: false,
     };
-    scope.disposers.push(disposeObj);
+    scope.last_disposer = disposeObj;
     return () => {
-        if (disposeObj.cancelled) {
+        if (disposeObj.settled) {
             return;
         }
-        disposeObj.cancelled = true;
-        const popped = scope.disposers.pop()!;
-        if (popped !== disposeObj) {
-            scope.disposers[disposeObj.index] = popped;
-            popped.index = disposeObj.index;
+        disposeObj.settled = true;
+        if (disposeObj.prev) {
+            disposeObj.prev.next = disposeObj.next;
+        }
+        if (disposeObj.next) {
+            disposeObj.next.prev = disposeObj.prev;
+        } else {
+            scope.last_disposer = disposeObj.prev;
         }
     };
 }
@@ -81,14 +89,19 @@ function resumeScope() {
     return currentScope;
 }
 
+function getCurrentScope() {
+    return currentScope;
+}
+
 function disposeScope(scope: Scope) {
     if (scope.disposed) {
         return;
     }
-    while (scope.disposers.length) {
-        const popped = scope.disposers.pop()!;
-        popped.cancelled = true;
-        popped.disposeFn();
+    let currentDisposer = scope.last_disposer;
+    while (currentDisposer !== null) {
+        currentDisposer.disposeFn();
+        currentDisposer.settled = true;
+        currentDisposer = currentDisposer.prev;
     }
     scope.injections.clear();
     scope.root = null;
@@ -99,16 +112,31 @@ function disposeScope(scope: Scope) {
 function unscoped<T>(fn: () => T) {
     const stored = currentScope;
     currentScope = null;
-    const ret = fn();
-    currentScope = stored;
+    let ret;
+    try {
+        ret = fn();
+    } catch (e) {
+        throw e;
+    } finally {
+        currentScope = stored;
+    }
     return ret;
 }
 
 function scopedWith<T>(fn: () => T, scope: Scope) {
+    if (scope.disposed) {
+        throw Error('Scope has been disposed');
+    }
     const stored = currentScope;
     currentScope = scope;
-    const ret = fn();
-    currentScope = stored;
+    let ret;
+    try {
+        ret = fn();
+    } catch (e) {
+        throw e;
+    } finally {
+        currentScope = stored;
+    }
     return ret;
 }
 
@@ -243,5 +271,6 @@ export {
     provide,
     InjectToken,
     runIfScopeExist,
+    getCurrentScope,
 };
 export type { Scope, Provider, Factory };

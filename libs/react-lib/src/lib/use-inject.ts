@@ -40,50 +40,48 @@ export function useInject(
     token: any,
     options: any
 ): ExtractBehaviorProperty<any> {
-    const expose = useRef({});
-    const currentScope = useRef<Scope>();
+    runIfScopeExist(() => {
+        throw Error('Use `inject` instead of `useInject` if inside a scope.');
+    });
     const parentScope = useContext(KairoContext);
-    const [tick, setTick] = useState(0);
-    const currentTick = useRef(0);
-    currentTick.current = tick;
-    if (currentScope.current === undefined) {
-        runIfScopeExist(() => {
-            throw Error('Use `inject` instead of `useInject` if inside a scope.');
-        });
+    const [expose, setExpose] = useState(undefined);
+
+    useEffect(() => {
+        if(parentScope.disposed){
+            return;
+        }
         const { scope } = createScope(() => {
+            let expose = {};
             const resolve = inject(token, options);
             if (typeof resolve !== 'object' || resolve === null) {
-                expose.current = resolve;
+                expose = resolve;
                 return;
             }
             if (isBehavior(resolve)) {
-                expose.current = resolve.value;
+                expose = resolve.value;
                 resolve.watch((updated) => {
-                    expose.current = updated;
-                    setTick(currentTick.current + 1);
+                    expose = updated;
+                    setExpose(expose);
                 });
                 return;
             }
             for (const [key, value] of Object.entries(resolve)) {
                 if (typeof value === 'function') {
-                    expose.current[key] = action(value);
+                    expose[key] = action(value);
                 } else if (isBehavior(value)) {
-                    expose.current[key] = value.value;
+                    expose[key] = value.value;
                     value.watch((updated) => {
-                        expose.current[key] = updated;
-                        setTick(currentTick.current + 1); // it might be invoked multiple time in a transaction, react should handle this.
+                        expose[key] = updated;
+                        setExpose(expose);
                     });
                 } else {
-                    expose.current[key] = value;
+                    expose[key] = value;
                 }
             }
+            setExpose(expose);
         }, parentScope);
-        currentScope.current = scope;
-    }
+        return () => disposeScope(scope);
+    }, [parentScope]);
 
-    useEffect(() => {
-        return () => disposeScope(currentScope.current);
-    }, []);
-
-    return expose.current;
+    return expose;
 }

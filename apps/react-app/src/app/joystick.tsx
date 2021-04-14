@@ -1,92 +1,41 @@
-import { Component, getListener, getOwner } from 'solid-js';
+import { withKairo } from '@kairo/react';
 import {
     animation,
-    mutable as data,
+    delay,
     merge,
+    mutable,
     nextFrame,
     readEvents,
     stream,
     task,
-    InjectToken,
-    Behavior,
-    provide,
-    inject,
-    delay,
-    mutable,
 } from 'kairo';
-import { useInject, withKairo } from '@kairo/solid';
-import './App.css';
+import React from 'react';
+import './app.css';
 
-const App: Component = () => {
-    return (
-        <TestComponent>
-            <p>children elements</p>
-        </TestComponent>
-    );
-};
-
-const TEST_TOKEN = new InjectToken<{
-    value: Behavior<number>;
-    check: Function;
-}>('test');
-
-const AChildComponent = withKairo((props, useProp) => {
-    const injected = inject(TEST_TOKEN);
-    provide(TEST_TOKEN, null);
-    return () => (
-        <>
-            {injected !== null ? (
-                <p>
-                    <AChildComponent />
-                    {injected.value.value}
-                </p>
-            ) : (
-                <h1>1</h1>
-            )}
-        </>
-    );
-});
-
-// const TestComponent = withKairo(() => {
-//     const [data, setdata] = mutable(0);
-
-//     return () => (
-//         <button onclick={() => setdata(data.value + 1)}>{data.value}</button>
-//     );
-// });
-
-const TestComponent: Component = withKairo(() => {
-    const [position, setPosition] = data([0, 0]);
-
-    const d = position.map((x) => x[0]);
-
-    provide(TEST_TOKEN, {
-        value: d,
-        check: () => {},
-    });
+const TestComponent = withKairo(() => {
+    const [position, setPosition] = mutable([0, 0]);
 
     let ref: HTMLDivElement | null = null;
 
-    const [mouseup, onmouseup] = stream<MouseEvent>(),
-        [mousemove, onmousemove] = stream<MouseEvent>(),
-        [mouseleave, onmouseleave] = stream<MouseEvent>();
+    const [mouseup, onmouseup] = stream<{ clientX: number; clientY: number }>(),
+        [mousemove, onmousemove] = stream<{
+            clientX: number;
+            clientY: number;
+        }>(),
+        [mouseleave, onmouseleave] = stream<{
+            clientX: number;
+            clientY: number;
+        }>();
 
     position.changes(animation).listen(([x, y]) => {
         if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
     });
 
-    const testTask = task(function* () {
-        return yield* delay(1000);
-    });
-
     const scmousemove = mousemove.schedule(animation);
 
-    console.log(getListener());
-
-    const dnd = task(function* (e: MouseEvent) {
+    const dnd = task(function* (e: { clientX: number; clientY: number }) {
         let [x, y] = position.value;
         let lastMv = e;
-        // yield* testTask();
         const channel = readEvents({
             from: scmousemove,
             until: merge([mouseup, mouseleave]),
@@ -108,28 +57,29 @@ const TestComponent: Component = withKairo(() => {
         }
     });
 
+    const setref = (_ref: any) => {
+        ref = _ref;
+    };
+
     return () => (
         <div>
-            <AChildComponent></AChildComponent>
             <p>{`x:${position.value[0]},y:${position.value[1]}`}</p>
-            <div class="box">
+            <div className="box">
                 <div
-                    class="stick"
-                    onMouseUp={onmouseup}
-                    onMouseDown={dnd}
-                    onMouseMove={onmousemove}
+                    className="stick"
+                    onMouseUpCapture={onmouseup}
+                    onMouseDownCapture={dnd}
+                    onMouseMoveCapture={onmousemove}
                     onMouseLeave={onmouseleave}
-                    ref={(v) => {
-                        ref = v as any;
-                    }}
+                    ref={setref}
                 ></div>
-                <div class="bg"></div>
+                <div className="bg"></div>
             </div>
         </div>
     );
 });
 
-export default App;
+export default TestComponent;
 
 function interpolate2d(x: number, y: number, step: number) {
     step = EasingFunctions.easeInCubic(step);

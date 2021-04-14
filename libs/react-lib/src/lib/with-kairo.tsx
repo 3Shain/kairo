@@ -1,44 +1,49 @@
 import {
-    computed,
     createScope,
     disposeScope,
-    Scope,
     transaction,
     mutable as data,
     Behavior,
+    __executeRenderEffect,
+    __createRenderEffect,
+    __cleanupRenderEffect,
+    registerDisposer,
 } from 'kairo';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import type { PropsWithChildren, ReactElement } from 'react';
 import { KairoContext } from './context';
-
-// context required.
-export function bound(fn: Function) {
-    return () => transaction(fn as any);
-}
 
 export const KairoApp: React.FunctionComponent<{
     globalSetup: () => void;
 }> = (props) => {
-    const kContext = useRef<Scope | null>(null);
-    if (kContext.current === null) {
-        // it's the first rendering
+    const [kairoContext, setKairoContext] = useState<
+        [
+            ReturnType<typeof createScope>,
+            ReturnType<typeof __createRenderEffect>
+        ]
+    >(null);
+
+    const [] = useState(null);
+
+    useEffect(() => {
         const { scope } = createScope(() => {
             props.globalSetup(); // TODO: setup props...
         });
-        kContext.current = scope;
-    }
-
-    useEffect(() => {
+        setKairoContext([{ scope } as any, undefined]);
         return () => {
-            disposeScope(kContext.current!);
+            setKairoContext(null);
+            disposeScope(scope);
         };
     }, []);
 
-    return (
-        <KairoContext.Provider value={kContext.current}>
-            {props.children}
-        </KairoContext.Provider>
-    );
+    if (kairoContext) {
+        return (
+            <KairoContext.Provider value={kairoContext[0].scope}>
+                {props.children}
+            </KairoContext.Provider>
+        );
+    }
+    return null;
 };
 
 export function __unstable__runHooks<Props = any>(fn: (prop: Props) => void) {
@@ -52,72 +57,89 @@ export function __unstable__runHooks<Props = any>(fn: (prop: Props) => void) {
 
 let currentHooksCollector: Function[] | null = null;
 
-export function withKairo<Props, c = any>(
+export function withKairo<Props>(
     setup: (
         props: Props,
         useProp: <P>(selector: (x: Props) => P) => Behavior<P>
     ) => React.FC<{}>
 ): React.FC<Props> {
-    return (props: PropsWithChildren<Props>) => {
+    return React.memo(function KairoComponent(props: PropsWithChildren<Props>) {
         const [_, setTick] = useState(0);
-        const kContext = useRef<Scope>();
-        const currentRendered = useRef<ReactElement>();
-        const currentTick = useRef<number>(0);
-        const hooks = useRef<Function[]>([]);
+        const parentScope = useContext(KairoContext);
+        const [kairoContext, setKairo] = useState<
+            [
+                ReturnType<typeof createScope>,
+                ReturnType<typeof __createRenderEffect>,
+                Function[]
+            ]
+        >(null);
+        const currentTick = useRef(0);
 
-        if (kContext.current === undefined) {
-            // it's the first rendering
-            const { scope } = createScope(() => {
-                const [children, setChildren] = data(props.children);
-                currentHooksCollector = hooks.current;
+        useEffect(() => {
+            if (parentScope.disposed) {
+                return;
+            }
+            const _effect = __createRenderEffect(() => {
+                setTick(currentTick.current);
+            });
+            currentHooksCollector = [];
+            const _context = createScope(() => {
+                let propsHook = [];
                 const renderFn = setup(props, (selector) => {
                     const [beh, set] = data(selector(props));
-                    currentHooksCollector.push((currentProps: Props) => {
-                        set(selector(currentProps));
-                    });
+                    propsHook.push((p) => set(selector(p)));
                     return beh;
                 });
-                currentHooksCollector = null;
-                hooks.current.push(function ({ children }) {
-                    setChildren(children);
+                currentHooksCollector.push((currentProps: Props) => {
+                    useEffect(() => {
+                        transaction(() => {
+                            propsHook.forEach((x) => x(currentProps));
+                        });
+                    });
                 });
-                const rendered = computed(() =>
-                    renderFn({ children: children.value })
-                );
-                rendered.watch((elements) => {
-                    currentRendered.current = elements;
-                    if (currentTick.current > 0) {
-                        setTick(currentTick.current);
-                    }
+                registerDisposer(() => {
+                    __cleanupRenderEffect(_effect);
                 });
-                currentRendered.current = rendered.value;
-            });
-            kContext.current = scope;
-        } else {
-            const tmp = currentTick.current;
-            currentTick.current = 0;
-            transaction(() => {
-                // update by hooks is combined to be a transaction
-                for (const hook of hooks.current) {
-                    hook(props);
-                }
-            }); // i'm not sure if this is effective but
-            currentTick.current = tmp;
-        }
+                return renderFn;
+            }, parentScope);
+            const hooks = currentHooksCollector;
+            currentHooksCollector = null;
+            setKairo([_context, _effect, hooks]);
+            return () => {
+                disposeScope(_context.scope);
+            };
+        }, [parentScope]);
 
         currentTick.current++;
 
-        useEffect(() => {
-            return () => {
-                disposeScope(kContext.current!);
-                hooks.current = null;
-            };
-        }, []);
+        if (kairoContext) {
+            const [context, effect, hooks] = kairoContext;
+            return (
+                <KairoContext.Provider value={context.scope}>
+                    <KairoRender
+                        fcs={hooks}
+                        rprops={props}
+                        effect={effect}
+                        exposed={context.exposed}
+                    />
+                </KairoContext.Provider>
+            );
+        } else {
+            return null;
+        }
+    });
+}
 
-        return (
-            <KairoContext.Provider value={kContext.current!}>
-                {currentRendered.current}
-            </KairoContext.Provider>
-        );
-    };
+function KairoRender(props: {
+    fcs: Function[];
+    rprops: any;
+    effect: any;
+    exposed: any;
+}) {
+    for (const fc of props.fcs) {
+        fc(props.rprops); // they are real hooks and should not 'invoke state?'
+    }
+    return (
+        <>{__executeRenderEffect(props.effect, props.exposed, props.rprops)}</>
+    );
 }

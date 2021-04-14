@@ -95,7 +95,7 @@ export function action<Fn extends (...args: any[]) => any>(
     return ret;
 }
 
-type K<T> = {
+type ExtractEventStream<T> = {
     [P in keyof T]: T[P] extends EventStream<infer C> ? C : unknown;
 };
 
@@ -103,13 +103,21 @@ type Union<T extends any[]> = T[number];
 
 export function merge<A extends EventStream<any>[]>(
     array: A
-): EventStream<Union<K<A>>> {
-    const internal = createStream<Union<K<A>>>();
+): EventStream<Union<ExtractEventStream<A>>> {
+    const internal = createStream<Union<ExtractEventStream<A>>>();
     const emitter = emitEvent.bind(internal as any);
     for (const event of array) {
         event.listen(emitter);
     }
     return new EventStream(internal);
+}
+
+export function constant<T>(value: T) {
+    return new Behavior(createData(value));
+}
+
+export function never() {
+    return new EventStream(createStream<never>());
 }
 
 export class Behavior<T = any> {
@@ -154,15 +162,18 @@ export class Behavior<T = any> {
         return new EventStream(internal).schedule(scheduler);
     }
 
-    watch(watchFn: (value: T) => void): TeardownLogic {
+    watch(watchFn: (value: T) => TeardownLogic | void): TeardownLogic {
+        let lastDisposer: TeardownLogic | void = undefined;
         const watcher = watch(this.internal, () => {
-            watchFn(this.internal.value!);
+            if (typeof lastDisposer === 'function') {
+                lastDisposer();
+            }
+            lastDisposer = watchFn(this.internal.value!);
         });
-        // if inside a scope
         runIfScopeExist(() => {
-            registerDisposer(() => disposeWatcher(watcher));
+            registerDisposer(() => disposeWatcher(watcher!));
         });
-        return () => disposeWatcher(watcher);
+        return () => disposeWatcher(watcher!);
     }
 
     pipe() {
@@ -277,8 +288,15 @@ export {
     inject,
     provide,
     resumeScope,
+    registerDisposer,
     InjectToken,
 } from './core/scope';
 export type { Scope, Provider, Factory } from './core/scope';
-export { runInTransaction as transaction } from './core/behavior';
+export {
+    runInTransaction as transaction,
+    __current_collecting,
+    createRenderEffect as __createRenderEffect,
+    executeRenderEffect as __executeRenderEffect,
+    cleanupRenderEffect as __cleanupRenderEffect
+} from './core/behavior';
 export * from './core/schedule';

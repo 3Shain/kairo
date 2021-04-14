@@ -1,4 +1,4 @@
 import { Scope } from "kairo";
-import React from "react";
+import React, { MutableRefObject } from "react";
 
 export const KairoContext = React.createContext<Scope>(null);

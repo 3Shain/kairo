@@ -6,6 +6,8 @@ import {
     useContext,
     createSignal,
     createComputed,
+    runWithOwner,
+    getOwner,
 } from 'solid-js';
 import {
     Behavior,
@@ -13,6 +15,8 @@ import {
     disposeScope,
     ComputationalBehavior,
     mutable,
+    unscoped,
+    __current_collecting,
 } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
@@ -27,32 +31,89 @@ const originalGetter = Object.getOwnPropertyDescriptor(
 ).get;
 
 Object.defineProperty(Behavior.prototype, 'value', {
-    get(this: Behavior & { signal?: [Function, Function] }) {
-        if (!this.signal) {
-            this.signal = createSignal(originalGetter);
-            this.watch((v) => {
-                this.signal[1](v);
-            });
+    get(
+        this: Behavior & {
+            signal_ref?: WeakMap<
+                ReturnType<typeof getOwner>,
+                [Function, Function]
+            >;
         }
-        if (getListener() !== null) {
-            this.signal[0](); // trigger a solid read
+    ) {
+        if (__current_collecting()) {
+            return originalGetter.call(this);
+        }
+        if (getListener()) {
+            if (!this.signal_ref) {
+                this.signal_ref = new WeakMap();
+            }
+            const ref = this.signal_ref.get(getListener().owner); // TODO: always expect an owner?
+            if (ref === undefined) {
+                const owner = getListener().owner;
+                let ref = createSignal(originalGetter.call(this));
+                this.signal_ref.set(owner, ref);
+                const disposeWatcher = unscoped(() =>
+                    this.watch((v) => {
+                        ref[1](v);
+                    })
+                );
+                runWithOwner(owner, () => {
+                    onCleanup(() => {
+                        disposeWatcher();
+                        this.signal_ref.delete(owner);
+                    });
+                });
+                return ref[0]();
+            } else {
+                return ref[0]();
+            }
         }
         return originalGetter.call(this);
     },
 });
 
+const originalComputationGetter = Object.getOwnPropertyDescriptor(
+    ComputationalBehavior.prototype,
+    'value'
+).get;
+
 Object.defineProperty(ComputationalBehavior.prototype, 'value', {
-    get(this: Behavior & { signal?: [Function, Function] }) {
-        if (!this.signal) {
-            this.signal = createSignal(originalGetter);
-            this.watch((v) => {
-                this.signal[1](v);
-            });
+    get(
+        this: Behavior & {
+            signal_ref?: WeakMap<
+                ReturnType<typeof getOwner>,
+                [Function, Function]
+            >;
         }
-        if (getListener() !== null) {
-            this.signal[0](); // trigger a solid read
+    ) {
+        if (__current_collecting()) {
+            return originalComputationGetter.call(this);
         }
-        return originalGetter.call(this);
+        if (getListener()) {
+            if (!this.signal_ref) {
+                this.signal_ref = new WeakMap();
+            }
+            const ref = this.signal_ref.get(getListener().owner);
+            if (ref === undefined) {
+                const owner = getListener().owner;
+                let ref = createSignal(originalComputationGetter.call(this));
+                this.signal_ref.set(owner, ref);
+                const disposeWatcher = unscoped(() =>
+                    this.watch((v) => {
+                        ref[1](v);
+                    })
+                );
+                runWithOwner(owner, () => {
+                    onCleanup(() => {
+                        disposeWatcher();
+                        this.signal_ref.delete(owner);
+                    });
+                });
+                return ref[0]();
+            } else {
+                return ref[0]();
+            }
+        }
+        return originalComputationGetter.call(this);
     },
 });
 

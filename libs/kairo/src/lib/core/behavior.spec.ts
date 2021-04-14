@@ -22,12 +22,12 @@ describe('core/behavior', () => {
         const d = createComputation(() => accessData(a) + accessData(b));
         let result = 0;
         const watcher = watch(c, () => {
-            expect(c.flags & Flag.MaybeStale).toBeFalsy();
+            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
             result = c.value;
         });
         let result2 = 0;
         const watcher2 = watch(d, () => {
-            expect(d.flags & Flag.MaybeStale).toBeFalsy();
+            expect(d.flags & Flag.MarkForCheck).toBeFalsy();
             result2 = d.value;
         });
         const e = createComputation(() => accessData(c) + accessData(d), {
@@ -57,17 +57,13 @@ describe('core/behavior', () => {
         const b = createData(0);
         const c = createComputation(() => accessData(a) + accessData(b));
         const watcher = watch(c, () => {
-            expect(c.flags & Flag.MaybeStale).toBeFalsy();
+            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
         });
-        expect(c.sources).toContain(a);
-        expect(c.sources).toContain(b);
+        // expect(c.sources).toContain(a);
+        // expect(c.sources).toContain(b);
         cleanupComputation(c, 0);
-        expect(c.sources).toHaveLength(0);
-        expect(a.observer).toEqual(null);
-        expect(b.observer).toEqual(null);
-        expect(c.flags & Flag.SingleSource).toBeFalsy();
-        expect(a.flags & Flag.SingleObserver).toBeTruthy();
-        expect(b.flags & Flag.SingleObserver).toBeTruthy();
+        expect(c.last_source).toEqual(null);
+        expect(a.last_observer).toEqual(null);
 
         disposeWatcher(watcher);
         done();
@@ -77,14 +73,12 @@ describe('core/behavior', () => {
         const a = createData(0);
         const c = createComputation(() => accessData(a));
         const watcher = watch(c, () => {
-            expect(c.flags & Flag.MaybeStale).toBeFalsy();
+            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
         });
-        expect(c.source === a).toBeTruthy();
+        expect(c.last_source.source === a).toBeTruthy();
         cleanupComputation(c, 0);
-        expect(c.source === null).toBeTruthy();
-        expect(a.observer === null).toBeTruthy();
-        expect(c.flags & Flag.SingleSource).toBeTruthy();
-        expect(a.flags & Flag.SingleObserver).toBeTruthy();
+        expect(c.last_source === null).toBeTruthy();
+        expect(a.last_observer === null).toBeTruthy();
 
         disposeWatcher(watcher);
     });
@@ -98,14 +92,12 @@ describe('core/behavior', () => {
         const watcher = watch(c, noop);
         const watcher2 = watch(d, noop);
         const watcher3 = watch(e, noop);
-        expect(d.source === a).toBeTruthy();
+        expect(d.last_source.source === a).toBeTruthy();
         cleanupComputation(d, 0);
         cleanupComputation(e, 0);
         cleanupComputation(c, 0);
-        expect(d.source === null).toBeTruthy();
-        expect(a.observers).toHaveLength(0);
-        expect(d.flags & Flag.SingleSource).toBeTruthy();
-        expect(a.flags & Flag.SingleObserver).toBeFalsy();
+        expect(d.last_source === null).toBeTruthy();
+        expect(a.last_observer === null).toBeTruthy();
 
         disposeWatcher(watcher);
         disposeWatcher(watcher2);
@@ -127,12 +119,12 @@ describe('core/behavior', () => {
         });
         expect(c.value).toEqual(null); //
 
-        expect(c.flags & Flag.MaybeStale).toBeTruthy(); // because it is zombie ...
+        expect(c.flags & Flag.MarkForCheck).toBeTruthy(); // because it is zombie ...
 
         expect(accessComputation(c)).toEqual(3);
-        expect(c.flags & Flag.MaybeStale).toBeFalsy();
-        expect(a.flags & Flag.MaybeStale).toBeFalsy();
-        expect(b.flags & Flag.MaybeStale).toBeFalsy();
+        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(a.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(b.flags & Flag.MarkForCheck).toBeFalsy();
         // expect(c.flags & Tags.Active).toBeFalsy();
         // expect(a.flags & Tags.Active).toBeFalsy();
         // expect(b.flags & Tags.Active).toBeFalsy();
@@ -157,9 +149,9 @@ describe('core/behavior', () => {
 
         expect(c.value).toEqual(3); //
 
-        expect(c.flags & Flag.MaybeStale).toBeFalsy();
-        expect(a.flags & Flag.MaybeStale).toBeFalsy();
-        expect(b.flags & Flag.MaybeStale).toBeFalsy();
+        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(a.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(b.flags & Flag.MarkForCheck).toBeFalsy();
         // expect(c.flags & Tags.Active).toBeTruthy();
         // expect(a.flags & Tags.Active).toBeTruthy();
         // expect(b.flags & Tags.Active).toBeTruthy();
@@ -175,10 +167,10 @@ describe('core/behavior', () => {
         const e = createComputation(
             () => accessComputation(c) + accessComputation(d)
         );
-        expect(c.flags & Flag.NotReady).toBeTruthy();
+        expect(c.flags & Flag.NotReady).toBeFalsy();
         expect(accessComputation(c)).toEqual(3);
         expect(accessComputation(d)).toEqual(1);
-        expect(c.flags & Flag.NotReady).toBeFalsy();
+        // expect(c.flags & Flag.NotReady).toBeFalsy();
         expect(c.flags & Flag.MaybeStable).toBeTruthy();
         const watcher = watch(e, noop);
         setData(a, 2);
