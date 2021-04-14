@@ -13,7 +13,6 @@ import {
     provide,
     onUnmounted,
     SetupContext,
-    ComponentPublicInstance,
     App,
 } from 'vue';
 import { SCOPE } from './context';
@@ -55,18 +54,22 @@ export function setupKairo<Props, Bindings>(
                 setupContext
             );
             if (typeof exposed !== 'object' || exposed === null) {
-                console.log('?');
+                console.warn(
+                    `setupKairo() expects an object but actually gets ${typeof exposed}`
+                );
                 return exposed; // let vue handle this.
             }
             return Object.fromEntries(
                 Object.entries(exposed).map(([key, value]) => {
                     if (isBehavior(value)) {
                         const _ref = ref(value.value as object);
-                        value.watch((s) => (_ref.value = s as object));
+                        value.watch((s) => {
+                            _ref.value = s as object;
+                        });
                         return [key, _ref];
                     }
                     if (typeof value === 'function') {
-                        return [key, action(value as any)];
+                        return [key, action(value)];
                     }
                     return [key, value];
                 })
