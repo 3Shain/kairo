@@ -3,108 +3,132 @@ import {
     ɵComponentDef as ComponentDef,
     ɵɵdirectiveInject,
     ɵɵProvidersFeature,
-    INJECTOR,
     NgZone,
-    Injectable,
-    ɵɵdefineComponent as defineComponent,
     InjectFlags,
-    ChangeDetectionStrategy,
     ChangeDetectorRef,
-    SimpleChanges
+    Injector,
 } from '@angular/core';
-import { createScope, data, transaction, isBehavior } from 'kairo';
+import {
+    createScope,
+    mutable,
+    transaction,
+    isBehavior,
+    disposeScope,
+    action,
+} from 'kairo';
 import { KairoScope } from './kairo.service';
 
-
-export function KairoComponent(options?: {
-    untrackInputs?: string[],
-    exposeAt?: 'this' | string;
-}) {
+export function WithKairo() {
     return <T>(componentType: Type<T>) => {
-
-        const componentDef = (componentType['ɵcmp']) as ComponentDef<unknown>;
-
-        componentType['ɵcmp'] = defineComponent({
-            ...componentDef,
-            features: [ɵɵProvidersFeature([
-                // KairoInstance
-            ]), (def) => {
+        const componentDef = componentType['ɵcmp'] as ComponentDef<unknown>;
+        const originFac = componentType['ɵfac'];
+        componentType['ɵfac'] = (...args: any) => {
+            const origin = originFac(...args);
+            origin['__kairo_parent_scope__'] = ɵɵdirectiveInject(
+                KairoScope,
+                InjectFlags.SkipSelf
+            );
+            origin['__kairo_scope__'] = ɵɵdirectiveInject(
+                KairoScope,
+                InjectFlags.Self
+            );
+            origin['__injector__'] = ɵɵdirectiveInject(
+                Injector,
+                InjectFlags.Self
+            );
+            return origin;
+        };
+        const features = [
+            ɵɵProvidersFeature([
+                {
+                    provide: KairoScope,
+                    useClass: KairoScope,
+                },
+            ]),
+            (def: ComponentDef<unknown>) => {
+                (def.onPush as any) = true;
                 const originNgOnInit = def.type.prototype.ngOnInit as Function;
-                const originNgOnChanges = def.type.prototype.ngOnChanges as Function;
+                const originNgOnChanges = def.type.prototype
+                    .ngOnChanges as Function;
                 // ensure these method exist in prototype cuz ivy will store them.
                 let hookedOnChange: Function = null;
                 def.type.prototype.ngOnChanges = function (...args: any[]) {
-                    hookedOnChange?.(...args);
+                    hookedOnChange?.call(this, ...args);
                     originNgOnChanges?.call(this, ...args);
-                }
-                const originNgOnDestroy = def.type.prototype.ngOnDestroy as Function;
+                };
+                const originNgOnDestroy = def.type.prototype
+                    .ngOnDestroy as Function;
                 let hookedOnDestroy: Function = null;
                 def.type.prototype.ngOnDestroy = function () {
                     hookedOnDestroy?.();
                     originNgOnDestroy?.call(this);
-                }
-                def.type.prototype.ngOnInit = function () {
-                    /**
-                     * type: this:Component
-                     */
+                };
 
-                    const zone = ɵɵdirectiveInject(INJECTOR).get(NgZone);
-                    const parentScope = ɵɵdirectiveInject(KairoScope, InjectFlags.SkipSelf | InjectFlags.Optional);
+                def.type.prototype.ngOnInit = function (this: {
+                    __kairo_parent_scope__: KairoScope;
+                    __kairo_scope__: KairoScope;
+                    __injector__: Injector;
+                    ngSetup: Function;
+                }) {
+                    if (typeof this.ngSetup !== 'function') {
+                        console.error(`ngSetup is not declared.`);
+                        return;
+                    }
+                    const changesHook: Function[] = [];
+                    const zone = this.__injector__.get(NgZone);
+                    const changeDetector = this.__injector__.get(
+                        ChangeDetectorRef
+                    );
                     zone.runOutsideAngular(() => {
-                        // console.log(Object.entries(componentDef.inputs));
-                        const ref = ɵɵdirectiveInject(ChangeDetectorRef);
-
-                        let inputsSetter: any = {};
-                        const scope = createScope(() => {
-                            let setupInputs: any = {};
-                            for (const inputDeclaredName in def.declaredInputs) {
-                                const [beh, setter] = data(this[def.declaredInputs[inputDeclaredName]]);
-                                inputsSetter[inputDeclaredName] = setter;
-                                setupInputs[inputDeclaredName] = beh;
-                            }
-                            const resolve = this.ngSetup(setupInputs);
+                        const { scope, exposed } = createScope(() => {
+                            const resolve = this.ngSetup((thunk: Function) => {
+                                const [beh, setbeh] = mutable(thunk(this));
+                                changesHook.push((instance: unknown) => {
+                                    setbeh(thunk(instance));
+                                });
+                                return beh;
+                            });
                             if (typeof resolve != 'object') {
-                                throw `ngSetup() is expected to return an object, but it got ${typeof resolve}`;
+                                throw Error(
+                                    `ngSetup() is expected to return an object, but it got ${typeof resolve}`
+                                );
                             }
-                            for (const [key, value] of Object.entries(resolve)) {
+                            for (const [key, value] of Object.entries(
+                                resolve
+                            )) {
                                 if (isBehavior(value)) {
                                     value.watch((v) => {
                                         this[key] = v;
+                                        changeDetector.detectChanges();
                                     });
                                     resolve[key] = value.value;
-                                } else if(typeof value === 'function'){
-                                    resolve[key] = (...args:any[])=>{
-                                        return transaction(()=>{
-                                            return value(...args);
-                                        });
-                                    }
+                                } else if (typeof value === 'function') {
+                                    resolve[key] = action(value as any);
                                 }
                             }
                             return resolve;
-                        },null);
-                        Object.assign(this, scope.exposed); //TODO: initial wtf
+                        }, this.__kairo_parent_scope__?.scope);
+                        this.__kairo_scope__.scope = scope;
+                        Object.assign(this, exposed); //TODO:
 
-                        hookedOnChange = (changes: SimpleChanges) => {
+                        hookedOnChange = () => {
                             zone.runOutsideAngular(() => {
-                                // use scheduler? asapInTransaction.
                                 transaction(() => {
-                                    for (const key in changes) {
-                                        inputsSetter[key](changes[key].currentValue);
-                                    }
+                                    changesHook.forEach((x) => x(this));
                                 });
                             });
-                        }
+                        };
 
                         hookedOnDestroy = () => {
                             zone.runOutsideAngular(() => {
-                                // scope.dispose();
+                                disposeScope(scope);
                             });
-                        }
+                        };
                     });
                     originNgOnInit?.call(this);
-                }
-            }],
-            changeDetection: ChangeDetectionStrategy.OnPush
-        });
+                };
+            },
+        ];
+        features.forEach((x) => x(componentDef));
     };
 }

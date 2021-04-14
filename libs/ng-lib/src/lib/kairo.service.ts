@@ -3,9 +3,10 @@ import { disposeScope, Scope, scopedWith, inject } from "kairo";
 
 @Injectable()
 export class KairoScope implements OnDestroy {
-    constructor(
-        public readonly scope: Scope
-    ) { }
+
+    public scope: Scope;
+
+    constructor() { }
 
     useInject(token: unknown): void
     useInject(token: any) {

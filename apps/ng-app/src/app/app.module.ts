@@ -4,9 +4,10 @@ import { HttpClientModule } from '@angular/common/http';
 
 import { AppComponent } from './app.component';
 import { KairoModule } from '@kairo/angular';
+import { ChildComponent } from './child.component';
 
 @NgModule({
-    declarations: [AppComponent],
+    declarations: [AppComponent, ChildComponent],
     imports: [BrowserModule, HttpClientModule, KairoModule.forRoot(() => {})],
     providers: [],
     bootstrap: [AppComponent],
