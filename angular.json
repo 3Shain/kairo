@@ -324,7 +324,7 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo","vue"],
+            "externals": ["kairo","vue","@vue/reactivity"],
             "bundleName": "kairo-vue"
           }
         },
