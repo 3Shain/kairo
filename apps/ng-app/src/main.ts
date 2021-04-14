@@ -8,6 +8,11 @@ if (environment.production) {
   enableProdMode();
 }
 
+declare global {
+  const __DEV__:boolean;
+  const __TEST__: boolean;
+}
+
 (window as any).__DEV__ = true;
 (window as any).__TEST__ = true;
 

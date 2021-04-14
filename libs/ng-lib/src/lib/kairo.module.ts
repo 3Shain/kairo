@@ -6,21 +6,21 @@ import {
     InjectionToken,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { KairoScope } from './kairo.service';
-import { createScope } from 'kairo';
+import { KairoScopeRef, KairoScopeRefImpl } from './kairo.service';
+import { createScope, disposeScope } from 'kairo';
 
 const SETUP_FUNCTION = new InjectionToken<() => void>('kairo setup function');
 
 export function setupRootScope(setup: () => void) {
     const { scope } = createScope(setup);
-    const ngService = new KairoScope();
+    const ngService = new KairoScopeRefImpl();
     ngService.scope = scope;
     return ngService;
 }
 
-export function setupModuleScope(parent: KairoScope, setup: () => void) {
+export function setupModuleScope(parent: KairoScopeRefImpl, setup: () => void) {
     const { scope } = createScope(setup, null, parent.scope);
-    const ngService = new KairoScope();
+    const ngService = new KairoScopeRefImpl();
     ngService.scope = scope;
     return ngService;
 }
@@ -29,6 +29,14 @@ export function setupModuleScope(parent: KairoScope, setup: () => void) {
     imports: [CommonModule],
 })
 export class KairoModule {
+    constructor(private scopeRef: KairoScopeRefImpl) {
+        this.scopeRef.__initialize();
+    }
+
+    ngOnDestroy() {
+        disposeScope(this.scopeRef.scope);
+    }
+
     static forRoot(setup: () => void): ModuleWithProviders<KairoModule> {
         return {
             ngModule: KairoModule,
@@ -38,9 +46,13 @@ export class KairoModule {
                     useValue: setup,
                 },
                 {
-                    provide: KairoScope,
+                    provide: KairoScopeRefImpl,
                     useFactory: setupRootScope,
                     deps: [SETUP_FUNCTION],
+                },
+                {
+                    provide: KairoScopeRef,
+                    useExisting: KairoScopeRefImpl,
                 },
             ],
         };
@@ -55,9 +67,16 @@ export class KairoModule {
                     useValue: setup,
                 },
                 {
-                    provide: KairoScope,
+                    provide: KairoScopeRefImpl,
                     useFactory: setupModuleScope,
-                    deps: [[Optional, SkipSelf, KairoScope], SETUP_FUNCTION],
+                    deps: [
+                        [Optional, SkipSelf, KairoScopeRefImpl],
+                        SETUP_FUNCTION,
+                    ],
+                },
+                {
+                    provide: KairoScopeRef,
+                    useExisting: KairoScopeRefImpl,
                 },
             ],
         };

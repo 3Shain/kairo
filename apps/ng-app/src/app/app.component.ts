@@ -48,7 +48,7 @@ export class AppComponent {
             return count.value * 2;
         });
 
-        const { count,plus} = provide(Counter);
+        const { count, plus } = provide(Counter);
 
         const theTask = switchedTask(function* (this: any) {
             console.log('task start!');
@@ -118,13 +118,12 @@ function useKonami(keys: string[]) {
                 while (keysRemain.length) {
                     const next = yield* race([keydown, delay(1000)]);
                     if (next !== keysRemain.pop()) {
+                        console.log('failed');
                         break;
                     }
-                }
-                if (keysRemain.length == 0) {
-                    console.log('Activated!');
-                } else {
-                    console.log('Failed!');
+                    if (keysRemain.length == 0) {
+                        console.log('activated!');
+                    }
                 }
             }
         }

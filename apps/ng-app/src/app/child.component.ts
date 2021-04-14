@@ -1,30 +1,40 @@
-import { Component, Input } from '@angular/core';
-import { NgSetup, WithKairo } from '@kairo/angular';
-import { Behavior, inject } from 'kairo';
+import { Component, Input, OnInit } from '@angular/core';
+import { KairoScopeRef } from '@kairo/angular';
 import { Counter } from './shared';
 
 @Component({
-    template: `<p>child {{count}}</p>`,
+    template: `<ng-container *ngIf="counter$ | async; let counter">
+            <p (click)="counter.plus(1)">
+                child {{ counter.count }}
+            </p> </ng-container
+        ><ng-container *ngIf="counter$ | async; let counter">
+            <p (click)="counter.plus(1)">child {{ counter.count }}</p>
+        </ng-container>`,
     styles: [``],
     selector: 'rk-child-component',
 })
-@WithKairo()
-export class ChildComponent implements NgSetup<ChildComponent> {
+// @WithKairo()
+//  implements NgSetup<ChildComponent>
+export class ChildComponent {
     @Input()
     test: string;
 
-    count: number;
+    constructor(private scope: KairoScopeRef) {}
 
-    ngSetup(
-        useProp: <P>(thunk: (instance: ChildComponent) => P) => Behavior<P>
-    ): object {
-        const testprop = useProp((x) => x.test);
+    counter$ = this.scope.useInject(Counter);
 
-        const { count } = inject(Counter);
+    // count: number;
 
-        testprop.watch(console.log);
-        return {
-            count
-        };
-    }
+    // ngSetup(
+    //     useProp: <P>(thunk: (instance: ChildComponent) => P) => Behavior<P>
+    // ): object {
+    //     const testprop = useProp((x) => x.test);
+
+    //     const { count } = inject(Counter);
+
+    //     testprop.watch(console.log);
+    //     return {
+    //         count
+    //     };
+    // }
 }

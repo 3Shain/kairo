@@ -16,7 +16,7 @@ import {
     disposeScope,
     action,
 } from 'kairo';
-import { KairoScope } from './kairo.service';
+import { KairoScopeRef, KairoScopeRefImpl } from './kairo.service';
 
 export function WithKairo() {
     return <T>(componentType: Type<T>) => {
@@ -25,11 +25,11 @@ export function WithKairo() {
         componentType['ɵfac'] = (...args: any) => {
             const origin = originFac(...args);
             origin['__kairo_parent_scope__'] = ɵɵdirectiveInject(
-                KairoScope,
+                KairoScopeRefImpl,
                 InjectFlags.SkipSelf
             );
             origin['__kairo_scope__'] = ɵɵdirectiveInject(
-                KairoScope,
+                KairoScopeRefImpl,
                 InjectFlags.Self
             );
             origin['__injector__'] = ɵɵdirectiveInject(
@@ -41,8 +41,12 @@ export function WithKairo() {
         const features = [
             ɵɵProvidersFeature([
                 {
-                    provide: KairoScope,
-                    useClass: KairoScope,
+                    provide: KairoScopeRefImpl,
+                    useClass: KairoScopeRefImpl,
+                },
+                {
+                    provide: KairoScopeRef,
+                    useExisting: KairoScopeRefImpl,
                 },
             ]),
             (def: ComponentDef<unknown>) => {
@@ -65,8 +69,8 @@ export function WithKairo() {
                 };
 
                 def.type.prototype.ngOnInit = function (this: {
-                    __kairo_parent_scope__: KairoScope;
-                    __kairo_scope__: KairoScope;
+                    __kairo_parent_scope__: KairoScopeRefImpl;
+                    __kairo_scope__: KairoScopeRefImpl;
                     __injector__: Injector;
                     ngSetup: Function;
                 }) {
@@ -107,9 +111,9 @@ export function WithKairo() {
                                 }
                             }
                             return resolve;
-                        }, this.__kairo_parent_scope__?.scope);
+                        }, this.__kairo_parent_scope__.scope);
                         this.__kairo_scope__.scope = scope;
-                        Object.assign(this, exposed); //TODO:
+                        Object.assign(this, exposed);
 
                         hookedOnChange = () => {
                             zone.runOutsideAngular(() => {
@@ -126,6 +130,7 @@ export function WithKairo() {
                         };
                     });
                     originNgOnInit?.call(this);
+                    this.__kairo_scope__.__initialize();
                 };
             },
         ];

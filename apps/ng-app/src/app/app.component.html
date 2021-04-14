@@ -13,4 +13,7 @@
 <button (click)="theTask()">
     start task
 </button>
-<rk-child-component [test]="msg"></rk-child-component>
+<ng-container *ngIf="count%2">
+
+    <rk-child-component [test]="msg"></rk-child-component>
+</ng-container>

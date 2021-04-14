@@ -1,9 +1,11 @@
 {
   "name": "@kairo/angular",
-  "version": "11.0.0-alpha.0",
+  "version": "11.0.0-alpha.1",
   "description": "Angular integration for kairo",
   "peerDependencies": {
     "@angular/common": "^11.0.0",
-    "@angular/core": "^11.0.0"
+    "@angular/core": "^11.0.0",
+    "rxjs": "^6.5.3",
+    "kairo": ">=0.2.0"
   }
 }
