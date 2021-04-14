@@ -1,5 +1,4 @@
 import { Suite } from 'benchmark';
-import { KairoLinkInternal, KairoLinkInternalStatic } from './linklist-impl';
 import {
     Bridge,
     KairoBridge,
@@ -11,6 +10,14 @@ import {
     SolidBridge,
     VueReactiveBridge,
 } from './common';
+
+declare global {
+    const __DEV__: boolean;
+    const __TEST__: boolean;
+}
+
+(global as any).__DEV__ = false;
+(global as any).__TEST__ = false;
 
 const suite = new Suite('reactive');
 
@@ -37,25 +44,25 @@ function NormalTest(bridge: Bridge) {
         const a = bridge.cell(0);
         const b = bridge.cell(1);
         const c = bridge.computed(() => {
-            let p = a.read() + b.read();
-            // p = a.read() + b.read();
-            // p = a.read() + b.read();
-            // p = a.read() + b.read();
-            // p = a.read() + b.read();
-            // p = a.read() + b.read();
-            // p = a.read() + b.read();
+            let p = a.read();
+            p = a.read() + b.read();
+            p = a.read() + b.read();
+            p = a.read() + b.read();
+            p = a.read() + b.read();
+            p = a.read() + b.read();
+            p = a.read() + b.read();
             // console.log(p);
             return p;
         });
         const d = bridge.computed(() => {
-            let g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
-            // g = b.read() + c.read();
+            let g = b.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
+            g = b.read() + c.read();
             // console.log(g);
             return g;
         });
@@ -95,29 +102,23 @@ let results = [];
 export function test() {
     // debugger;
     suite
-        .add('solid', () => {
-            NormalTest(SolidBridge);
-        })
-        .add('mobx', () => {
-            NormalTest(MobxBridge);
-        })
+        // .add('solid', () => {
+        //     NormalTest(SolidBridge);
+        // })
+        // .add('mobx', () => {
+        //     NormalTest(MobxBridge);
+        // })
         .add('s', () => {
             NormalTest(SBridge);
         })
-        // .add('kairo static', () => {
-        //     NormalTest(KairoStaticBridge);
-        // })
-        .add('kairo static "internal api"', () => {
-            NormalTest(KairoInternalStatic);
+        .add('kairo static', () => {
+            NormalTest(KairoStaticBridge);
         })
         .add('kairo "internal api"', () => {
             NormalTest(KairoInternal);
         })
-        .add('kairo link  "internal api"', () => {
-            NormalTest(KairoLinkInternal);
-        })
-        .add('kairo link static "internal api"', () => {
-            NormalTest(KairoLinkInternalStatic);
+        .add('kairo static "internal api"', () => {
+            NormalTest(KairoInternalStatic);
         })
         // .add('kairo', () => {
         //     NormalTest(KairoBridge);

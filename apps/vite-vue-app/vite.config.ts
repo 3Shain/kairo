@@ -5,5 +5,9 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    define: {
+      '__DEV__': 'true',
+      '__TEST__': 'true'
+    },
     plugins: [tsconfigPaths(),vue(),vueJsx()]
 })

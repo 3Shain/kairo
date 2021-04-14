@@ -61,7 +61,7 @@ export function App() {
         <>
             <KairoApp globalSetup={() => {}}>
                 <TestComponent uid={state}>
-                    {/* <NormalComponent /> */}
+                    <NormalComponent />
                 </TestComponent>
                 <button onClick={() => setstate(state + 1)}>set uid</button>
             </KairoApp>

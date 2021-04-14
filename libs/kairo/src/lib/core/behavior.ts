@@ -38,7 +38,7 @@ const enum Flag {
      */
     Changed = 0x400,
     /**
-     *
+     * When a computation is zombie, it is definitely markforcheck
      */
     Zombie = 0x800,
     /**
@@ -97,7 +97,7 @@ interface Watcher {
 let currentCollecting: Computation | null = null;
 
 function setData<T>(data: Data<T>, value: T): void {
-    if (currentCollecting) {
+    if (__DEV__ && currentCollecting) {
         console.error(
             `Violated action: You can't mutate any behavior inside a computation or side effect.`
         );
@@ -154,7 +154,7 @@ function accessData(data: Data) {
 }
 
 function accessComputation(data: Computation) {
-    if (data.flags & Flag.Computing) {
+    if (__DEV__ && data.flags & Flag.Computing) {
         console.error(`Circular dependency detected.`);
         return data.value;
     }
@@ -168,6 +168,7 @@ function accessComputation(data: Computation) {
             if ((currentCollecting.flags & Flag.Zombie) === 0) {
                 data.flags -= Flag.Zombie;
                 data.value = updateComputation(data);
+                data.flags -= Flag.MarkForCheck;
             }
         }
     } else {
@@ -281,10 +282,10 @@ function cleanupComputation(
 
 function propagate(data: Data) {
     let notZombie = false;
-    // if maybe stale
+    // if maybe stale (not for data)
     if (data.flags & Flag.MarkForCheck) {
         if (data.flags & Flag.Computation) {
-            if ((data as Computation).depsCounter !== 0) {
+            if (__TEST__ && (data as Computation).depsCounter !== 0) {
                 throw 'this should never happen.';
             }
             if (data.flags & Flag.Stale) {
@@ -314,7 +315,7 @@ function propagate(data: Data) {
                 observer = observer.prev_observer;
                 continue;
             }
-            if ((current.flags & Flag.MarkForCheck) === 0) {
+            if (__TEST__ && (current.flags & Flag.MarkForCheck) === 0) {
                 throw 'should never haapen';
                 // observer = observer.prev_observer;
                 // notZombie = true;
@@ -358,20 +359,23 @@ function propagate(data: Data) {
         }
     }
     if (!notZombie) {
-        console.log('stop updating?');
+        if (__TEST__) console.log('stop updating?');
         data.flags |= Flag.Zombie;
+        if (data.flags & Flag.Computation) {
+            data.flags |= Flag.MarkForCheck;
+        }
     }
     return notZombie;
 }
 
 function watch(data: Data, sideEffect: Function) {
-    if (/** dev */ currentCollecting) {
+    if (__DEV__ && currentCollecting) {
         console.error(`You should not watch inside computation.`);
         return { disposed: true } as WatcherNode;
     }
-    if (inTransaction) {
+    if (__DEV__ && inTransaction) {
         console.error(
-            `You should not watch inside transaction, as it will breaks dep structure?.`
+            `You should not watch inside transaction, as it will breaks dep structure.`
         );
         return { disposed: true } as WatcherNode;
     }
@@ -379,6 +383,7 @@ function watch(data: Data, sideEffect: Function) {
         data.flags -= Flag.Zombie;
         if (data.flags & Flag.Computation) {
             data.value = updateComputation(data as Computation);
+            data.flags -= Flag.MarkForCheck;
         }
     }
 
@@ -396,14 +401,9 @@ function watch(data: Data, sideEffect: Function) {
     return node;
 }
 
-let inEffect = false;
-
 function disposeWatcher(watcher: WatcherNode) {
-    if (currentCollecting) {
-        // // console.error('Violated'); // TODO: no dynamic watch?
-        // // return;
-        // console.log(currentCollecting);
-        console.error('violet');
+    if (__TEST__ && currentCollecting) {
+        console.error('Violated action.');
         return;
     }
     if (watcher.disposed) {
@@ -437,13 +437,9 @@ function runInTransaction<T>(fn: () => T) {
         propagate(data);
     }
 
-    // currentCollecting = EMPTY_COMPUTATION;
-    inEffect = true;
     while (effects.length) {
         effects.pop()!();
     }
-    inEffect = false;
-    // currentCollecting = null;
 
     return retValue;
 }
@@ -502,6 +498,7 @@ function insertNewObserver(
 }
 
 function createRenderEffect(sideEffect: Function) {
+    // a renderEffect can never be zombie!
     const ret: Computation<null> = {
         flags: Flag.RenderEffect | Flag.MaybeStable | Flag.Stale,
         last_effect: {
@@ -528,10 +525,10 @@ function executeRenderEffect<T>(
     fn: (...args: any[]) => T,
     ...args: any[]
 ) {
-    if (inTransaction) {
+    if (__TEST__ && inTransaction) {
         throw Error('should be not in transaction');
     }
-    if (currentCollecting) {
+    if (__TEST__ && currentCollecting) {
         throw Error('should be not in computation');
     }
     if (computation.flags & Flag.Stale) {

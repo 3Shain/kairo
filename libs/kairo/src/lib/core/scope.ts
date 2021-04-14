@@ -22,7 +22,7 @@ function createScope<T>(
     parentScope: Scope | null = null,
     rootScope: Scope | null = null
 ) {
-    if (parentScope && !parentScope.sealed) {
+    if (__DEV__ && parentScope && !parentScope.sealed) {
         throw Error('Parent scope is not sealed.');
     }
     const scope: Scope = {
@@ -38,6 +38,12 @@ function createScope<T>(
         ),
         disposed: false,
     };
+    if (scope.parent) {
+        // in case parent is disposed before child (e.g. in react)
+        registerDisposer(() => {
+            disposeScope(scope);
+        }, scope.parent);
+    }
     const exposed = scopedWith(fn, scope);
     scope.sealed = true;
     return {
@@ -52,8 +58,8 @@ function runIfScopeExist(fn: () => void) {
     }
 }
 
-function registerDisposer(disposer: () => void) {
-    const scope = resumeScope();
+function registerDisposer(disposer: () => void, inscope?: Scope) {
+    const scope = inscope ?? resumeScope();
     if (scope.disposed) {
         throw Error('Scope has been disposed.');
     }
@@ -142,6 +148,10 @@ function scopedWith<T>(fn: () => T, scope: Scope) {
 
 class InjectToken<T> {
     constructor(public readonly name: string) {}
+
+    static for<T>(name: string) {
+        return new InjectToken<T>(name);
+    }
 
     toString() {
         return this.name;

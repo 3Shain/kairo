@@ -9,7 +9,6 @@ import {
     Flag,
     setData,
     runInTransaction,
-    untrack,
 } from './behavior';
 
 describe('core/behavior', () => {
@@ -34,6 +33,8 @@ describe('core/behavior', () => {
             static: true,
         });
         const watcher3 = watch(e, noop);
+        expect(e.flags & Flag.Zombie).toBeFalsy();
+        expect(e.last_source).toBeTruthy();
 
         setData(a, 1);
         expect(result).toEqual(1);
@@ -43,6 +44,10 @@ describe('core/behavior', () => {
         expect(result).toEqual(3);
         expect(result2).toEqual(3);
 
+        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(d.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(e.depsCounter).toEqual(0);
+        expect(e.flags & Flag.MarkForCheck).toBeFalsy();
         expect(e.value).toEqual(6);
 
         disposeWatcher(watcher3);
@@ -121,10 +126,10 @@ describe('core/behavior', () => {
 
         expect(c.flags & Flag.MarkForCheck).toBeTruthy(); // because it is zombie ...
 
-        expect(accessComputation(c)).toEqual(3);
-        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(a.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(b.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(accessComputation(c)).toEqual(3); // accessComputation doesn't changes 'markforcheck'
+        expect(c.flags & Flag.MarkForCheck).toBeTruthy();
+        // expect(a.flags & Flag.MarkForCheck).toBeTruthy(); // data has no markforcheck status
+        // expect(b.flags & Flag.MarkForCheck).toBeTruthy();
         // expect(c.flags & Tags.Active).toBeFalsy();
         // expect(a.flags & Tags.Active).toBeFalsy();
         // expect(b.flags & Tags.Active).toBeFalsy();
@@ -150,8 +155,8 @@ describe('core/behavior', () => {
         expect(c.value).toEqual(3); //
 
         expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(a.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(b.flags & Flag.MarkForCheck).toBeFalsy();
+        // expect(a.flags & Flag.MarkForCheck).toBeFalsy();
+        // expect(b.flags & Flag.MarkForCheck).toBeFalsy();
         // expect(c.flags & Tags.Active).toBeTruthy();
         // expect(a.flags & Tags.Active).toBeTruthy();
         // expect(b.flags & Tags.Active).toBeTruthy();
@@ -231,31 +236,14 @@ describe('core/behavior', () => {
         );
         const watcher = watch(e, noop);
         setData(a, 0);
+        expect(c.value).toBe(2);
+        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
+        expect(c.flags & Flag.MaybeStable).toBeFalsy();
         setData(b, 0);
+        expect(d.value).toBe(0);
+        expect(e.value).toBe(0);
+        expect(b.last_observer.prev_observer).toBeFalsy();
+        expect(e.flags & Flag.MaybeStable).toBeTruthy(); 
         disposeWatcher(watcher);
     });
-
-    // it('', done => {
-
-    // });
-
-    // it('', done => {
-
-    // });
-
-    // it('', done => {
-
-    // });
-
-    // it('', done => {
-
-    // });
-
-    // it('', done => {
-
-    // });
-
-    // it('', done => {
-
-    // });
 });
