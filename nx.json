@@ -25,6 +25,7 @@
     "react-lib": { "tags": [] },
     "vue-lib": { "tags": [] },
     "solid-lib": { "tags": [] },
+    "svelte-lib": { "tags": [] },
     "svelte-app": { "tags": [] },
     "svelte-app-e2e": { "tags": [], "implicitDependencies": ["svelte-app"] },
     "solid-app": { "tags": [] },

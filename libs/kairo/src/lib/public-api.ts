@@ -176,6 +176,21 @@ export class Behavior<T = any> {
         return () => disposeWatcher(watcher!);
     }
 
+    /**
+     * @deprecated Use watch.
+     */
+    subscribe(next: (value: T) => void) {
+        next(this.internal.value!);
+        const ret = this.watch((v) => {
+            next(v);
+        });
+        (ret as any).unsubscribe = ret;
+        return ret as {
+            (): void;
+            unsubscribe(): void;
+        };
+    }
+
     pipe() {
         throw Error('not implemented');
     }
@@ -297,6 +312,6 @@ export {
     __current_collecting,
     createRenderEffect as __createRenderEffect,
     executeRenderEffect as __executeRenderEffect,
-    cleanupRenderEffect as __cleanupRenderEffect
+    cleanupRenderEffect as __cleanupRenderEffect,
 } from './core/behavior';
 export * from './core/schedule';

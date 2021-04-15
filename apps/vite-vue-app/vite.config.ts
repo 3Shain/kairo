@@ -9,5 +9,5 @@ export default defineConfig({
       '__DEV__': 'true',
       '__TEST__': 'true'
     },
-    plugins: [tsconfigPaths(),vue(),vueJsx()]
+    plugins: [vue(),vueJsx(),tsconfigPaths()]
 })

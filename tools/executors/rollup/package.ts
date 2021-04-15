@@ -11,6 +11,7 @@ interface Options {
     externals: string[];
     entry: string;
     bundleName: string;
+    copy: string[];
 }
 
 export default async function (
@@ -38,6 +39,9 @@ export default async function (
                         src: [
                             resolve(projectRoot, 'README.md'),
                             resolve(projectRoot, 'package.json'),
+                            ..._options.copy?.map((x) =>
+                                resolve(projectRoot, x)
+                            ),
                         ],
                         dest: outDir,
                     },
@@ -50,7 +54,7 @@ export default async function (
                     __TEST__: 'false',
                 },
             }),
-            filesize()
+            filesize(),
         ],
         external: [..._options.externals],
         input: resolve(projectRoot, _options.entry ?? 'src/index.ts'),
@@ -85,7 +89,7 @@ export default async function (
                     __TEST__: 'false',
                 },
             }),
-            filesize()
+            filesize(),
         ],
         external: [..._options.externals],
         input: resolve(projectRoot, _options.entry ?? 'src/index.ts'),
@@ -126,11 +130,14 @@ export default async function (
     packageJson.main = `${_options.bundleName}.cjs.js`;
     packageJson.module = `${_options.bundleName}.esm.js`;
     packageJson.exports = {
-        '.': {
-            development: `./${_options.bundleName}.dev.esm.js`,
-            production: `./${_options.bundleName}.esm.js`,
-            require: `./${_options.bundleName}.cjs.js`,
-            default: `./${_options.bundleName}.esm.js`,
+        ...(packageJson.exports ?? {}),
+        ...{
+            '.': {
+                development: `./${_options.bundleName}.dev.esm.js`,
+                production: `./${_options.bundleName}.esm.js`,
+                require: `./${_options.bundleName}.cjs.js`,
+                default: `./${_options.bundleName}.esm.js`,
+            },
         },
     };
     packageJson.types = `src/index.d.ts`;

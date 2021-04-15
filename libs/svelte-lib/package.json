@@ -1,6 +1,13 @@
 {
     "name": "@kairo/svelte",
-    "dependencies": {
-        "kairo": "0.0.0"
+    "description": "Svelte integration for kairo",
+    "peerDependencies": {
+        "kairo": "0.0.0",
+        "svelte": ">=3.0.0"
+    },
+    "exports": {
+        "./transformer": {
+            "require": "./transformer.js"
+        }
     }
 }
