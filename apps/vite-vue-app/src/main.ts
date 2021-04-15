@@ -1,12 +1,14 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
+import "kairo"; // bug solved by import kairo first (you don't need to do so if install from npm)
+// weird.
 import { kairoApp } from '@kairo/vue';
 
 setTimeout(() => {
     createApp(App)
         .use(router)
-        .use(kairoApp(() => {})) // this line! remove it if you can not start vite! then add it back!
+        .use(kairoApp(() => {}))
         .mount('#app');
 }, 0);
 // vite has a bug:

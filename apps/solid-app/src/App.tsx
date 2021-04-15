@@ -55,7 +55,9 @@ const AChildComponent = withKairo((props, useProp) => {
 //     );
 // });
 
-const TestComponent: Component = withKairo(() => {
+const TestComponent: Component = withKairo<{
+    test: number
+}>(() => {
     const [position, setPosition] = data([0, 0]);
 
     const d = position.map((x) => x[0]);

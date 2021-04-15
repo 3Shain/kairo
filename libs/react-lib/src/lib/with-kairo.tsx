@@ -56,7 +56,7 @@ export function withKairo<Props>(
     setup: (
         props: Props,
         useProp: <P>(selector: (x: Props) => P) => Behavior<P>
-    ) => React.FC<{}>
+    ) => React.FC<Props>
 ): React.FC<Props> {
     // we don't need memo by default as kairo provides memo like mechanism
     return function KairoComponent(props: PropsWithChildren<Props>) {

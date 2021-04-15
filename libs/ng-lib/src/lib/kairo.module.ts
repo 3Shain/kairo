@@ -58,7 +58,7 @@ export class KairoModule {
         };
     }
 
-    static forFeature(setup: () => void): ModuleWithProviders<KairoModule> {
+    static forChild(setup: () => void): ModuleWithProviders<KairoModule> {
         return {
             ngModule: KairoModule,
             providers: [

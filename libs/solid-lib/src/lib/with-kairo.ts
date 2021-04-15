@@ -136,7 +136,7 @@ function withKairo<Props>(
     component: (
         props: Props,
         useProp: <P>(selector: (x: Props) => P) => Behavior<P>
-    ) => Component<{}>
+    ) => Component<Props>
 ): Component<Props> {
     return (
         props: Props & {
@@ -167,11 +167,7 @@ function withKairo<Props>(
         return createComponent(KairoContext.Provider, {
             value: scope,
             get children() {
-                return createComponent(realComponent, {
-                    get children() {
-                        return props.children;
-                    },
-                });
+                return createComponent(realComponent, props);
             },
         });
     };
