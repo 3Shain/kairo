@@ -1,20 +1,22 @@
-<script lang="ts" kairo>
-import { inject, registerDisposer } from "kairo";
-import { TOKEN } from "./lib";
+<script lang="ts" kairo true>
+    import { inject, registerDisposer } from 'kairo';
+    import { TOKEN } from './lib';
 
-export let prop: number = 0;
+    export let prop: number = 0;
+    console.log(prop);
 
-registerDisposer(()=>{
-    console.log('I disposed');
-})
+    registerDisposer(() => {
+        console.log('I disposed');
+    });
 
-$: {
-    console.log("www "+prop);
-}
+    $: {
+        console.log('www ' + prop);
+    }
 
-const count = inject(TOKEN);
-
+    const count = inject(TOKEN);
 </script>
+
 <h1>
-    Halo~~~~~ {$count} {prop}
+    Halo~~~~~ {$count}
+    {prop}
 </h1>

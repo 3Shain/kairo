@@ -139,6 +139,7 @@ export default async function (
                 default: `./${_options.bundleName}.esm.js`,
             },
         },
+        "./package.json": "./package.json" // some cli tools may need this
     };
     packageJson.types = `src/index.d.ts`;
 

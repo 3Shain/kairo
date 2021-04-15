@@ -398,7 +398,10 @@ Kairo becomes the common language of reactive pieces.
 
 [Solid](https://github.com/3shain/kairo/tree/master/libs/solid-lib)
 
+[Svelte](https://github.com/3shain/kairo/tree/master/libs/svelte-lib)
+
 [Vue](https://github.com/3shain/kairo/tree/master/libs/vue-lib)
+
 
 
 ## Documentation(TBD)

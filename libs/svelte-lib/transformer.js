@@ -1,22 +1,38 @@
-Object.defineProperty(exports, "__esModule", { value: true });
+Object.defineProperty(exports, '__esModule', { value: true });
 
-const { transformer: typescriptTrans } = require('svelte-preprocess/dist/transformers/typescript');
+const {
+    transformer: typescriptTrans,
+} = require('svelte-preprocess/dist/transformers/typescript');
 
-const ts = require('typescript');
-const { factory, isIdentifier, isObjectBindingPattern, isArrayBindingPattern } = require('typescript');
+const {
+    factory,
+    isIdentifier,
+    isObjectBindingPattern,
+    isArrayBindingPattern,
+    SyntaxKind,
+    createSourceFile,
+    createPrinter,
+    ScriptTarget,
+    NodeFlags
+} = require('typescript');
 
-function kairo(
-    options = {}
-) {
+function kairo(options = {}) {
     return {
         typescript: async (args) => {
-            const {
-                content,
-                attributes
-            } = args;
+            const { content, attributes } = args;
             if (attributes.kairo) {
+                const level =
+                    attributes.kairo == 'root'
+                        ? 'root'
+                        : attributes.kairo == 'module'
+                            ? 'module'
+                            : 'component';
 
-                const file = ts.createSourceFile('component.ts', content, ts.ScriptTarget.Latest);
+                const file = createSourceFile(
+                    'component.ts',
+                    content,
+                    ScriptTarget.Latest
+                );
                 const tokens = [];
                 const importsStatements = [];
                 const propsStatement = [];
@@ -24,135 +40,205 @@ function kairo(
                 const wrappingStatements = [];
                 const reactiveStatements = [];
                 for (const statement of file.statements) {
-                    if (statement.kind == ts.SyntaxKind.VariableStatement) {
-                        if (statement.modifiers?.find(x => x.kind == ts.SyntaxKind.ExportKeyword)) {
+                    if (statement.kind == SyntaxKind.VariableStatement) {
+                        if (
+                            statement.modifiers &&
+                            statement.modifiers.find(
+                                (x) => x.kind == SyntaxKind.ExportKeyword
+                            )
+                        ) {
                             propsStatement.push(statement);
                         } else {
-                            // (statement as ts.VariableStatement)
                             if (statement.declarationList) {
-                                for (let dec of statement.declarationList.declarations) {
+                                for (let dec of statement.declarationList
+                                    .declarations) {
                                     if (isIdentifier(dec.name)) {
-                                        tokens.push(dec.name.escapedText);
-                                    } else if (isObjectBindingPattern(dec.name)) {
-                                        for (let bindingelmenet of dec.name.elements) {
-                                            tokens.push(bindingelmenet.name.escapedText); // might be error: nested binding
+                                        if (dec.name.escapedText.endsWith('$$')) {
+                                            reactiveStatements.push(factory.createVariableStatement(
+                                                statement.modifiers,
+                                                factory.createVariableDeclarationList([
+                                                    dec
+                                                ], statement.declarationList.flags)
+                                            ));
+                                        } else {
+                                            tokens.push(dec.name.escapedText);
+                                            wrappingStatements.push(factory.createVariableStatement(
+                                                statement.modifiers,
+                                                factory.createVariableDeclarationList([
+                                                    dec
+                                                ], statement.declarationList.flags)
+                                            ));
                                         }
-                                    } else if (isArrayBindingPattern(dec.name)) {
-                                        for (let bindingelmenet of dec.name.elements) {
-                                            tokens.push(bindingelmenet.name.escapedText); // might be error: nested binding
+                                    } else if (
+                                        isObjectBindingPattern(dec.name)
+                                    ) {
+                                        for (let bindingelmenet of dec.name
+                                            .elements) {
+                                            tokens.push(
+                                                bindingelmenet.name.escapedText
+                                            ); // might be error: nested binding
                                         }
+                                        wrappingStatements.push(factory.createVariableStatement(
+                                            statement.modifiers,
+                                            factory.createVariableDeclarationList([
+                                                dec
+                                            ], statement.declarationList.flags)
+                                        ));
+                                    } else if (
+                                        isArrayBindingPattern(dec.name)
+                                    ) {
+                                        for (let bindingelmenet of dec.name
+                                            .elements) {
+                                            tokens.push(
+                                                bindingelmenet.name.escapedText
+                                            ); // might be error: nested binding
+                                        }
+                                        wrappingStatements.push(factory.createVariableStatement(
+                                            statement.modifiers,
+                                            factory.createVariableDeclarationList([
+                                                dec
+                                            ], statement.declarationList.flags)
+                                        ));
                                     } else {
-                                        throw Error('unknown variable name :' + JSON.stringify(dec.name))
+                                        throw Error(
+                                            'unknown variable name :' +
+                                            JSON.stringify(dec.name)
+                                        );
                                     }
                                 }
                             } else {
                                 throw Error('unknown variable statement?');
                             }
-                            wrappingStatements.push(statement);
                         }
-                    } else if (statement.kind == ts.SyntaxKind.FunctionDeclaration) {
-                        tokens.push(statement.name.escapedText)
+                    } else if (
+                        statement.kind == SyntaxKind.FunctionDeclaration
+                    ) {
+                        tokens.push(statement.name.escapedText);
                         wrappingStatements.push(statement);
-                    }
-                    else if (statement.kind == ts.SyntaxKind.ImportDeclaration || statement.kind == ts.SyntaxKind.ImportEqualsDeclaration) {
+                    } else if (
+                        statement.kind == SyntaxKind.ImportDeclaration ||
+                        statement.kind == SyntaxKind.ImportEqualsDeclaration
+                    ) {
                         importsStatements.push(statement);
-                    } else if (statement.kind == ts.SyntaxKind.ExportAssignment || statement.kind == ts.SyntaxKind.ExportDeclaration) {
+                    } else if (
+                        statement.kind == SyntaxKind.ExportAssignment ||
+                        statement.kind == SyntaxKind.ExportDeclaration
+                    ) {
                         exportsStatements.push(statement);
-                    } else if (statement.kind == ts.SyntaxKind.LabeledStatement && statement.label.escapedText == "$") {
+                    } else if (
+                        statement.kind == SyntaxKind.LabeledStatement &&
+                        statement.label.escapedText == '$'
+                    ) {
                         reactiveStatements.push(statement);
-                    }
-                    else {
+                    } else {
                         wrappingStatements.push(statement);
                     }
                 }
-                const newFile = ts.factory.createSourceFile([
+                const newFile = factory.createSourceFile([
                     ...importsStatements,
                     createImportDeclaration({
                         from: '@kairo/svelte',
-                        imports: [['withKairo', '_withKairo']]
+                        imports: [['withKairo', '_withKairo']],
                     }),
                     ...propsStatement,
+                    ...reactiveStatements,
                     createScopedCall({
                         tokenList: tokens,
-                        innerStatements: wrappingStatements
-                    }),
-                    ...reactiveStatements
+                        innerStatements: wrappingStatements,
+                        level,
+                    })
                 ]);
-                const printer = ts.createPrinter();
+                const printer = createPrinter();
                 args.content = printer.printFile(newFile);
             }
 
-            const ret = typescriptTrans({
+            const transformer = options.transformer ? options.transformer : typescriptTrans;
+
+            const ret = transformer({
                 ...args,
-                ...options
+                ...options,
             });
             return ret;
-        }
-    }
+        },
+    };
 }
 
-function createImportDeclaration({
-    from,
-    imports
-}) {
-    return ts.factory.createImportDeclaration(
+function createImportDeclaration({ from, imports }) {
+    return factory.createImportDeclaration(
         undefined,
         undefined,
-        ts.factory.createImportClause(false,
+        factory.createImportClause(
+            false,
             undefined,
-            ts.factory.createNamedImports(imports.map(s => ts.factory.createImportSpecifier(
-                ts.factory.createIdentifier(s[0]),
-                ts.factory.createIdentifier(s[1])
-            )))
-        ),
-        ts.factory.createStringLiteral(from)
-    )
-}
-
-function createScopedCall({
-    tokenList,
-    innerStatements
-}) {
-    return ts.factory.createVariableStatement(
-        undefined,
-        ts.factory.createVariableDeclarationList([
-            ts.factory.createVariableDeclaration(
-                ts.factory.createObjectBindingPattern(
-                    tokenList.map(x => {
-                        return ts.factory.createBindingElement(undefined, undefined,
-                            ts.factory.createIdentifier(x))
-                    })
-                ),
-                undefined,
-                undefined,
-                ts.factory.createCallExpression(
-                    factory.createIdentifier("_withKairo"),
-                    undefined,
-                    [
-                        factory.createFunctionExpression(
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            [],
-                            undefined,
-                            factory.createBlock(
-                                [...innerStatements,
-                                factory.createReturnStatement(factory.createObjectLiteralExpression(
-                                    tokenList.map(x => factory.createShorthandPropertyAssignment(
-                                        factory.createIdentifier(x),
-                                        undefined
-                                    )),
-                                    true
-                                ))],
-                                true
-                            )
-                        )
-                    ]
+            factory.createNamedImports(
+                imports.map((s) =>
+                    factory.createImportSpecifier(
+                        factory.createIdentifier(s[0]),
+                        factory.createIdentifier(s[1])
+                    )
                 )
             )
-        ], ts.NodeFlags.Const | ts.NodeFlags.BlockScoped)
-    )
+        ),
+        factory.createStringLiteral(from)
+    );
+}
+
+function createScopedCall({ tokenList, level, innerStatements }) {
+    return factory.createVariableStatement(
+        undefined,
+        factory.createVariableDeclarationList(
+            [
+                factory.createVariableDeclaration(
+                    factory.createObjectBindingPattern(
+                        tokenList.map((x) => {
+                            return factory.createBindingElement(
+                                undefined,
+                                undefined,
+                                factory.createIdentifier(x)
+                            );
+                        })
+                    ),
+                    undefined,
+                    undefined,
+                    factory.createCallExpression(
+                        factory.createIdentifier('_withKairo'),
+                        undefined,
+                        [
+                            factory.createFunctionExpression(
+                                undefined,
+                                undefined,
+                                undefined,
+                                undefined,
+                                [],
+                                undefined,
+                                factory.createBlock(
+                                    [
+                                        ...innerStatements,
+                                        factory.createReturnStatement(
+                                            factory.createObjectLiteralExpression(
+                                                tokenList.map((x) =>
+                                                    factory.createShorthandPropertyAssignment(
+                                                        factory.createIdentifier(
+                                                            x
+                                                        ),
+                                                        undefined
+                                                    )
+                                                ),
+                                                true
+                                            )
+                                        ),
+                                    ],
+                                    true
+                                )
+                            ),
+                            factory.createStringLiteral(level),
+                        ]
+                    )
+                ),
+            ],
+            NodeFlags.Const | NodeFlags.BlockScoped
+        )
+    );
 }
 
 exports.kairo = kairo;
