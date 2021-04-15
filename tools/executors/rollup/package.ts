@@ -11,7 +11,7 @@ interface Options {
     externals: string[];
     entry: string;
     bundleName: string;
-    copy: string[];
+    copy?: string[];
 }
 
 export default async function (

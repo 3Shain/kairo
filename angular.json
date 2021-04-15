@@ -196,7 +196,8 @@
             "externals": [
               "tslib"
             ],
-            "bundleName": "kairo"
+            "bundleName": "kairo",
+            "copy": []
           }
         }
       }
@@ -319,7 +320,8 @@
               "kairo",
               "react"
             ],
-            "bundleName": "kairo-react"
+            "bundleName": "kairo-react",
+            "copy": []
           }
         },
         "lint": {
@@ -361,7 +363,8 @@
               "vue",
               "@vue/reactivity"
             ],
-            "bundleName": "kairo-vue"
+            "bundleName": "kairo-vue",
+            "copy": []
           }
         },
         "test": {
@@ -396,7 +399,8 @@
               "kairo",
               "solid-js"
             ],
-            "bundleName": "kairo-solid"
+            "bundleName": "kairo-solid",
+            "copy": []
           }
         },
         "test": {
