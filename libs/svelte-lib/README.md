@@ -103,3 +103,11 @@ And you should avoid naming variables like this if you don't need two-way bindin
 `provide` and `inject` are guaranteed to work. It could be seen as an alternative of `getContext()/setContext()` and you are encouraged to use kairo's api more.
 
 Unlike other framework integration, there is no hook/composition api/service provided for svelte to access injections in non-kairo scope, because it is really convenient to use kairo in svelte : add `kairo` attribute on your component's script tag and it just works!
+
+
+## Caveats:
+
+* Two-way binding is broken, unless naming with $$ suffix
+* Source map is likely to be broken
+
+These problem might be solved by rewriting the transformer with babel (and get Javascript support). I'm still researching on this.

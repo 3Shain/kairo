@@ -27,7 +27,7 @@ To ultilize DI in kairo (not only for react), there are only 3 steps:
 2. Provide something on top (e.g. `<KairoApp>`).
 3. Inject something on bottom (any children component).
 
-The reason for introducing dependency injection is we want `inverse of control`, which decouples logic, so your component/composition "hooks" can be more reusable. The main idea is you pre-defined what you need (in form of a "Token"), 
+The reason for introducing dependency injection is we want `inverse of control`, which decouples logic, so your component & "hooks" (use-compositions) can be more reusable, because it dependes (and might optionally) on a token, not a specific instance.
 
 ## HoC `withKairo`
 
