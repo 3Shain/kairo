@@ -1,6 +1,11 @@
 import { untrack } from "./core/behavior";
 import { Behavior } from "./public-api";
 
+/**
+ * 
+ * Still WIP. Not exported yet.
+ * 
+ */
 export function reconcile<T, G>(
     cellOfArray: Behavior<Array<T>>,
     setup: (f: T) => G,

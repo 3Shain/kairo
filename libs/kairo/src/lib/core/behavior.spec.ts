@@ -7,12 +7,15 @@ import {
     disposeWatcher,
     cleanupComputation,
     Flag,
-    setData,
+    setData as _setData,
     runInTransaction,
+    Data,
 } from './behavior';
 
 describe('core/behavior', () => {
     var noop = () => {};
+
+    const setData = (a: Data<any>, v: number) => _setData(a, v, true);
 
     it('should establish a reactive relation', (done) => {
         const a = createData(0);
@@ -64,8 +67,6 @@ describe('core/behavior', () => {
         const watcher = watch(c, () => {
             expect(c.flags & Flag.MarkForCheck).toBeFalsy();
         });
-        // expect(c.sources).toContain(a);
-        // expect(c.sources).toContain(b);
         cleanupComputation(c, 0);
         expect(c.last_source).toEqual(null);
         expect(a.last_observer).toEqual(null);
@@ -128,12 +129,6 @@ describe('core/behavior', () => {
 
         expect(accessComputation(c)).toEqual(3); // accessComputation doesn't changes 'markforcheck'
         expect(c.flags & Flag.MarkForCheck).toBeTruthy();
-        // expect(a.flags & Flag.MarkForCheck).toBeTruthy(); // data has no markforcheck status
-        // expect(b.flags & Flag.MarkForCheck).toBeTruthy();
-        // expect(c.flags & Tags.Active).toBeFalsy();
-        // expect(a.flags & Tags.Active).toBeFalsy();
-        // expect(b.flags & Tags.Active).toBeFalsy();
-        // disposeWatcher(watcher);
     });
 
     it('runInTransaction guarantees consistancy', () => {
@@ -152,14 +147,8 @@ describe('core/behavior', () => {
             expect(c.value).toEqual(0);
         });
 
-        expect(c.value).toEqual(3); //
-
+        expect(c.value).toEqual(3);
         expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        // expect(a.flags & Flag.MarkForCheck).toBeFalsy();
-        // expect(b.flags & Flag.MarkForCheck).toBeFalsy();
-        // expect(c.flags & Tags.Active).toBeTruthy();
-        // expect(a.flags & Tags.Active).toBeTruthy();
-        // expect(b.flags & Tags.Active).toBeTruthy();
 
         disposeWatcher(watcher);
     });
@@ -180,7 +169,6 @@ describe('core/behavior', () => {
         const watcher = watch(e, noop);
         setData(a, 2);
         disposeWatcher(watcher);
-        // expect(c.flags & Flag.MaybeStable).toBeTruthy();
     });
 
     it('2', () => {
@@ -243,7 +231,7 @@ describe('core/behavior', () => {
         expect(d.value).toBe(0);
         expect(e.value).toBe(0);
         expect(b.last_observer.prev_observer).toBeFalsy();
-        expect(e.flags & Flag.MaybeStable).toBeTruthy(); 
+        expect(e.flags & Flag.MaybeStable).toBeTruthy();
         disposeWatcher(watcher);
     });
 });

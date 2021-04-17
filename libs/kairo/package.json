@@ -2,6 +2,11 @@
   "name": "kairo",
   "version": "0.0.0",
   "peerDependencies": {
-    
+    "immer": ">=9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "immer": {
+      "optional": true
+    }
   }
 }

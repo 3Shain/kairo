@@ -96,7 +96,7 @@ interface Watcher {
 
 let currentCollecting: Computation | null = null;
 
-function setData<T>(data: Data<T>, value: T): void {
+function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
     if (__DEV__ && currentCollecting) {
         console.error(
             `Violated action: You can't mutate any behavior inside a computation or side effect.`
@@ -104,17 +104,18 @@ function setData<T>(data: Data<T>, value: T): void {
         return;
     }
     if (!inTransaction) {
-        return runInTransaction(() => setData(data, value));
+        return runInTransaction(() => setData(data, value, equalCheck));
     }
-    if (data.value !== value) {
-        data.value = value;
-        if (data.flags & (Flag.Zombie | Flag.Changed)) {
-            return;
-        }
-        data.flags |= Flag.Changed;
-        dirtyDataQueue.push(data);
-        markObserversForCheck(data);
+    if (equalCheck && data.value === value) {
+        return;
     }
+    data.value = value;
+    if (data.flags & (Flag.Zombie | Flag.Changed)) {
+        return;
+    }
+    data.flags |= Flag.Changed;
+    dirtyDataQueue.push(data);
+    markObserversForCheck(data);
 }
 
 const dirtyDataQueue: Data[] = [];

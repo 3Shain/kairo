@@ -27,7 +27,7 @@ import { TeardownLogic } from './types';
 
 export function mutable<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
     const internal = createData(initialValue);
-    return [new Behavior(internal), (v) => setData(internal, v)];
+    return [new Behavior(internal), (v) => setData(internal, v, true)];
 }
 
 export function computed<T>(expr: () => T, staticDependencies = false) {
@@ -260,14 +260,14 @@ export class EventStream<Payload> {
     reduce<T>(reducer: (acc: T, cur: Payload) => any, initialValue: T) {
         const internal = createData(initialValue);
         this.listen((payload) => {
-            setData(internal, reducer(internal.value!, payload));
+            setData(internal, reducer(internal.value!, payload), true);
         }); // solve gc itself!
         return new Behavior(internal);
     }
 
     hold(initialValue: Payload) {
         const internal = createData(initialValue);
-        this.listen((p) => setData(internal, p));
+        this.listen((p) => setData(internal, p, true));
         return new Behavior(internal);
     }
 
