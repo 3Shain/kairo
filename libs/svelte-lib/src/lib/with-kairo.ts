@@ -1,42 +1,45 @@
 import { createScope, disposeScope, Scope } from 'kairo';
-import { getContext, onDestroy, setContext } from 'svelte';
+import type { getContext, onDestroy, setContext } from 'svelte';
 import { KairoContext } from './context';
 
 export function withKairo<T>(
     fn: () => T,
-    level: 'root' | 'module' | 'component'
+    level: 'root' | 'module' | 'component',
+    _onDestroy: typeof onDestroy,
+    _setContext: typeof setContext,
+    _getContext: typeof getContext
 ) {
     if (level === 'root') {
         const { scope, exposed } = createScope(fn);
-        onDestroy(() => {
+        _onDestroy(() => {
             disposeScope(scope);
         });
-        setContext(KairoContext, scope);
+        _setContext(KairoContext, scope);
         return exposed;
     } else if (level === 'module') {
         // not well defined yet
-        let currentContext = getContext(KairoContext) as Scope;
+        let currentContext = _getContext(KairoContext) as Scope;
         if (currentContext?.disposed) {
             // it's a bug from hot reload, we might get a staled context.
             currentContext = undefined;
         }
         const { scope, exposed } = createScope(fn, null, currentContext?.root);
-        onDestroy(() => {
+        _onDestroy(() => {
             disposeScope(scope);
         });
-        setContext(KairoContext, scope);
+        _setContext(KairoContext, scope);
         return exposed;
     } else {
-        let currentContext = getContext(KairoContext) as Scope;
+        let currentContext = _getContext(KairoContext) as Scope;
         if (currentContext?.disposed) {
             // it's a bug from hot reload, we might get a staled context.
             currentContext = undefined;
         }
         const { scope, exposed } = createScope(fn, currentContext);
-        onDestroy(() => {
+        _onDestroy(() => {
             disposeScope(scope);
         });
-        setContext(KairoContext, scope);
+        _setContext(KairoContext, scope);
         return exposed;
     }
 }
