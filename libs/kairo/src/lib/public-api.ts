@@ -180,10 +180,10 @@ export class Behavior<T = any> {
      * @deprecated Use watch.
      */
     subscribe(next: (value: T) => void) {
-        next(this.internal.value!);
         const ret = this.watch((v) => {
             next(v);
         });
+        next(this.internal.value!);
         (ret as any).unsubscribe = ret;
         return ret as {
             (): void;
