@@ -29,7 +29,7 @@ const TestComponent = withKairo<Props>((_, useProp) => {
             <span>{count.value}</span>
             <button onClick={() => plus(1)}>plus</button>
             <span>{uid.value}</span>
-            <FukcingComponent />
+            <ChildComponent /> {/* no bad word 🙊🙊🙊 */}
             <AC />
             {children}
         </div>
@@ -38,7 +38,7 @@ const TestComponent = withKairo<Props>((_, useProp) => {
 
 const testtoken = new InjectToken<Behavior<number>>('test');
 
-const FukcingComponent = withKairo<{}>((_, useProp) => {
+const ChildComponent = withKairo<{}>((_, useProp) => {
     // const uid = useProp((x) => x.uid);
     // const { plus, count } = provide(Counter);
     const { count } = inject(Counter);
