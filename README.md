@@ -19,17 +19,17 @@ Three primitives, with some helper functions.
 -   Logic composition & reuse.
 -   IoC with Dependency injection.
 -   State Management.
--   All features above is avaliable **ACROSS FRAMEWORKS/LIBRARIES**.
+-   All features above is avaliable **ACROSS FRAMEWORKS/UI LIBRARIES**.
     > Currently react, angular, solid, svelte and vue integrations are provided.
 
 ## Basic Idea
 
-We introduce **reactive programming** for two things: **small changes can make big effects** and **schedule things to happen in order**. Let's think of dominoes: When the first tile is toppled, it topples the second, which topples the third, etc., resulting in all of the tiles fallin; And all tile fall in a predictable order. So when we write a reactive program, we will have a similar experience: we assign a variable, then the view is changed consequently; The second point is usually achived by abstraction of declarative data-stream (like ReactiveX), or isn't a problem in imperative codes as order is guaranteed. With this definition in mind, I wrote this library `kairo`, refined most important ideas of 'reactive' in practical application, to provide you with a easy-to-use tool to write robust and maintainable reactive applications.
+We introduce **reactive programming** for two things: **small changes can make big effects** and **schedule things to happen in order**. Let's think of dominoes: When the first tile is toppled, it topples the second, which topples the third, etc., resulting in all of the tiles fallin; And all tile fall in a predictable order. So when we write a reactive program, we will have a similar experience: we assign a variable, then the view is changed consequently; The second point is usually achived by abstraction of declarative data-stream (like ReactiveX), or isn't a problem in imperative codes as order is guaranteed. With this definition in mind, I wrote this library `kairo`, refined most important ideas of 'reactive' in practical application, to provide you with an easy-to-use tool to write robust and maintainable reactive applications.
 
 ## Primitive#1 **Behavior**
 
 ```ts
-import { mutable, computed } from 'kairo';
+import { mutable } from 'kairo';
 
 const [count, setCount] = mutable(0);
 // `count` is a Behavior<number> object, `setCount` is a function.
@@ -134,10 +134,10 @@ It's known we can mutate Behaviors almost everywhere, but to be exact we only mu
 
 ```ts
 const [plusEvent, plus] = stream<number>();
-// `plusEvent` is a EventStream<number> object, `plus` is a function.
+// `plusEvent` is an EventStream<number> object, `plus` is a function.
 ```
 
-By `stream()` we can create a EventStream that is emittable.
+By `stream()` we can create an EventStream that is emittable.
 
 **But keep in mind, not all EventStream is emittable. By definition EventStream only stands for the future occurrences of an event.**
 
@@ -173,7 +173,7 @@ There are some built in schedulers:
 -   `debounce(time)`
 -   `threshold(time)`
 
-EventStreams can be `merge`d into a EventStream, just like you can `combine` Behaviors
+EventStreams can be `merge`d into an EventStream, just like you can `combine` Behaviors
 
 ```ts
 const mergedStream = merge([eventA, eventB, eventC]);
@@ -189,7 +189,7 @@ const count = plusEvent.reduce((a, b) => a + b, 0);
 const lastEvent = plusEvent.hold(0);
 ```
 
-And Behavior `.changes(scheduler)` can gives a EventStream, but you must provide a `Scheduler`,
+And Behavior `.changes(scheduler)` can gives an EventStream, but you must provide a `Scheduler`,
 
 Like Behavior can be `watch`ed, you can `listen` an EventStream.
 
@@ -213,7 +213,7 @@ Recall our basic idea of 'reactive' again. The first point is already brought by
 
 Task is based on generator function of ES6, and have a similar syntax with async/await. The differences expect for syntax are that Task is cancellable, and it has its own schedule strategy (other than microtasks). Task can solve the example above is because it is imperative, and imperative guarantees order in natural. (Later I will show a gist for this)
 
-Writing a task is almost the same as writing a ordinary function, and the main differences is:
+Writing a task is almost the same as writing an ordinary function, and the main differences is:
 
 1. There must be an asterisk(\*) after the keyword `function`
 2. There is a new statement `yield* <expression>`
@@ -221,7 +221,7 @@ Writing a task is almost the same as writing a ordinary function, and the main d
 
 > NB: It is `yield*` ,not `yield`. This is for better TypeScript support and avoid confusion. One simple rule, use `yield*`!
 
-Thle `yield*` statement yields an object whose value is not available at present but sometimes in the future. Thus we can yield a EventStream to get _the event data of next occurrence_.
+Thle `yield*` statement yields an object whose value is not available at present but sometimes in the future. Thus we can yield an EventStream to get _the event data of next occurrence_.
 
 ```ts
 import { task } from 'kairo';
@@ -232,7 +232,7 @@ const start = task(function* () {
 
 start(); // invoke the task
 
-// It's different from calling a ordinary generator function: the logic executes immediatly, like async function.
+// It's different from calling an ordinary generator function: the logic executes immediatly, like async function.
 ```
 
 You can yield a Promise or [Observable](https://github.com/tc39/proposal-observable) by `resolve()`
@@ -397,7 +397,7 @@ useKonami([
 
 You can derive and watch a Behavior, you can listen an EventStream, and you can start and cancel a task. But at some point you don't need to watch a Behavior or listen an EventStream anymore. Manage them manually is painful, that's one of the reason why Scope comes here.
 
-A Scope usually attaches to a outside world object such as a Component (of any front-end frameworks), and when this object disposes (Component destroyed), the Scope disposes (and all subscriptions, on-going tasks collected by scope).
+A Scope usually attaches to an outside world object such as a Component (of any front-end frameworks), and when this object disposes (Component destroyed), the Scope disposes (and all subscriptions, on-going tasks collected by scope).
 
 Scopes can have a hierarchy, just like we usually model application as a tree of component. A Scope has a parent Scope, and a Scope is always initialize after and dispose before its parent Scope. There is a root Scope, and it might attach to the whole application.
 

@@ -67,7 +67,7 @@ export default defineComponent({
 ### Access properties
 
 ```tsx
-setkairo((props, useProp, ctx)=>{
+setupkairo((props, useProp, ctx)=>{
 
     const prop1 : number = props.prop1;
     /**
