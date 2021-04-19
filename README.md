@@ -209,7 +209,7 @@ Here is a table comparing the conceps of Behavior and EventStream
 
 Now you can already build a reactive system using Behavior & EventStream. They are both declarative (describe the data flow than mutate/transport data directly) and predictable (given initial state and steps of event, we get the current state).
 
-Recall our basic idea of 'reactive' again. The first point is already brought by Behavior and EventStream, but how about the second point: schedule things to happen **in order**? To make it clear, we are going to make a [kocani code](https://en.wikipedia.org/wiki/Konami_Code) as an example: press the keys in order to `activate a cheat`. It seems Behavior and EventStream are not very handy tools to solve this problem, at least we need extra states to model it. Is there any intuitive way to solve this? The third primitive: Task is introduced.
+Recall our basic idea of 'reactive' again. The first point is already brought by Behavior and EventStream, but how about the second point: schedule things to happen **in order**? To make it clear, we are going to make a [konami code](https://en.wikipedia.org/wiki/Konami_Code) as an example: press the keys in order to `activate a cheat`. It seems Behavior and EventStream are not very handy tools to solve this problem, at least we need extra states to model it. Is there any intuitive way to solve this? The third primitive: Task is introduced.
 
 Task is based on generator function of ES6, and have a similar syntax with async/await. The differences expect for syntax are that Task is cancellable, and it has its own schedule strategy (other than microtasks). Task can solve the example above is because it is imperative, and imperative guarantees order in natural. (Later I will show a gist for this)
 
@@ -226,11 +226,11 @@ Thle `yield*` statement yields an object whose value is not available at present
 ```ts
 import { task } from 'kairo';
 
-const start = task(function* () {
+const startTask = task(function* () {
     const data = yield* eventStream;
 });
 
-start(); // invoke the task
+startTask(); // invoke the task
 
 // It's different from calling an ordinary generator function: the logic executes immediatly, like async function.
 ```
@@ -240,7 +240,7 @@ You can yield a Promise or [Observable](https://github.com/tc39/proposal-observa
 ```ts
 import { task, resolve } from 'kairo';
 
-const start = task(function* () {
+const startTask = task(function* () {
     const body = yield* resolve(
         fetch('https://api.github.com/').then((x) => x.text())
     );
@@ -257,7 +257,7 @@ Or you can use callback. It looks like constructing a Promise, but you can retur
 ```ts
 import { task, callback, delay } from 'kairo';
 
-const start = task(function* () {
+const startTask = task(function* () {
     // delay 500ms
     yield* callback((resolve, reject) => {
         const id = setTimeout(() => {
@@ -276,18 +276,18 @@ const start = task(function* () {
 Task itself is yield\*able as well.
 
 ```ts
-const task1 = task(...);
+const startTask1 = task(...);
 
-const task2 = task(function*(
+const startTask2 = task(function*(
     parameter1:number,
     parameter2:string
     /** you can declare parameters as well  */
 ) {
-    const value = yield* task1(); // you can get the return value of a task
+    const value = yield* startTask1(); // you can get the return value of a task
 
     ...
 
-    yield* task2(0,'a string'); // and pass parameters like normal function call
+    yield* startTask2(0,'a string'); // and pass parameters like normal function call
 });
 ```
 
