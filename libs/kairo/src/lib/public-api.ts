@@ -71,7 +71,6 @@ export function combine<
 >(obj: C): Behavior<ExtractBehaviorProperty<C>>;
 export function combine(obj: object): Behavior<any> {
     if (obj instanceof Array) {
-        /** Array need to be implemented in different way */
         return computed(() => {
             return obj.map((x) => {
                 return x.value;
@@ -190,10 +189,6 @@ export class Behavior<T = any> {
             unsubscribe(): void;
         };
     }
-
-    pipe() {
-        throw Error('not implemented');
-    }
 }
 
 export class ComputationalBehavior<T> extends Behavior<T> {
@@ -210,8 +205,7 @@ export class EventStream<Payload> {
     constructor(private internal: Emitter<Payload>) {}
 
     *[Symbol.iterator]() {
-        const resoved = (yield this) as Payload;
-        return resoved;
+        return (yield this) as Payload;
     }
 
     transform<R>(transformFn: (payload: Payload) => R) {
@@ -287,10 +281,6 @@ export class EventStream<Payload> {
             registerDisposer(() => unsusbcribeNext(this.internal, subscriber));
         });
         return () => unsusbcribeNext(this.internal, subscriber);
-    }
-
-    pipe() {
-        throw Error('not implemented');
     }
 }
 
