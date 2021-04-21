@@ -25,6 +25,7 @@ export function taskExecutor(
     let { scope } = createScope(() => {});
 
     let iter = gen[Symbol.iterator]();
+    let settled = false;
 
     function execute(resumed: unknown, error: unknown) {
         let performed: IteratorResult<unknown>;
@@ -35,15 +36,18 @@ export function taskExecutor(
             );
         } catch (e) {
             if (e === DISPOSED) {
-                // user doesn't handle this.
+                // it has been already settled
+                // seems user doesn't handle this.
             } else {
+                settled = true;
                 onFailure(e);
             }
             disposeScope(scope);
-            return;
+            return; // TODO: what if user doesn't exit?
         }
 
         if (performed.done == true) {
+            settled = true;
             onSuccess(performed.value);
             disposeScope(scope);
             return;
@@ -86,6 +90,10 @@ export function taskExecutor(
     execute(undefined, undefined);
 
     return () => {
+        if (settled) {
+            return;
+        }
+        settled = true;
         execute(undefined, DISPOSED);
         currentDisposer?.();
     };
