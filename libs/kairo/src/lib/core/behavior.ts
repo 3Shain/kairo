@@ -31,17 +31,21 @@ const enum Flag {
     /**
      * current value is changed (so need to propagate)
      */
-    Changed = 0x400,
+    Changed = 0x200,
     /**
      * When a computation is zombie, it is definitely markforcheck
      */
-    Zombie = 0x800,
+    Zombie = 0x400,
     /**
      * dynamic is true when this is true
      */
     NotReady = 0x1000,
     RenderEffect = 0x2000,
+    Suspensed = 0x4000,
+    Suspending = 0x8000,
 }
+
+const SUSPENSE_STATE = {};
 
 interface WatcherNode {
     fn: Function;
@@ -76,9 +80,23 @@ interface Data<T = any> {
 interface Computation<T = any> extends Data<T> {
     first_source: SourceLinkNode<Data> | null;
     last_source: SourceLinkNode<Data> | null;
-    collect: () => T;
+    collect: Function;
     depsCounter: number;
     checkNode: SourceLinkNode<Data> | null;
+}
+
+interface Suspensed<T = any, F = undefined> extends Computation<T> {
+    fallback: F;
+    first_node: SuspenseNode | null;
+    current_node: SuspenseNode | null;
+}
+
+interface SuspenseNode {
+    dependencies: any[];
+    data: Data;
+    fetcher: any;
+    next: SuspenseNode | null;
+    cancel: Function;
 }
 
 interface Watcher {
@@ -144,6 +162,12 @@ function accessData(data: Data) {
                 data.flags -= Flag.Zombie;
             }
         }
+        if (
+            currentCollecting.flags & Flag.Suspensed &&
+            data.flags & Flag.Suspending
+        ) {
+            throw SUSPENSE_STATE;
+        }
     }
     return data.value;
 }
@@ -165,6 +189,12 @@ function accessComputation(data: Computation) {
                 data.value = updateComputation(data);
                 data.flags -= Flag.MarkForCheck;
             }
+        }
+        if (
+            currentCollecting.flags & Flag.Suspensed &&
+            data.flags & Flag.Suspending
+        ) {
+            throw SUSPENSE_STATE;
         }
     } else {
         if (data.flags & (Flag.MarkForCheck | Flag.Zombie)) {
@@ -197,7 +227,30 @@ function collectSourceAndRecomputeComputation(computation: Computation) {
     currentCollecting = computation;
     computation.checkNode = computation.first_source;
     computation.flags |= Flag.Computing;
-    const currentValue = computation.collect();
+
+    let currentValue;
+
+    if (computation.flags & Flag.Suspensed) {
+        try {
+            computation.flags |= Flag.Suspending;
+            currentValue = computation.collect((fetcher: any, ...args: any[]) =>
+                readSuspense(computation as Suspensed, fetcher, args)
+            );
+            computation.flags -= Flag.Suspending;
+        } catch (e) {
+            if (e === SUSPENSE_STATE) {
+                // a _behavior_ has been collected and it will schedule an update later.
+            } else {
+                // it's an error! TODO: deal with the error.
+            }
+            currentValue = (computation as Suspensed).fallback;
+        } finally {
+            (computation as Suspensed).current_node = null;
+        }
+    } else {
+        currentValue = computation.collect();
+    }
+
     computation.flags -= Flag.Computing;
     if (computation.flags & Flag.MaybeStable) {
         // check the real used deps is lesser than assumed.
@@ -210,6 +263,75 @@ function collectSourceAndRecomputeComputation(computation: Computation) {
     computation.checkNode = null;
     currentCollecting = stored;
     return currentValue;
+}
+
+function readSuspense(
+    suspensed: Suspensed,
+    fetcher: Function,
+    dependencies: any[]
+) {
+    let currentChecking: SuspenseNode | null;
+    if (suspensed.current_node === null) {
+        currentChecking = suspensed.first_node;
+    } else {
+        currentChecking = suspensed.current_node.next;
+    }
+    if (currentChecking === null) {
+        currentChecking = {
+            data: createData(null),
+            next: null,
+            dependencies,
+            cancel: () => {},
+            // settled: false,
+            fetcher,
+        };
+        suspensed.current_node = currentChecking;
+        if (suspensed.first_node === null) {
+            suspensed.first_node = currentChecking;
+        }
+    } else {
+        suspensed.current_node = currentChecking;
+        if (compareSuspense(currentChecking, fetcher, dependencies)) {
+            // it is the same
+            return accessData(currentChecking.data);
+        }
+        let next = currentChecking.next;
+        currentChecking.next = null; // otherwise discard remain nodes
+        while (next != null) {
+            if (next.next == null) {
+                break;
+            }
+            next = next.next;
+        }
+        next?.cancel();
+    }
+    accessData(currentChecking.data); // log read
+    currentChecking.fetcher = fetcher;
+    currentChecking.dependencies = dependencies;
+    // start fetch effect
+    fetcher.call(void 0, ...dependencies).then((x: any) => {
+        setData(currentChecking!.data, x, false);
+    }); // TODO: cancellation support & task (need to rewrite)
+    throw SUSPENSE_STATE;
+}
+
+function compareSuspense(
+    node: SuspenseNode,
+    fetcher: any,
+    dependencies: any[]
+) {
+    if (node.fetcher !== fetcher) {
+        return false;
+    }
+    if (node.dependencies.length !== dependencies.length) {
+        return false;
+    }
+    for (let i = 0; i < node.dependencies.length; i++) {
+        if (node.dependencies[i] !== dependencies[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
@@ -315,8 +437,8 @@ function propagate(data: Data) {
             }
             current.flags |= Flag.Stale;
             current.depsCounter--;
+            notZombie = true;
             if (current.depsCounter === 0 && propagate(current)) {
-                notZombie = true;
             }
             observer = observer.prev_observer;
         }
@@ -338,8 +460,8 @@ function propagate(data: Data) {
                 continue;
             }
             current.depsCounter--;
+            notZombie = true;
             if (current.depsCounter === 0 && propagate(current)) {
-                notZombie = true;
             }
             observer = observer.prev_observer;
         }
@@ -593,6 +715,29 @@ function createComputation<T>(
     return ret;
 }
 
+function createSuspensed<T, F>(fn: (read: Function) => T, fallback: F) {
+    const ret: Suspensed<T, F> = {
+        flags:
+            Flag.Computation |
+            Flag.Suspensed |
+            Flag.Zombie |
+            Flag.MarkForCheck |
+            Flag.MaybeStable,
+        last_effect: null,
+        last_observer: null,
+        value: null,
+        first_source: null,
+        last_source: null,
+        collect: fn,
+        depsCounter: 0,
+        checkNode: null,
+        fallback,
+        current_node: null,
+        first_node: null,
+    };
+    return ret;
+}
+
 export function __current_collecting() {
     return currentCollecting;
 }
@@ -615,4 +760,6 @@ export {
     createRenderEffect,
     executeRenderEffect,
     cleanupRenderEffect,
+    SUSPENSE_STATE,
+    createSuspensed,
 };

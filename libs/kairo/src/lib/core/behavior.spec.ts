@@ -248,6 +248,9 @@ describe('core/behavior', () => {
         disposeWatcher(watcher);
         setData(a, 0);
         setData(b, 2);
+        expect(e.flags & Flag.Zombie).toBeTruthy();
+        // expect(c.flags & Flag.Zombie).toBeTruthy(); // c is not zombie yet
+        setData(a, 1);
         expect(c.flags & Flag.Zombie).toBeTruthy();
 
         disposeWatcher(keep_a_b_alive_watcher);
