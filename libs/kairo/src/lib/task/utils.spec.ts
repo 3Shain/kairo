@@ -1,6 +1,15 @@
 import { any, all, allSettled, race, delay } from './utils';
 import { task, taskExecutor } from './task';
 
+// polyfill
+if (typeof AggregateError === 'undefined') {
+    (globalThis.AggregateError as any) = class extends Error {
+        constructor(...args: any[]) {
+            super('');
+        }
+    };
+}
+
 describe('task/utils', () => {
     it('race should return the first settled task: when success', (done) => {
         taskExecutor(
@@ -231,7 +240,6 @@ describe('task/utils', () => {
     });
 
     it('allSettled should fail when all task fail', (done) => {
-
         taskExecutor(
             (function* () {
                 return yield* allSettled([

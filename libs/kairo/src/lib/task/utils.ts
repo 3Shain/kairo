@@ -74,17 +74,19 @@ type Union<T extends any[]> = T[number];
 function* any<R extends Array<any>>(array: R): Task<Union<ResolveAll<R>>> {
     return yield* callback((resolve, reject) => {
         let taskNum = array.length;
-        const disposors = array.map((task) =>
+        let errors = new Array(taskNum);
+        const disposors = array.map((task, index) =>
             taskExecutor(
                 task,
-                (v: unknown) => {
-                    resolve(v as any);
-                    // should dispose other ?
+                (value: Union<ResolveAll<R>>) => {
+                    disposors.forEach((x) => x());
+                    resolve(value);
                 },
-                () => {
+                (error: unknown) => {
                     taskNum--;
+                    errors[index] = error;
                     if (taskNum === 0) {
-                        reject(Error('All task failed'));
+                        reject(new AggregateError(errors, 'All task failed'));
                     }
                 }
             )
@@ -98,13 +100,13 @@ function* race<R extends Array<any>>(array: R): Task<Union<ResolveAll<R>>> {
         const disposors = array.map((task) =>
             taskExecutor(
                 task,
-                (v: unknown) => {
-                    resolve(v as any);
-                    // should dispose other ?
+                (value: Union<ResolveAll<R>>) => {
+                    disposors.forEach((x) => x());
+                    resolve(value);
                 },
-                (e: unknown) => {
-                    reject(e);
-                    // should dispose other ?
+                (error: unknown) => {
+                    disposors.forEach((x) => x());
+                    reject(error);
                 }
             )
         );
@@ -123,12 +125,12 @@ function* all<R extends Array<any>>(array: R): Task<ResolveAll<R>> {
                     result[index] = v;
                     remains--;
                     if (remains === 0) {
-                        resolve(result as any);
+                        resolve(result as ResolveAll<R>);
                     }
                 },
                 (e: unknown) => {
+                    disposors.forEach((x) => x());
                     reject(e);
-                    // should dispose other?
                 }
             )
         );
@@ -176,7 +178,7 @@ function* allSettled<R extends Array<any>>(
                     };
                     remains--;
                     if (remains === 0) {
-                        reject(Error('All task failed.'));
+                        reject(new AggregateError(result, 'All task failed.'));
                     }
                 }
             )
