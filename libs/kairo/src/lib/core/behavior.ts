@@ -1,8 +1,3 @@
-/**
- * Not fully tested yet.
- * Suspected to be faster by 10% than current impl.
- */
-
 const enum Flag {
     /**
      * this is a data */
@@ -46,7 +41,6 @@ const enum Flag {
      */
     NotReady = 0x1000,
     RenderEffect = 0x2000,
-    MaskRenderEffect = 0x4000,
 }
 
 interface WatcherNode {
@@ -317,14 +311,7 @@ function propagate(data: Data) {
                 continue;
             }
             if (__TEST__ && (current.flags & Flag.MarkForCheck) === 0) {
-                throw 'should never haapen';
-                // observer = observer.prev_observer;
-                // notZombie = true;
-                // this will happen if the observer is propagated already
-                // as repeatation is allowed in the linked list
-                // are you fucking sure?
-                // if a node is propagated already, it should never be here!
-                // continue;
+                throw 'should never happen'; // how is this possible? It could not even be mocked in unit tests.
             }
             current.flags |= Flag.Stale;
             current.depsCounter--;
@@ -347,6 +334,7 @@ function propagate(data: Data) {
         while (observer !== null) {
             let current = observer.observer;
             if (current.flags & Flag.Zombie) {
+                observer = observer.prev_observer;
                 continue;
             }
             current.depsCounter--;
@@ -360,7 +348,6 @@ function propagate(data: Data) {
         }
     }
     if (!notZombie) {
-        if (__TEST__) console.log('stop updating?');
         data.flags |= Flag.Zombie;
         if (data.flags & Flag.Computation) {
             data.flags |= Flag.MarkForCheck;
