@@ -4,7 +4,7 @@
 
 ## ☝️ Kairo is
 
-### a set of API ,as well as a refinement of **Reactive Programming Pattern**.
+### a set of APIs as well as ***a refinement of the reactive programming paradigm.***.
 
 _Kairo is currently designed for frontend applications, but there are still a lot to investigate!_
 
