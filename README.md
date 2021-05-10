@@ -4,7 +4,7 @@
 
 ## ☝️ Kairo is
 
-### a set of APIs as well as ***a refinement of the reactive programming paradigm.***.
+### a set of APIs as well as **_a refinement of the reactive programming paradigm._**.
 
 _Kairo is currently designed for frontend applications, but there are still a lot to investigate!_
 
@@ -29,22 +29,22 @@ We introduce **reactive programming** for two things: **small changes can make b
 ## Primitive#1 **Behavior**
 
 ```ts
-import { mutable } from 'kairo';
+import { mut } from 'kairo';
 
-const [count, setCount] = mutable(0);
+const [count, setCount] = mut(0);
 // `count` is a Behavior<number> object, `setCount` is a function.
 
 const snap = count.value; // read
 setCount(1); // mutate
 ```
 
-**Behavior** stores a varying value. We can access the value by `.value`. By `mutable(initialValue)` we can create a Behavior that is mutable.
+**Behavior** stores a varying value. We can access the value by `.value`. By `mut(initialValue)` we can create a Behavior that is mutable.
 
 **There are reasons to read by getter and write by a separate function**
 
 -   It doesn't break javascript semantics. Read is still read but mutating a data is not the same and shouldn't be treated as object property assignment.
 -   It enforces uni-direction data-flow: you can mutate data only if you have the setter. (And usually you shouldn't expose it, keep it _private_)
--   With a `.value` getter, you know you are accessing a Behavior. Thus you know which part of your code is going to 'react'. (While the code is still readable, it increases maintainbility a lot!)
+-   With a `.value` getter, you know you are accessing a Behavior. Thus you know which part of your code is going to 'react'. (While the code is still readable, it increases maintainability a lot!)
 
 **But keep in mind, not all Behavior is mutable. By definition Behavior just store a varying value.**
 
@@ -61,7 +61,7 @@ Computation can depend on multiple behaviors, but be careful with circular depen
 ```ts
 const sum = computed(()=>a.value + b.value); // computed receives a thunk.
 // FP fashion
-const sum = combine([a,b]).map(Math.sum);
+const sum = combined([a,b]).map(Math.sum);
 // actually there is not such `Math.sum` ... but you know what I mean
 
 const c = computed(()=> ... c.value ...); // never do this!
@@ -85,12 +85,13 @@ Computation defines a strict relationship of behaviors, and this relationship ho
 Let's return to the basic idea of reactive. We now have data and data depend on data......but it is meaningless if our data don't do some real effects, i.e. update our views, or send a http request, etc. So we need to _bind_ our Behavior to something in some way, and actually the integrations of kairo for many frameworks/libraries do this job in a really sophisticated way. (You will see more about this below). Anyway, there is a simplest way to make a Behavior _effective_: `.watch(watcherFn)`
 
 ```ts
-count.watch((current) => {
+const stopWatchHandler = count.watch((current) => {
     console.log(`current value is ${current}`); // log is a typical side effect
     // and you can e.g. mutate DOM element, but with a nice framework integration you will rarely do this.
 });
 
-// there is no such `watch(()=>{...})` function, you can only watch _a single_ Behavior, but not an expression.
+// at some point, stop watching
+stopWatchHandler();
 
 /**
  * This is an example of React integration, no need to .watch()
@@ -110,21 +111,7 @@ const Counter = withKairo(() => {
 });
 ```
 
-<!-- And there is another important rule: **Do not mutate any Behavior in `.watch()`**. It seems to be too strict, I will explain this later and you will feel it is pretty reasonable. -->
-
-<!-- Now it comes to the question where should we mutate Behavior. The anwser is you can mutate Behavior anywhere expect for computations and `.watch()`.  -->
-
-You are not recommend to mutate Behavior in `.watch()`**. The reason is super simple: A mutation causes consequential computations and (synchronous) side effects. If you do another mutation inside computations or (synchronous) side effects then a loop might come up, which makes things **hard to predict\*\*.
-
-<!-- But there is an exception: you can wrap your mutation inside an async api (like `setTimeout`,`Promise.then`):
-
-```ts
-count.watch((current) => {
-    setTimeout(() => {
-        setCount(current + 1); // but you should know what you are doing. Like this code will keep running...
-    }, 0);
-});
-``` -->
+You are not recommended to mutate Behavior in `.watch()`. The reason is super simple: A mutation causes consequential computations and (synchronous) side effects. If you do another mutation inside computations or (synchronous) side effects then a loop might come up, which makes things **hard to predict**. In most case, you can use `computed()` instead of you want to mutate a Behavior after another Behavior changes.
 
 ## Primitive#2 **EventStream**
 
@@ -159,6 +146,7 @@ const notNullStream = event.filter((x) => x != null);
  */
 ```
 
+<!--
 Schedule is a kind of derivation that make an occurance of event filtered or delayed asynchronously. It receives a scheduler.
 
 ```ts
@@ -171,39 +159,39 @@ There are some built in schedulers:
 -   `async`: Emit event in next microtask.
 -   `animation`: Emit event in next requestAnimationFrame call.
 -   `debounce(time)`
--   `threshold(time)`
+-   `threshold(time)` -->
 
-EventStreams can be `merge`d into an EventStream, just like you can `combine` Behaviors
+EventStreams can be `merged` into an EventStream, just like you can combine Behaviors
 
 ```ts
-const mergedStream = merge([eventA, eventB, eventC]);
+const mergedStream = merged([eventA, eventB, eventC]);
 ```
 
-EventStream can be `reduce`ed or `hold`ed to become a Behavior
+EventStream can be `reduced` or `held` to become a Behavior
 
 ```ts
 const [plusEvent, plus] = stream<number>();
 
-const count = plusEvent.reduce((a, b) => a + b, 0);
+const count = reduced(plusEvent, (a, b) => a + b, 0);
 
-const lastEvent = plusEvent.hold(0);
+const lastEvent = held(plusEvent, 0);
 ```
-
-And Behavior `.changes(scheduler)` can gives an EventStream, but you must provide a `Scheduler`,
+<!-- 
+And Behavior `.changes(scheduler)` can gives an EventStream, but you must provide a `Scheduler`, -->
 
 Like Behavior can be `watch`ed, you can `listen` an EventStream.
 
 Here is a table comparing the conceps of Behavior and EventStream
 
-|               | Behavior                        | EventStream                            |
-| ------------- | ------------------------------- | -------------------------------------- |
-| definition    | a varying value                 | future occurrences of an event         |
-| the 'atom'    | mutable(`initial`)              | stream()                               |
-| derivation    | .map() / .switch() / computed() | .transform() / .filter() / .schedule() |
-| composition   | combine()                       | merge()                                |
-| notification  | .watch()                        | .listen()                              |
-| convert       | .changes()                      | .reduce() / .hold()                    |
-| 'placeholder' | constant(value)                 | never()                                |
+|               | Behavior                        | EventStream                    |
+| ------------- | ------------------------------- | ------------------------------ |
+| definition    | a varying value                 | future occurrences of an event |
+| the 'atom'    | mut(`initial`)                  | stream()                       |
+| derivation    | .map() / .switch() / computed() | .transform() / .filter() /     |
+| composition   | combined()                      | merged()                       |
+| notification  | .watch()                        | .listen()                      |
+| 'placeholder' | constant(value)                 | never()                        |
+| convert       | N/A                             | reduced() / held()             |
 
 ## Primitive#3 **Task**
 
@@ -230,7 +218,9 @@ const startTask = task(function* () {
     const data = yield* eventStream;
 });
 
-startTask(); // invoke the task
+const taskObject = startTask(); // invoke the task
+// taskObject is a Promise with a `cancel()` method
+taskObject.cancel();
 
 // It's different from calling an ordinary generator function: the logic executes immediatly, like async function.
 ```
@@ -252,6 +242,7 @@ const startTask = task(function* () {
 });
 ```
 
+<!--
 Or you can use callback. It looks like constructing a Promise, but you can return a function which will be called when the excuting task is cancelled.
 
 ```ts
@@ -271,7 +262,7 @@ const startTask = task(function* () {
     // or use timeout, the difference is timeout raise an error
     yield* timeout(500);
 });
-```
+``` -->
 
 Task itself is yield\*able as well.
 
@@ -295,25 +286,23 @@ const startTask2 = task(function*(
 
 Just use try-catch.
 
-As Task is cancellable, a `yield*` statement will throw an `DISPOSED` object, so that you can get notified and do cleanup logics.
-
-By the way, you can have `immediately invoked task expression` like IIFE.
+As Task is cancellable, a `yield*` statement will throw an `CanceledError`, so that you can get notified and do cleanup logics.
 
 ```ts
 
-import { task, DISPOSED } from 'kairo';
+import { task, CanceledError } from 'kairo';
 
 task(function*(){
     try{
         ... // your logics
     } catch(e) {
-        if(e === DISPOSED){
+        if(e instanceof CanceledError){
             // do cleanup logics
         } else {
             // handle errors
         }
     }
-})();
+});
 ```
 
 ### Concurrency
@@ -335,8 +324,8 @@ Sometimes you need a sequence of event occurance other than single one (e.g. Dra
 task(function*(){
 
     const channel = readEvents({
-        from: event1
-        until: event2
+        from: eventStream1
+        until: eventStream2
     });
 
     while(yield* channel.hasNext()){
@@ -364,7 +353,7 @@ function useKonami(keys: string[]) {
 
     const keydownCode = keydown.transform((x) => x.code);
 
-    task(function* () {
+    const startTask = task(function* () {
         while (true) {
             const key = yield* keydownCode;
             if (key == keys[0]) {
@@ -381,23 +370,39 @@ function useKonami(keys: string[]) {
                 }
             }
         }
-    })();
+    });
 
-    window.addEventListener('keydown', emitkey);
-    registerDisposer(() => window.removeEventListener('keydown', emitkey));
+    effect(() => {
+        window.addEventListener('keydown', emitkey);
+        return () => window.removeEventListener('keydown', emitkey);
+    });
+
+    effect(() => startTask());
 }
 
 useKonami([
-    'ArrowUp','ArrowUp','ArrowDown','ArrowDown',
-    'ArrowLeft','ArrowRight','ArrowLeft','ArrowRight',
+    'ArrowUp',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowLeft',
+    'ArrowRight',
 ]);
 ```
 
-## Lifecycle and Scope
+## Scope
 
-You can derive and watch a Behavior, you can listen an EventStream, and you can start and cancel a task. But at some point you don't need to watch a Behavior or listen an EventStream anymore. Manage them manually is painful, that's one of the reason why Scope comes here.
+Scope is introduced to manage side effects. 
 
-A Scope usually attaches to an outside world object such as a Component (of any front-end frameworks), and when this object disposes (Component destroyed), the Scope disposes (and all subscriptions, on-going tasks collected by scope).
+<!-- If you don't know what is side effect, there is a very interesting definition: the code can be executed multiple times at any time with no issues. Let's give some example:
+* A function calculate the sum of two number : no side effect.
+* A function that will change the title of window : there is side effect
+* A function will watch ...
+* ... -->
+
+`effect` is used in a gist above but doesn't introduced yet, it shows how kairo manages side effects. `effect(sideEffect)` receives a function that will be executed when kairo think it's time to do side effect (e.g. A component mounted) and this function can return a function that will be executed when kairo decided to do cleanups. A Scope usually attaches to an outside world object such as a Component (of a front-end frameworks).
 
 Scopes can have a hierarchy, just like we usually model application as a tree of component. A Scope has a parent Scope, and a Scope is always initialize after and dispose before its parent Scope. There is a root Scope, and it might attach to the whole application.
 
@@ -405,9 +410,9 @@ Because Scopes have a hierarchy, thus its suitable and reasonable to have a depe
 
 ```ts
 
-import { provide, inject, InjectToken } from 'kairo';
+import { provide, inject, Token } from 'kairo';
 
-const THE_TOKEN = InjectToken.for<Type>('A meaningful name.');
+const THE_TOKEN = Token.for<Type>('A unique name');
 
 // In parent Scope
 
@@ -421,7 +426,7 @@ const theObject = inject(THE_TOKEN);
 
 ```
 
-Besides `InjectToken`, a function can be also treat as a token, such that we call this function a Service.
+Besides `Token` object, a function can be also treat as a token, such that we call this function a Service.
 
 ```ts
 function FooService() {
@@ -444,7 +449,6 @@ const foo = inject(FooService);
 
 But how can I create a Scope? Well this should be done by integrations already, but you can still check the documentation.
 
-`registerDisposer` is used in a gist above but doesn't introduced yet. This is to register a callback that will be called when current scope is disposed.
 
 ## Integrations
 
