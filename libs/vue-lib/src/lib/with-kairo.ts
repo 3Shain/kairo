@@ -2,6 +2,9 @@ import {
     ComponentPublicInstance,
     defineComponent,
     inject,
+    onActivated,
+    onDeactivated,
+    onMounted,
     onUnmounted,
     provide,
     ref,
@@ -12,13 +15,13 @@ import {
 } from 'vue';
 import {
     Behavior,
-    createScope,
-    disposeScope,
+    effect,
     mutable,
-    registerDisposer,
-    __cleanupRenderEffect,
+    Scope,
     __createRenderEffect,
+    __disposeWatcher,
     __executeRenderEffect,
+    __watch,
 } from 'kairo';
 import { track, TrackOpTypes, triggerRef } from '@vue/reactivity';
 import { SCOPE } from './context';
@@ -34,35 +37,40 @@ export function withKairo<Props>(
     ) => VNodeChild | object
 ) {
     return defineComponent<Props>(function (props, ctx) {
-        const { scope, exposed } = createScope(() => {
+        const scope = new Scope(() => {
             const renderFn = setup(
                 {
                     ...props,
                 },
                 (thunk: (_: Props) => any) => {
                     const [prop, setProp] = mutable(thunk(props));
-                    watch(
-                        () => thunk(props),
-                        (value) => {
-                            setProp(value);
-                        }
+                    effect(() =>
+                        watch(
+                            () => thunk(props),
+                            (value) => {
+                                setProp(value);
+                            }
+                        )
                     );
                     return prop;
                 },
                 ctx
             );
             let trigger = ref(0);
-            const renderEffect = __createRenderEffect(() => {
+            const renderEffect = __createRenderEffect();
+
+            effect(() => {
+                const node = __watch(renderEffect, () => {
+                    triggerRef(trigger);
+                });
                 triggerRef(trigger);
-            });
-            registerDisposer(() => {
-                __cleanupRenderEffect(renderEffect);
+                return () => __disposeWatcher(node);
             });
             return function (this: ComponentPublicInstance) {
                 const _this = this;
                 track(trigger, 'get' as TrackOpTypes, 'value');
                 return __executeRenderEffect(renderEffect, () =>
-                    renderFn.call(this, {
+                    renderFn.call(_this, {
                         get children() {
                             return renderSlot(_this.$slots, 'default');
                         },
@@ -71,12 +79,34 @@ export function withKairo<Props>(
             };
         }, inject(SCOPE, undefined));
 
+        let detachHandler: Function | null = null;
+
+        onMounted(() => {
+            detachHandler = scope.attach();
+        });
+
         onUnmounted(() => {
-            disposeScope(scope);
+            detachHandler!();
+            detachHandler = null;
+        });
+
+        let deactivating = false;
+
+        onActivated(() => {
+            if (deactivating) {
+                detachHandler = scope.attach();
+                deactivating = false;
+            }
+        });
+
+        onDeactivated(() => {
+            detachHandler!();
+            detachHandler = null;
+            deactivating = true;
         });
 
         provide(SCOPE, scope);
 
-        return exposed;
+        return scope.exported;
     });
 }

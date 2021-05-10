@@ -142,7 +142,7 @@ function kairo(options = {}) {
                     }),
                     createImportDeclaration({
                         from: 'svelte',
-                        imports: [['onDestroy', '_onDestroy'],['setContext', '_setContext'],['getContext','_getContext']],
+                        imports: [['onDestroy', '_onDestroy'],['setContext', '_setContext'],['getContext','_getContext'],['onMount','_onMount']],
                     }),
                     ...propsStatement,
                     ...reactiveStatements,
@@ -239,6 +239,7 @@ function createScopedCall({ tokenList, level, innerStatements }) {
                             factory.createIdentifier('_onDestroy'),
                             factory.createIdentifier('_setContext'),
                             factory.createIdentifier('_getContext'),
+                            factory.createIdentifier('_onMount'),
                         ]
                     )
                 ),

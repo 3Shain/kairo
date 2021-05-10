@@ -287,57 +287,57 @@ describe('core/behavior', () => {
         disposeWatcher(watcher2);
     });
 
-    it('renderEffect should works', () => {
-        let effectCount = 0;
+    // it('renderEffect should works', () => {
+    //     let effectCount = 0;
 
-        const reff = createRenderEffect(() => {
-            effectCount++;
-        });
+    //     const reff = createRenderEffect(() => {
+    //         effectCount++;
+    //     });
 
-        const a = data(1);
-        const b = data(2);
+    //     const a = data(1);
+    //     const b = data(2);
 
-        const result = executeRenderEffect(reff, () => {
-            return readData(a) + readData(b);
-        });
+    //     const result = executeRenderEffect(reff, () => {
+    //         return readData(a) + readData(b);
+    //     });
 
-        expect(result).toBe(3);
+    //     expect(result).toBe(3);
 
-        setData(a, 2);
-        setData(b, 3);
+    //     setData(a, 2);
+    //     setData(b, 3);
 
-        expect(effectCount).toBe(2);
+    //     expect(effectCount).toBe(2);
 
-        setData(b, 3);
-        const result2 = executeRenderEffect(reff, () => {
-            return readData(a);
-        });
+    //     setData(b, 3);
+    //     const result2 = executeRenderEffect(reff, () => {
+    //         return readData(a);
+    //     });
 
-        expect(result2).toBe(2);
+    //     expect(result2).toBe(2);
 
-        setData(a, 4);
+    //     setData(a, 4);
 
-        const result3 = executeRenderEffect(reff, () => {
-            return readData(b);
-        });
-        const result4 = executeRenderEffect(reff, () => {
-            return readData(b);
-        }); // memo result
+    //     const result3 = executeRenderEffect(reff, () => {
+    //         return readData(b);
+    //     });
+    //     const result4 = executeRenderEffect(reff, () => {
+    //         return readData(b);
+    //     }); // memo result
 
-        expect(result3).toBe(3);
-        expect(result3).toBe(result4);
-        // expect(effectCount).toBe(3);
+    //     expect(result3).toBe(3);
+    //     expect(result3).toBe(result4);
+    //     // expect(effectCount).toBe(3);
 
-        expect(reff.flags & Flag.Unstable).toBeTruthy();
+    //     expect(reff.flags & Flag.Unstable).toBeTruthy();
 
-        setData(b,0);
+    //     setData(b,0);
 
-        // executeRenderEffect will not eager update if it is not stale (marked stale by previous dependencies)
-        const result5 = executeRenderEffect(reff, () => {
-            return readData(a);
-        }); // memo result
-        expect(result5).toBe(4);
+    //     // executeRenderEffect will not eager update if it is not stale (marked stale by previous dependencies)
+    //     const result5 = executeRenderEffect(reff, () => {
+    //         return readData(a);
+    //     }); // memo result
+    //     expect(result5).toBe(4);
 
-        cleanupRenderEffect(reff);
-    });
+    //     cleanupRenderEffect(reff);
+    // });
 });

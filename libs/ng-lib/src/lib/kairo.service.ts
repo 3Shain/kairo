@@ -1,15 +1,14 @@
 import { Injectable } from '@angular/core';
 import {
-    disposeScope,
     Scope,
     inject,
-    createScope,
     Behavior,
-    InjectToken,
+    Token,
     ExtractBehaviorProperty,
     isBehavior,
     action,
     Factory,
+    effect,
 } from 'kairo';
 import { Observable, ReplaySubject } from 'rxjs';
 import { publishReplay, refCount, switchMap } from 'rxjs/operators';
@@ -27,7 +26,7 @@ export abstract class KairoScopeRef {
         ? Observable<C>
         : Observable<ExtractBehaviorProperty<T>>;
     abstract useInject<T>(
-        token: InjectToken<T>,
+        token: Token<T>,
         options?: {
             optional?: true;
             skipSelf?: boolean;
@@ -37,7 +36,7 @@ export abstract class KairoScopeRef {
         ? Observable<C>
         : Observable<ExtractBehaviorProperty<T>>;
     abstract useInject<T>(
-        token: InjectToken<T>,
+        token: Token<T>,
         options?: {
             optional?: boolean;
             skipSelf?: boolean;
@@ -63,7 +62,7 @@ export class KairoScopeRefImpl {
         ? Observable<C>
         : Observable<ExtractBehaviorProperty<T>>;
     useInject<T>(
-        token: InjectToken<T>,
+        token: Token<T>,
         options?: {
             optional?: true;
             skipSelf?: boolean;
@@ -73,7 +72,7 @@ export class KairoScopeRefImpl {
         ? Observable<C>
         : Observable<ExtractBehaviorProperty<T>>;
     useInject<T>(
-        token: InjectToken<T>,
+        token: Token<T>,
         options?: {
             optional?: boolean;
             skipSelf?: boolean;
@@ -84,7 +83,7 @@ export class KairoScopeRefImpl {
         return this.init$.pipe(
             switchMap(() => {
                 return new Observable<any>((observer) => {
-                    const { scope } = createScope(() => {
+                    const scope = new Scope(() => {
                         const resolve = inject(token, options);
                         if (typeof resolve !== 'object' || resolve === null) {
                             observer.next(resolve);
@@ -92,7 +91,9 @@ export class KairoScopeRefImpl {
                         }
                         if (isBehavior(resolve)) {
                             observer.next(resolve.value);
-                            resolve.watch((x) => observer.next(x));
+                            effect(() =>
+                                resolve.watch((x) => observer.next(x))
+                            );
                             return;
                         }
                         let expose = {};
@@ -101,22 +102,22 @@ export class KairoScopeRefImpl {
                                 expose[key] = action(value);
                             } else if (isBehavior(value)) {
                                 expose[key] = value.value;
-                                value.watch((updatedValue) => {
-                                    expose = {
-                                        ...expose,
-                                        [key]: updatedValue,
-                                    };
-                                    observer.next(expose);
-                                });
+                                effect(() =>
+                                    value.watch((updatedValue) => {
+                                        expose = {
+                                            ...expose,
+                                            [key]: updatedValue,
+                                        };
+                                        observer.next(expose);
+                                    })
+                                );
                             } else {
                                 expose[key] = value;
                             }
                         }
                         observer.next(expose);
                     }, this.scope); // it should be avaliable
-                    return () => {
-                        disposeScope(scope);
-                    };
+                    return scope.attach();
                 });
             }),
             publishReplay(1),

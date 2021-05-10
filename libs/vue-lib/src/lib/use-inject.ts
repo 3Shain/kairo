@@ -1,16 +1,23 @@
 import {
-    action,
     Behavior,
-    createScope,
-    disposeScope,
+    Scope,
     ExtractBehaviorProperty,
     Factory,
     inject,
-    InjectToken,
+    Token,
     isBehavior,
-    runIfScopeExist,
+    effect,
 } from 'kairo';
-import { inject as vueInject, ref, reactive, onUnmounted, Ref } from 'vue';
+import {
+    inject as vueInject,
+    ref,
+    reactive,
+    onUnmounted,
+    Ref,
+    onMounted,
+    onActivated,
+    onDeactivated,
+} from 'vue';
 import { SCOPE } from './context';
 
 export function useInject<T>(
@@ -21,7 +28,7 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject<T>(
-    token: InjectToken<T>,
+    token: Token<T>,
     options?: {
         optional?: true;
         skipSelf?: boolean;
@@ -29,45 +36,70 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject<T>(
-    token: InjectToken<T>,
+    token: Token<T>,
     options?: {
         optional?: boolean;
         skipSelf?: boolean;
     }
 ): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject(token: any, options: any): any {
-    runIfScopeExist(() => {
-        throw Error('Use `inject` instead of `useInject` if inside a scope.');
-    });
     let expose = {};
-    const { scope } = createScope(() => {
+    const scope = new Scope(() => {
         const resolve = inject(token, options);
         if (typeof resolve !== 'object' || resolve === null) {
             return resolve;
         }
         if (isBehavior(resolve)) {
             const tRef = ref(resolve.value);
-            resolve.watch((updated) => {
-                tRef.value = updated;
-            });
+            effect(() =>
+                resolve.watch((updated) => {
+                    tRef.value = updated;
+                })
+            );
             return tRef;
         }
         for (const [key, value] of Object.entries(resolve)) {
             if (typeof value === 'function') {
-                expose[key] = action(value as any);
+                expose[key] = value;
             } else if (isBehavior(value)) {
                 const tRef = ref(value.value);
-                value.watch((updated) => {
-                    tRef.value = updated;
-                });
+                effect(() =>
+                    value.watch((updated) => {
+                        tRef.value = updated;
+                    })
+                );
                 expose[key] = tRef;
             } else {
                 expose[key] = value;
             }
         }
     }, vueInject(SCOPE));
-    onUnmounted(() => {
-        disposeScope(scope);
+
+    let detachHandler: Function | null = null;
+
+    onMounted(() => {
+        detachHandler = scope.attach();
     });
+
+    onUnmounted(() => {
+        detachHandler!();
+        detachHandler = null;
+    });
+
+    let deactivating = false;
+
+    onActivated(() => {
+        if (deactivating) {
+            detachHandler = scope.attach();
+            deactivating = false;
+        }
+    });
+
+    onDeactivated(() => {
+        detachHandler!();
+        detachHandler = null;
+        deactivating = true;
+    });
+
     return reactive(expose);
 }

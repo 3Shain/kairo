@@ -8,14 +8,7 @@ import {
     ChangeDetectorRef,
     Injector,
 } from '@angular/core';
-import {
-    createScope,
-    mutable,
-    transaction,
-    isBehavior,
-    disposeScope,
-    action,
-} from 'kairo';
+import { mutable, transaction, isBehavior, action, Scope } from 'kairo';
 import { KairoScopeRef, KairoScopeRefImpl } from './kairo.service';
 
 export function WithKairo() {
@@ -84,7 +77,7 @@ export function WithKairo() {
                         ChangeDetectorRef
                     );
                     zone.runOutsideAngular(() => {
-                        const { scope, exposed } = createScope(() => {
+                        const scope = new Scope(() => {
                             const resolve = this.ngSetup((thunk: Function) => {
                                 const [beh, setbeh] = mutable(thunk(this));
                                 changesHook.push((instance: unknown) => {
@@ -113,7 +106,7 @@ export function WithKairo() {
                             return resolve;
                         }, this.__kairo_parent_scope__.scope);
                         this.__kairo_scope__.scope = scope;
-                        Object.assign(this, exposed);
+                        Object.assign(this, scope.exported);
 
                         hookedOnChange = () => {
                             zone.runOutsideAngular(() => {
@@ -123,9 +116,11 @@ export function WithKairo() {
                             });
                         };
 
+                        const detach = scope.attach();
+
                         hookedOnDestroy = () => {
                             zone.runOutsideAngular(() => {
-                                disposeScope(scope);
+                                detach();
                             });
                         };
                     });

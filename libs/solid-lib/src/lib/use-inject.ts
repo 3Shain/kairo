@@ -1,16 +1,14 @@
 import {
     action,
     Behavior,
-    createScope,
-    disposeScope,
     ExtractBehaviorProperty,
     Factory,
     inject,
-    InjectToken,
+    Token,
     isBehavior,
-    runIfScopeExist,
+    Scope,
 } from 'kairo';
-import { onCleanup, useContext } from 'solid-js';
+import { createEffect, onCleanup, onMount, useContext } from 'solid-js';
 import { KairoContext } from './context';
 
 export function useInject<T>(
@@ -21,7 +19,7 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
 export function useInject<T>(
-    token: InjectToken<T>,
+    token: Token<T>,
     options?: {
         optional?: true;
         skipSelf?: boolean;
@@ -29,19 +27,20 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
 export function useInject<T>(
-    token: InjectToken<T>,
+    token: Token<T>,
     options?: {
         optional?: boolean;
         skipSelf?: boolean;
     }
 ): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
 export function useInject(token: any, options: any): any {
-    runIfScopeExist(() => {
-        throw Error('Use `inject` instead of `useInject` if inside a scope.');
-    });
+    // TODO:
+    // runIfScopeExist(() => {
+    //     throw Error('Use `inject` instead of `useInject` if inside a scope.');
+    // });
     const context = useContext(KairoContext);
     let expose = {};
-    const { scope } = createScope(() => {
+    const scope = new Scope(() => {
         const resolve = inject(token, options);
         if (typeof resolve !== 'object' || resolve === null) {
             return resolve;
@@ -65,8 +64,9 @@ export function useInject(token: any, options: any): any {
             }
         }
     }, context);
-    onCleanup(() => {
-        disposeScope(scope);
+    createEffect(() => {
+        const dispose = scope.attach();
+        onCleanup(dispose);
     });
     return expose;
 }

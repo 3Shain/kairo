@@ -1,110 +1,114 @@
-import { callback } from './task';
-import { ReadableChannel, Task } from './types';
 import { EventStream } from '../public-api';
+import { Runnable } from './types';
 
 const END = {};
 
-class EventReader<T> implements ReadableChannel<T> {
-    private closed = false;
+export interface ReadableChannel<T> {
+    next(): Runnable<T>;
+    hasNext(): Runnable<boolean>;
+    dispose(): void;
+}
 
-    private bufferQueue: any[] = [];
-
-    private continuation: Function | null = null;
-
-    private stopListening = this.from.listen((next) => {
-        if (this.continuation) {
-            this.continuation(next);
-        } else {
-            this.bufferQueue.push(next);
+function eventReaderBase<T>(
+    from: EventStream<T>,
+    until: EventStream<any>
+): ReadableChannel<T> {
+    let closed = false;
+    let bufferQueue: any[] = [];
+    let continuation: Function | null = null;
+    const stopUntilListener = until.listen((next) => {
+        if (!closed) {
+            dispose();
+            if (continuation) {
+                continuation(END);
+                continuation = null;
+            }
         }
     });
-    constructor(private from: EventStream<T>, until: EventStream<any>) {
-        until.listenNext((next) => {
-            // This listener is never unsubscribe manully?
-            // potential mem leak?
-            if (!this.closed) {
-                this.closed = true;
-                if (this.continuation) {
-                    this.continuation(END);
-                    this.continuation = null;
-                }
-                this.stopListening();
-            }
-        });
-    }
+    const stopFromListener = from.listen((next) => {
+        if (continuation) {
+            continuation(next);
+        } else {
+            bufferQueue.push(next);
+        }
+    });
 
-    dispose() {
-        if (!this.closed) {
-            this.stopListening();
-            this.closed = true;
+    function dispose() {
+        if (!closed) {
+            stopUntilListener();
+            stopFromListener();
+            closed = true;
         }
     }
 
-    *next(): Task<T> {
-        if (this.continuation) {
+    const next = function* (): Runnable<T> {
+        if (continuation !== null) {
             throw new Error(
                 `There exists a Task waiting for this channel already.`
             );
         }
-        if (this.closed) {
-            throw new Error(`Closed`); // TODO: catchable error
+        if (closed) {
+            throw new Error(`Closed`);
         }
-        if (this.bufferQueue.length > 0) {
-            return this.bufferQueue.shift();
+        if (bufferQueue.length > 0) {
+            return bufferQueue.shift() as T;
         }
-        return yield* callback((resolve, reject) => {
-            const continuation = (value: T) => {
+        return (yield (resolve, reject) => {
+            continuation = (value: T) => {
                 if (value === END) {
                     reject(
-                        new Error(`Closed`) // TODO: catchable error
+                        new Error(`Closed`)
                     );
                     return;
                 }
-                this.continuation = null;
+                continuation = null;
                 resolve(value);
             };
-            this.continuation = continuation;
             return () => {
-                this.continuation = null;
+                continuation = null;
             };
-        });
-    }
+        }) as T;
+    };
 
-    *hasNext(): Task<boolean> {
-        if (this.continuation) {
+    const hasNext = function* (): Runnable<boolean> {
+        if (continuation !== null) {
             throw new Error(
                 `There exists a Task waiting for this channel already.`
             );
         }
-        if (this.closed) {
+        if (closed) {
             return false;
         }
-        if (this.bufferQueue.length > 0) {
+        if (bufferQueue.length > 0) {
             return true;
         }
-        return yield* callback<boolean>((resolve) => {
-            const continuation = (value: unknown) => {
+        return yield (resolve) => {
+            continuation = (value: unknown) => {
                 if (value === END) {
-                    this.continuation = null;
+                    continuation = null;
                     resolve(false);
                     return;
                 }
-                this.bufferQueue.push(value);
-                this.continuation = null;
+                bufferQueue.push(value);
+                continuation = null;
                 resolve(true);
             };
-            this.continuation = continuation;
             return () => {
-                this.continuation = null;
+                continuation = null;
             };
-        });
-    }
+        };
+    };
+
+    return {
+        next,
+        hasNext,
+        dispose,
+    };
 }
 
 export function readEvents<TF, TU>(props: {
     from: EventStream<TF>;
     until: EventStream<TU>;
 }): ReadableChannel<TF> {
-    return new EventReader(props.from, props.until);
-    // TODO: auto dispose
+    return eventReaderBase(props.from, props.until);
 }

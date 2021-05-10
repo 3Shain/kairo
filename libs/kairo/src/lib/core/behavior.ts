@@ -1,3 +1,6 @@
+import { Cleanable, Symbol_observable, TeardownLogic } from '../types';
+import { doCleanup } from '../utils';
+
 const enum Flag {
     /**
      * this is a data */
@@ -389,6 +392,7 @@ function watch(data: Data, sideEffect: Function) {
     return node;
 }
 
+// TODO: Make node zombie if no watcher.
 function disposeWatcher(watcher: WatcherNode) {
     if (__TEST__ && currentCollecting) {
         console.error('Violated action.');
@@ -485,17 +489,11 @@ function insertNewObserver(
     }
 }
 
-function createRenderEffect(sideEffect: Function) {
+function createRenderEffect() {
     // a renderEffect can never be zombie!
     const ret: Computation<null> = {
-        flags: Flag.RenderEffect | Flag.MaybeStable | Flag.Stale,
-        last_effect: {
-            fn: sideEffect,
-            prev: null,
-            next: null,
-            disposed: false,
-            data: null as any,
-        },
+        flags: Flag.RenderEffect | Flag.Zombie | Flag.MaybeStable | Flag.Stale,
+        last_effect: null,
         last_observer: null,
         value: null,
         first_source: null,
@@ -504,7 +502,7 @@ function createRenderEffect(sideEffect: Function) {
         depsCounter: 0,
         checkNode: null,
     };
-    ret.last_effect!.data = ret;
+    // ret.last_effect!.data = ret;
     return ret;
 }
 
@@ -518,6 +516,13 @@ function executeRenderEffect<T>(
     }
     if (__TEST__ && currentCollecting) {
         throw Error('should be not in computation');
+    }
+    if (computation.flags & Flag.Zombie) {
+        // potential optimization: memo? that's too complex.
+        computation.flags |= Flag.Computing;
+        const currentValue = fn(...args);
+        computation.flags -= Flag.Computing;
+        return currentValue;
     }
     if (computation.flags & Flag.Stale) {
         if (computation.flags & Flag.Unstable) {
@@ -549,6 +554,11 @@ function executeRenderEffect<T>(
     return (computation.value as any) as T;
 }
 
+/**
+ *
+ * @param computation
+ * @deprecated
+ */
 function cleanupRenderEffect(computation: Computation<null>) {
     cleanupComputation(computation, null);
     disposeWatcher(computation.last_effect!);
@@ -595,6 +605,117 @@ function createComputation<T>(
 
 export function __current_collecting() {
     return currentCollecting;
+}
+
+export function constant<T>(value: T) {
+    return new Behavior(createData(value));
+}
+
+export class Behavior<T> {
+    constructor(protected internal: Data<T>) {}
+
+    get value(): T {
+        return accessData(this.internal);
+    }
+
+    [Symbol_observable]() {
+        return this;
+    }
+
+    map<R>(mapFn: (value: T) => R): Behavior<R> {
+        const internal = createComputation(() => mapFn(this.value), {
+            static: true,
+            sources: [this.internal],
+        });
+        return new ComputationalBehavior(internal);
+    }
+
+    switch<R>(
+        switchFn: (value: T) => Behavior<R> /* use output type? */
+    ): Behavior<R> {
+        const internal = createComputation(() => {
+            const returned = untrack(switchFn, this.value);
+            return returned.value;
+        });
+        return new ComputationalBehavior(internal);
+    }
+
+    watch(watchFn: (value: T) => Cleanable): TeardownLogic {
+        let lastDisposer: Cleanable = undefined;
+        const watcher = watch(this.internal, () => {
+            doCleanup(lastDisposer);
+            lastDisposer = watchFn(this.internal.value!);
+        });
+        return () => disposeWatcher(watcher!);
+    }
+
+    /**
+     * @deprecated Use watch.
+     */
+    subscribe(next: (value: T) => void) {
+        const ret = this.watch((v) => {
+            next(v);
+        });
+        next(this.internal.value!);
+        (ret as any).unsubscribe = ret;
+        return ret as {
+            (): void;
+            unsubscribe(): void;
+        };
+    }
+}
+
+export class ComputationalBehavior<T> extends Behavior<T> {
+    constructor(internal: Computation<T>) {
+        super(internal);
+    }
+
+    get value(): T {
+        return accessComputation(this.internal as Computation);
+    }
+}
+
+export function mutable<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
+    const internal = createData(initialValue);
+    return [new Behavior(internal), (v) => setData(internal, v, true)];
+}
+
+export function computed<T>(expr: () => T, staticDependencies = false) {
+    const internal = createComputation(expr, {
+        static: staticDependencies,
+    });
+    return new ComputationalBehavior(internal);
+}
+
+export type ExtractBehaviorProperty<T> = T extends object
+    ? {
+          [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
+      }
+    : T;
+
+export function combined<A extends Array<Behavior<any>>[]>(
+    array: A
+): Behavior<ExtractBehaviorProperty<A>>;
+export function combined<
+    C extends {
+        [key: string]: Behavior<any>;
+    }
+>(obj: C): Behavior<ExtractBehaviorProperty<C>>;
+export function combined(obj: object): Behavior<any> {
+    if (obj instanceof Array) {
+        return computed(() => {
+            return obj.map((x) => {
+                return x.value;
+            });
+        }, true);
+    }
+    return computed(() => {
+        return Object.fromEntries(
+            Object.entries(obj).map(([key, value]) => {
+                return [key, value.value];
+            })
+        );
+    }, true);
 }
 
 export {

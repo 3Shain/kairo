@@ -8,14 +8,13 @@ import {
     createComputed,
     runWithOwner,
     getOwner,
+    createEffect,
 } from 'solid-js';
 import {
     Behavior,
-    createScope,
-    disposeScope,
     ComputationalBehavior,
     mutable,
-    unscoped,
+    Scope,
     __current_collecting,
 } from 'kairo';
 import type { JSX } from 'solid-js';
@@ -32,7 +31,7 @@ const originalGetter = Object.getOwnPropertyDescriptor(
 
 Object.defineProperty(Behavior.prototype, 'value', {
     get(
-        this: Behavior & {
+        this: Behavior<any> & {
             signal_ref?: WeakMap<
                 ReturnType<typeof getOwner>,
                 [Function, Function]
@@ -46,16 +45,14 @@ Object.defineProperty(Behavior.prototype, 'value', {
             if (!this.signal_ref) {
                 this.signal_ref = new WeakMap();
             }
-            const ref = this.signal_ref.get(getListener().owner); // TODO: always expect an owner?
+            const ref = this.signal_ref.get(getListener().owner);
             if (ref === undefined) {
                 const owner = getListener().owner;
                 let ref = createSignal(originalGetter.call(this));
                 this.signal_ref.set(owner, ref);
-                const disposeWatcher = unscoped(() =>
-                    this.watch((v) => {
-                        ref[1](v);
-                    })
-                );
+                const disposeWatcher = this.watch((v) => {
+                    ref[1](v);
+                });
                 runWithOwner(owner, () => {
                     onCleanup(() => {
                         disposeWatcher();
@@ -78,7 +75,7 @@ const originalComputationGetter = Object.getOwnPropertyDescriptor(
 
 Object.defineProperty(ComputationalBehavior.prototype, 'value', {
     get(
-        this: Behavior & {
+        this: Behavior<any> & {
             signal_ref?: WeakMap<
                 ReturnType<typeof getOwner>,
                 [Function, Function]
@@ -97,11 +94,9 @@ Object.defineProperty(ComputationalBehavior.prototype, 'value', {
                 const owner = getListener().owner;
                 let ref = createSignal(originalComputationGetter.call(this));
                 this.signal_ref.set(owner, ref);
-                const disposeWatcher = unscoped(() =>
-                    this.watch((v) => {
-                        ref[1](v);
-                    })
-                );
+                const disposeWatcher = this.watch((v) => {
+                    ref[1](v);
+                });
                 runWithOwner(owner, () => {
                     onCleanup(() => {
                         disposeWatcher();
@@ -118,14 +113,15 @@ Object.defineProperty(ComputationalBehavior.prototype, 'value', {
 });
 
 function KairoApp(props: { globalSetup: () => void; children: JSX.Element }) {
-    const scope = createScope(props.globalSetup, null);
-
-    onCleanup(() => {
-        disposeScope(scope.scope);
+    const scope = new Scope(props.globalSetup, null);
+    
+    createEffect(() => {
+        const dispose = scope.attach();
+        onCleanup(dispose);
     });
 
     return createComponent(KairoContext.Provider, {
-        value: scope.scope,
+        value: scope,
         get children() {
             return props.children;
         },
@@ -145,7 +141,7 @@ function withKairo<Props>(
     ) => {
         const parent = useContext(KairoContext);
 
-        const { scope, exposed: realComponent } = createScope(() => {
+        const scope = new Scope(() => {
             return component(
                 {
                     ...props,
@@ -160,14 +156,15 @@ function withKairo<Props>(
             );
         }, parent);
 
-        onCleanup(() => {
-            disposeScope(scope);
+        createEffect(() => {
+            const dispose = scope.attach();
+            onCleanup(dispose);
         });
 
         return createComponent(KairoContext.Provider, {
             value: scope,
             get children() {
-                return createComponent(realComponent, props);
+                return createComponent(scope.exported, props);
             },
         });
     };

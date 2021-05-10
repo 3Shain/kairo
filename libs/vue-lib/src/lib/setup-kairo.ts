@@ -1,11 +1,4 @@
-import {
-    createScope,
-    disposeScope,
-    isBehavior,
-    action,
-    Behavior,
-    mutable,
-} from 'kairo';
+import { isBehavior, Behavior, mutable, Scope, effect } from 'kairo';
 import {
     ref,
     watch,
@@ -14,13 +7,16 @@ import {
     onUnmounted,
     SetupContext,
     App,
+    onMounted,
+    onActivated,
+    onDeactivated,
 } from 'vue';
 import { SCOPE } from './context';
 import { RemoveBehaviors } from './types';
 
 export function kairoApp(setup?: (app: App) => void) {
     return (app: App) => {
-        const { scope } = createScope(() => {
+        const scope = new Scope(() => {
             setup?.(app);
         });
 
@@ -36,18 +32,20 @@ export function setupKairo<Props, Bindings>(
     ) => Bindings
 ): (props: Props, ctx: SetupContext) => RemoveBehaviors<Bindings> {
     return function (props: Props, setupContext: SetupContext) {
-        const { scope, exposed } = createScope(() => {
+        const scope = new Scope(() => {
             const exposed = setup(
                 {
                     ...props,
                 },
                 (thunk: (_: Props) => any) => {
                     const [prop, setProp] = mutable(thunk(props));
-                    watch(
-                        () => thunk(props),
-                        (value) => {
-                            setProp(value);
-                        }
+                    effect(() =>
+                        watch(
+                            () => thunk(props),
+                            (value) => {
+                                setProp(value);
+                            }
+                        )
                     );
                     return prop;
                 },
@@ -63,24 +61,45 @@ export function setupKairo<Props, Bindings>(
                 Object.entries(exposed).map(([key, value]) => {
                     if (isBehavior(value)) {
                         const _ref = ref(value.value as object);
-                        value.watch((s) => {
-                            _ref.value = s as object;
-                        });
+                        effect(() =>
+                            value.watch((s) => {
+                                _ref.value = s as object;
+                            })
+                        );
                         return [key, _ref];
-                    }
-                    if (typeof value === 'function') {
-                        return [key, action(value)];
                     }
                     return [key, value];
                 })
             );
         }, inject(SCOPE, undefined));
 
+        let detachHandler: Function | null = null;
+
+        onMounted(() => {
+            detachHandler = scope.attach();
+        });
+
         onUnmounted(() => {
-            disposeScope(scope);
+            detachHandler!();
+            detachHandler = null;
+        });
+
+        let deactivating = false;
+
+        onActivated(() => {
+            if (deactivating) {
+                detachHandler = scope.attach();
+                deactivating = false;
+            }
+        });
+
+        onDeactivated(() => {
+            detachHandler!();
+            detachHandler = null;
+            deactivating = true;
         });
 
         provide(SCOPE, scope);
-        return exposed as RemoveBehaviors<Bindings>;
+        return scope.exported as RemoveBehaviors<Bindings>;
     };
 }
