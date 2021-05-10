@@ -101,7 +101,7 @@ stopWatchHandler();
  * by just copy&paste!
  */
 const Counter = withKairo(() => {
-    const [count, setCount] = mutable(0);
+    const [count, setCount] = mut(0);
     return () => (
         <>
             <span>{count.value}</span>
