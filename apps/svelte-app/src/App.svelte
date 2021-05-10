@@ -1,15 +1,18 @@
 <script lang="ts" kairo="root">
     import {
         animation,
+        effect,
         inject,
-        merge,
+        merged,
         mutable,
-        nextFrame,
+        nextAnimationFrame,
         provide,
         readEvents,
         stream,
         task,
     } from 'kairo';
+import Child from './Child.svelte';
+import { TOKEN } from './lib';
 
     let ref$$: HTMLDivElement;
 
@@ -19,9 +22,13 @@
         [mousemove, onmousemove] = stream<MouseEvent>(),
         [mouseleave, onmouseleave] = stream<MouseEvent>();
 
-    position.changes(animation).listen(([x, y]) => {
-        if (ref$$) ref$$.style.transform = `translate3d(${x}px,${y}px,0px)`;
-    });
+    effect(() =>
+        position.watch(([x, y]) => {
+            if (ref$$) ref$$.style.transform = `translate3d(${x}px,${y}px,0px)`;
+        })
+    );
+
+    provide(TOKEN,position.map(x=>x[0]));
 
     const dnd = task(function* (e: MouseEvent) {
         let [x, y] = position.value;
@@ -29,7 +36,7 @@
         // yield* testTask();
         const channel = readEvents({
             from: mousemove,
-            until: merge([mouseup, mouseleave]),
+            until: merged([mouseup, mouseleave]),
         });
         while (yield* channel.hasNext()) {
             const mv = yield* channel.next();
@@ -44,7 +51,7 @@
         while (framePass < frameTotal) {
             framePass++;
             setPosition(interpolate2d(x, y, 1 - framePass / frameTotal));
-            yield* nextFrame();
+            yield* nextAnimationFrame();
         }
     });
 
@@ -114,6 +121,7 @@
         />
         <div class="bg" />
     </div>
+    <Child/>
 </main>
 
 <style>

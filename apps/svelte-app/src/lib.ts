@@ -1,3 +1,3 @@
-import { Behavior, InjectToken } from "kairo";
+import { Behavior, Token } from "kairo";
 
-export const TOKEN = InjectToken.for<Behavior<number>>('2333')
+export const TOKEN = Token.for<Behavior<number>>('2333')

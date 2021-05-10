@@ -1,16 +1,12 @@
 import { withKairo } from '@kairo/vue';
-import { renderSlot } from 'vue';
 import {
     mutable as data,
     readEvents,
     stream,
     task,
-    merge,
-    nextFrame,
-    animation,
-    debounce,
-    throttle,
-    asap,
+    merged,
+    nextAnimationFrame,
+    effect,
 } from 'kairo';
 import './Test.css';
 
@@ -29,17 +25,19 @@ const Component = withKairo<{
         [mousemove, onmousemove] = stream<MouseEvent>(),
         [mouseleave, onmouseleave] = stream<MouseEvent>();
 
-    position.changes(animation).listen(([x, y]) => {
-        // console.log(ref);
-        if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
-    });
+    effect(() =>
+        position.watch(([x, y]) => {
+            // console.log(ref);
+            if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
+        })
+    );
 
     const dnd = task(function* (e: MouseEvent) {
         let [x, y] = position.value;
         let lastMv = e;
         const channel = readEvents({
             from: mousemove,
-            until: merge([mouseup, mouseleave]),
+            until: merged([mouseup, mouseleave]),
         });
         while (yield* channel.hasNext()) {
             const mv = yield* channel.next();
@@ -53,8 +51,8 @@ const Component = withKairo<{
         let framePass = 0;
         while (framePass < frameTotal) {
             framePass++;
+            yield* nextAnimationFrame();
             setPosition(interpolate2d(x, y, 1 - framePass / frameTotal));
-            yield* nextFrame();
         }
     });
 

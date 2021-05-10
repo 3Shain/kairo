@@ -2,9 +2,9 @@ import { withKairo } from '@kairo/react';
 import {
     animation,
     delay,
-    merge,
+    merged,
     mutable,
-    nextFrame,
+    nextAnimationFrame,
     readEvents,
     stream,
     task,
@@ -27,18 +27,18 @@ const TestComponent = withKairo(() => {
             clientY: number;
         }>();
 
-    position.changes(animation).listen(([x, y]) => {
+    position.watch(([x, y]) => {
         if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
     });
 
-    const scmousemove = mousemove.schedule(animation);
+    // const scmousemove = mousemove.schedule(animation);
 
     const dnd = task(function* (e: { clientX: number; clientY: number }) {
         let [x, y] = position.value;
         let lastMv = e;
         const channel = readEvents({
-            from: scmousemove,
-            until: merge([mouseup, mouseleave]),
+            from: mousemove,
+            until: merged([mouseup, mouseleave]),
         });
         while (yield* channel.hasNext()) {
             const mv = yield* channel.next();
@@ -52,8 +52,8 @@ const TestComponent = withKairo(() => {
         let framePass = 0;
         while (framePass < frameTotal) {
             framePass++;
+            yield* nextAnimationFrame();
             setPosition(interpolate2d(x, y, 1 - framePass / frameTotal));
-            yield* nextFrame();
         }
     });
 

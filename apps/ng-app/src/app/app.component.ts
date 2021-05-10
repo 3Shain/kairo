@@ -8,13 +8,10 @@ import {
     task,
     resolve as $,
     Behavior,
-    switchedTask,
-    DISPOSED,
     delay,
-    lockedTask,
     race,
-    registerDisposer,
     provide,
+    effect,
 } from 'kairo';
 import { Counter } from './shared';
 
@@ -50,33 +47,33 @@ export class AppComponent {
 
         const { count, plus } = provide(Counter);
 
-        const theTask = switchedTask(function* (this: any) {
-            console.log('task start!');
-            const text = yield* $(http.get('https://api.github.com'));
-            console.log(text);
-            // for (let i = 0; i < 10; i++) {
-            //     console.log(`one event! ${yield* plusEvent}`);
-            // }
-            // console.log('task end!');
-        });
+        // const theTask = switchedTask(function* (this: any) {
+        //     console.log('task start!');
+        //     const text = yield* $(http.get('https://api.github.com'));
+        //     console.log(text);
+        //     // for (let i = 0; i < 10; i++) {
+        //     //     console.log(`one event! ${yield* plusEvent}`);
+        //     // }
+        //     // console.log('task end!');
+        // });
 
-        const theTask1 = lockedTask(
-            function* () {
-                try {
-                    console.log('start!');
-                    yield* delay(1000);
-                    console.log('stop!');
-                } catch (e) {
-                    if (e === DISPOSED) {
-                        console.log('canceled!');
-                    }
-                }
-            },
-            {
-                maxConcurrency: 3,
-                throwThanWait: true,
-            }
-        );
+        // const theTask1 = lockedTask(
+        //     function* () {
+        //         try {
+        //             console.log('start!');
+        //             yield* delay(1000);
+        //             console.log('stop!');
+        //         } catch (e) {
+        //             if (e === DISPOSED) {
+        //                 console.log('canceled!');
+        //             }
+        //         }
+        //     },
+        //     {
+        //         maxConcurrency: 3,
+        //         throwThanWait: true,
+        //     }
+        // );
 
         useKonami([
             'ArrowUp',
@@ -95,7 +92,7 @@ export class AppComponent {
             count,
             doubled,
             msg: doubled.map((x) => String(x)),
-            theTask,
+            // theTask,
         };
     }
 
@@ -109,7 +106,7 @@ function useKonami(keys: string[]) {
 
     const keydown = keyevent.transform((x) => x.code);
 
-    task(function* () {
+    const startTask = task(function* () {
         while (true) {
             const key = yield* keydown;
             if (key == keys[0]) {
@@ -127,9 +124,12 @@ function useKonami(keys: string[]) {
                 }
             }
         }
-    })();
+    });
 
-    window.addEventListener('keydown', emitkey);
+    effect(() => startTask());
 
-    registerDisposer(() => window.removeEventListener('keydown', emitkey));
+    effect(() => {
+        window.addEventListener('keydown', emitkey);
+        return () => window.removeEventListener('keydown', emitkey);
+    });
 }

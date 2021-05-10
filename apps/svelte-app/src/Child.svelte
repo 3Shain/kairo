@@ -1,12 +1,14 @@
-<script lang="ts" kairo true>
-    import { inject, registerDisposer } from 'kairo';
+<script lang="ts" kairo>
+    import { effect, inject } from 'kairo';
     import { TOKEN } from './lib';
 
     export let prop: number = 0;
     console.log(prop);
 
-    registerDisposer(() => {
-        console.log('I disposed');
+    effect(() => {
+        return () => {
+            console.log('I disposed');
+        };
     });
 
     $: {

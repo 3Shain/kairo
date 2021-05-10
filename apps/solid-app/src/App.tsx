@@ -1,31 +1,30 @@
-import { Component, getListener, getOwner } from 'solid-js';
+import { Component } from 'solid-js';
 import {
     animation,
-    mutable as data,
-    merge,
-    nextFrame,
+    merged,
     readEvents,
     stream,
     task,
-    InjectToken,
+    Token,
     Behavior,
     provide,
     inject,
     delay,
-    mutable,
+    mut,
+    nextAnimationFrame,
 } from 'kairo';
 import { useInject, withKairo } from '@kairo/solid';
 import './App.css';
 
 const App: Component = () => {
     return (
-        <TestComponent>
+        <TestComponent2>
             <p>children elements</p>
-        </TestComponent>
+        </TestComponent2>
     );
 };
 
-const TEST_TOKEN = new InjectToken<{
+const TEST_TOKEN = new Token<{
     value: Behavior<number>;
     check: Function;
 }>('test');
@@ -47,18 +46,18 @@ const AChildComponent = withKairo((props, useProp) => {
     );
 });
 
-// const TestComponent = withKairo(() => {
-//     const [data, setdata] = mutable(0);
-
-//     return () => (
-//         <button onclick={() => setdata(data.value + 1)}>{data.value}</button>
-//     );
-// });
+const TestComponent2 = withKairo(() => {
+    const [data, setdata] = mut(0);
+    console.log('side effect');
+    return () => (
+        <button onclick={() => setdata(data.value + 1)}>{data.value}</button>
+    );
+});
 
 const TestComponent: Component = withKairo<{
-    test: number
+    test: number;
 }>(() => {
-    const [position, setPosition] = data([0, 0]);
+    const [position, setPosition] = mut([0, 0]);
 
     const d = position.map((x) => x[0]);
 
@@ -73,25 +72,25 @@ const TestComponent: Component = withKairo<{
         [mousemove, onmousemove] = stream<MouseEvent>(),
         [mouseleave, onmouseleave] = stream<MouseEvent>();
 
-    position.changes(animation).listen(([x, y]) => {
-        if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
+    position.watch(([x, y]) => {
+        if (ref) {
+            ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
+        }
     });
 
     const testTask = task(function* () {
         return yield* delay(1000);
     });
 
-    const scmousemove = mousemove.schedule(animation);
-
-    console.log(getListener());
+    // const scmousemove = mousemove.schedule(animation);
 
     const dnd = task(function* (e: MouseEvent) {
         let [x, y] = position.value;
         let lastMv = e;
         // yield* testTask();
         const channel = readEvents({
-            from: scmousemove,
-            until: merge([mouseup, mouseleave]),
+            from: mousemove,
+            until: merged([mouseup, mouseleave]),
         });
         while (yield* channel.hasNext()) {
             const mv = yield* channel.next();
@@ -106,7 +105,7 @@ const TestComponent: Component = withKairo<{
         while (framePass < frameTotal) {
             framePass++;
             setPosition(interpolate2d(x, y, 1 - framePass / frameTotal));
-            yield* nextFrame();
+            yield* nextAnimationFrame();
         }
     });
 

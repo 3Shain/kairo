@@ -9,7 +9,7 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
-import { mutable, stream } from 'kairo';
+import { mutable, reduced, stream } from 'kairo';
 import { setupKairo } from '@kairo/vue';
 
 export default defineComponent({
@@ -23,7 +23,7 @@ export default defineComponent({
 
         const [plusEnv, plus] = stream<number>();
 
-        const count = plusEnv.reduce((a, b) => a + b, 0);
+        const count = reduced(plusEnv, (a, b) => a + b, 0);
 
         return {
             plus: () => plus(1),
