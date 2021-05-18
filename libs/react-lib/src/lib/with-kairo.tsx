@@ -1,14 +1,4 @@
-import {
-    transaction,
-    Behavior,
-    __executeRenderEffect,
-    __createRenderEffect,
-    Scope,
-    effect,
-    __watch,
-    __disposeWatcher,
-    mut,
-} from 'kairo';
+import { transaction, Behavior, Scope, effect, mut, lazy } from 'kairo';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { KairoContext } from './context';
@@ -32,8 +22,9 @@ export const KairoApp: React.FunctionComponent<{
             }),
         []
     );
+    const { hooks } = kairoScope.exported;
 
-    for (const hook of kairoScope.exported.hooks) {
+    for (const hook of hooks) {
         hook(props);
     }
 
@@ -91,13 +82,15 @@ export function withKairo<Props>(
                             });
                         }
                     });
-                    const _effect = __createRenderEffect();
+                    const renderComp = lazy<ReturnType<typeof renderFn>>();
                     effect(() => {
-                        const node = __watch(_effect, () => {
+                        const stop = renderComp.watch(() => {
                             setTick(++tick);
                         });
-                        __executeRenderEffect(_effect, renderFn, props); // start
-                        return () => __disposeWatcher(node);
+                        renderComp.execute(() => renderFn(props)); // start
+                        return () => {
+                            stop()
+                        };
                     });
 
                     const hooks = $$CURRENT_HOOKS;
@@ -105,27 +98,24 @@ export function withKairo<Props>(
                     return {
                         renderFn,
                         hooks,
-                        effect: _effect,
+                        renderComp,
                     };
                 }, parentScope),
             []
         );
+        const { hooks, renderFn, renderComp } = kairoScope.exported;
 
         useEffect(() => {
             return kairoScope.attach();
         }, []);
 
-        for (const hook of kairoScope.exported.hooks) {
+        for (const hook of hooks) {
             hook(props);
         }
 
         return (
             <KairoContext.Provider value={kairoScope}>
-                {__executeRenderEffect(
-                    kairoScope.exported.effect,
-                    kairoScope.exported.renderFn,
-                    props
-                )}
+                {renderComp.execute(() => renderFn(props))}
             </KairoContext.Provider>
         );
     };

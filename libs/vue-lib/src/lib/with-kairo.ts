@@ -13,16 +13,7 @@ import {
     VNodeChild,
     watch,
 } from 'vue';
-import {
-    Behavior,
-    effect,
-    mutable,
-    Scope,
-    __createRenderEffect,
-    __disposeWatcher,
-    __executeRenderEffect,
-    __watch,
-} from 'kairo';
+import { Behavior, effect, mutable, Scope, lazy } from 'kairo';
 import { track, TrackOpTypes, triggerRef } from '@vue/reactivity';
 import { SCOPE } from './context';
 
@@ -57,19 +48,19 @@ export function withKairo<Props>(
                 ctx
             );
             let trigger = ref(0);
-            const renderEffect = __createRenderEffect();
+            const renderEffect = lazy();
 
             effect(() => {
-                const node = __watch(renderEffect, () => {
+                const stop = renderEffect.watch(() => {
                     triggerRef(trigger);
                 });
                 triggerRef(trigger);
-                return () => __disposeWatcher(node);
+                return () => stop();
             });
             return function (this: ComponentPublicInstance) {
                 const _this = this;
                 track(trigger, 'get' as TrackOpTypes, 'value');
-                return __executeRenderEffect(renderEffect, () =>
+                return renderEffect.execute(() =>
                     renderFn.call(_this, {
                         get children() {
                             return renderSlot(_this.$slots, 'default');

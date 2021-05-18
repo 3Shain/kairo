@@ -48,18 +48,18 @@ Object.defineProperty(Behavior.prototype, 'value', {
             const ref = this.signal_ref.get(getListener().owner);
             if (ref === undefined) {
                 const owner = getListener().owner;
-                let ref = createSignal(originalGetter.call(this));
-                this.signal_ref.set(owner, ref);
                 const disposeWatcher = this.watch((v) => {
-                    ref[1](v);
+                    ref2[1](v);
                 });
+                const ref2 = createSignal(originalGetter.call(this));
+                this.signal_ref.set(owner, ref2);
                 runWithOwner(owner, () => {
                     onCleanup(() => {
                         disposeWatcher();
                         this.signal_ref.delete(owner);
                     });
                 });
-                return ref[0]();
+                return ref2[0]();
             } else {
                 return ref[0]();
             }
@@ -92,18 +92,18 @@ Object.defineProperty(ComputationalBehavior.prototype, 'value', {
             const ref = this.signal_ref.get(getListener().owner);
             if (ref === undefined) {
                 const owner = getListener().owner;
-                let ref = createSignal(originalComputationGetter.call(this));
-                this.signal_ref.set(owner, ref);
                 const disposeWatcher = this.watch((v) => {
-                    ref[1](v);
+                    ref2[1](v);
                 });
+                const ref2 = createSignal(originalComputationGetter.call(this));
+                this.signal_ref.set(owner, ref2);
                 runWithOwner(owner, () => {
                     onCleanup(() => {
                         disposeWatcher();
                         this.signal_ref.delete(owner);
                     });
                 });
-                return ref[0]();
+                return ref2[0]();
             } else {
                 return ref[0]();
             }
@@ -114,7 +114,7 @@ Object.defineProperty(ComputationalBehavior.prototype, 'value', {
 
 function KairoApp(props: { globalSetup: () => void; children: JSX.Element }) {
     const scope = new Scope(props.globalSetup, null);
-    
+
     createEffect(() => {
         const dispose = scope.attach();
         onCleanup(dispose);
