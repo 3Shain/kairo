@@ -11,11 +11,9 @@ import {
     runInTransaction,
     Data,
     untrack,
-    createRenderEffect,
-    executeRenderEffect,
-    cleanupRenderEffect,
+    createLazy,
+    executeLazy,
 } from './behavior';
-
 
 /**
  * TODO: add comments explaining all the mechanism
@@ -50,7 +48,7 @@ describe('core/behavior', () => {
             static: true,
         });
         const watcher3 = watch(e, noop);
-        expect(e.flags & Flag.Zombie).toBeFalsy();
+        expect(e.flags & Flag.Stale).toBeFalsy();
         expect(e.last_source).toBeTruthy();
 
         setData(a, 1);
@@ -130,11 +128,11 @@ describe('core/behavior', () => {
             setData(a, 1); // redunant set.
             setData(b, 2);
         });
-        expect(c.value).toEqual(null); // change is not propagated
-        expect(c.flags & Flag.MarkForCheck).toBeTruthy(); // zombie would stay mark for check?
+        expect(c.value).toEqual(undefined); // change is not propagated
+        expect(c.flags & Flag.Stale).toBeTruthy();
 
-        expect(readCompute(c)).toEqual(3); // accessComputation doesn't changes 'markforcheck'
-        expect(c.flags & Flag.MarkForCheck).toBeTruthy();
+        expect(readCompute(c)).toEqual(3); // accessComputation
+        expect(c.flags & Flag.Stale).toBeFalsy(); // now it's active (but might be disposed later.)
     });
 
     it('runInTransaction guarantees consistancy', () => {
@@ -248,7 +246,9 @@ describe('core/behavior', () => {
         disposeWatcher(watcher);
         setData(a, 0);
         setData(b, 2);
-        expect(c.flags & Flag.Zombie).toBeTruthy();
+        // expect(c.flags & Flag.Zombie).toBeTruthy(); // c is not zombie yet
+        setData(a, 1);
+        expect(c.flags & Flag.Stale).toBeTruthy();
 
         disposeWatcher(keep_a_b_alive_watcher);
     });
@@ -340,4 +340,22 @@ describe('core/behavior', () => {
 
     //     cleanupRenderEffect(reff);
     // });
+
+    it('self referenced computation', () => {
+        const a = data(1);
+        const c = compute(
+            () => {
+                if (readCompute(c) < 10) {
+                    return readCompute(c) + readData(a);
+                }
+                return readCompute(c);
+            },
+            { initial: 0 }
+        );
+
+        const watcher1 = watch(c, noop);
+
+        disposeWatcher(watcher1);
+        console.log(c);
+    });
 });

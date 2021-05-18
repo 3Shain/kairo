@@ -24,21 +24,19 @@ export {
     mutable as mut,
     constant,
     combined,
-    computed
+    computed,
+    suspended,
+    lazy
 } from './core/behavior';
 export type { ExtractBehaviorProperty } from './core/behavior';
 export { EventStream, stream, never, merged } from './core/stream';
 export { inject, provide, effect, Scope, Token } from './core/scope';
 export type { Provider, Factory } from './core/scope';
 export { held, reduced } from './derived';
+export * from './read';
 export {
     runInTransaction as transaction,
     untrack,
     __current_collecting,
-    createRenderEffect as __createRenderEffect,
-    executeRenderEffect as __executeRenderEffect,
-    cleanupRenderEffect as __cleanupRenderEffect,
-    watch as __watch,
-    disposeWatcher as __disposeWatcher
 } from './core/behavior';
 export * from './core/schedule';

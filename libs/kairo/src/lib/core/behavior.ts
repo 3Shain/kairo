@@ -1,5 +1,5 @@
 import { Cleanable, Symbol_observable, TeardownLogic } from '../types';
-import { doCleanup } from '../utils';
+import { doCleanup, noop } from '../utils';
 
 const enum Flag {
     /**
@@ -17,33 +17,41 @@ const enum Flag {
      */
     MarkForCheck = 0x8,
     /**
-     *
+     * 
      */
-    HasSideEffect = 0x10,
-    /**
-     * (computation) is busy
-     */
-    Computing = 0x20,
+    Estimating = 0x10,
     /**
      * sources are dynamically collected.
      * exclusive
      */
-    Unstable = 0x40,
-    Stable = 0x80,
-    MaybeStable = 0x100,
+    Unstable = 0x20,
+    Stable = 0x40,
+    MaybeStable = 0x80,
     /**
      * current value is changed (so need to propagate)
      */
-    Changed = 0x400,
-    /**
-     * When a computation is zombie, it is definitely markforcheck
-     */
-    Zombie = 0x800,
+    Changed = 0x100,
     /**
      * dynamic is true when this is true
      */
-    NotReady = 0x1000,
-    RenderEffect = 0x2000,
+    NotReady = 0x200,
+    Suspensed = 0x400,
+    Suspending = 0x800,
+    Lazy = 0x1000,
+    Marking = 0x2000,
+}
+
+class Suspend {
+    constructor(public readonly cancel: () => void) {}
+}
+
+class SuspendWithFallback extends Suspend {
+    constructor(
+        public readonly fallback: any,
+        public readonly cancel: () => void
+    ) {
+        super(cancel);
+    }
 }
 
 interface WatcherNode {
@@ -71,7 +79,7 @@ interface ObserverLinkNode<T> {
 
 interface Data<T = any> {
     flags: Flag;
-    value: T | null;
+    value: T | undefined;
     last_effect: WatcherNode | null;
     last_observer: ObserverLinkNode<Computation> | null;
 }
@@ -79,9 +87,14 @@ interface Data<T = any> {
 interface Computation<T = any> extends Data<T> {
     first_source: SourceLinkNode<Data> | null;
     last_source: SourceLinkNode<Data> | null;
-    collect: () => T;
+    collect: Function;
     depsCounter: number;
     checkNode: SourceLinkNode<Data> | null;
+}
+
+interface Suspense<T = any, F = undefined> extends Computation<T> {
+    fallback: F;
+    currentCancel: (() => void) | undefined;
 }
 
 interface Watcher {
@@ -96,7 +109,7 @@ let currentCollecting: Computation | null = null;
 function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
     if (__DEV__ && currentCollecting) {
         console.error(
-            `Violated action: You can't mutate any behavior inside a computation or side effect.`
+            `Violated action: You can't mutate any behavior inside a computation.`
         );
         return;
     }
@@ -107,10 +120,10 @@ function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
         return;
     }
     data.value = value;
-    if (data.flags & (Flag.Zombie | Flag.Changed)) {
+    if (data.flags & Flag.Changed) {
         return;
     }
-    data.flags |= Flag.Changed;
+    data.flags |= Flag.Changed | Flag.MarkForCheck;
     dirtyDataQueue.push(data);
     markObserversForCheck(data);
 }
@@ -119,12 +132,16 @@ const dirtyDataQueue: Data[] = [];
 const effects: Function[] = [];
 
 function markObserversForCheck(computation: Data) {
+    computation.flags |= Flag.Marking;
     let node = computation.last_observer;
     while (node !== null) {
         const observer = node.observer;
-        if ((observer.flags & Flag.Zombie) === 0) {
-            observer.depsCounter++;
+        if (observer.flags & Flag.Marking) {
+            // skip circular observer.
+            node = node.prev_observer;
+            continue;
         }
+        observer.depsCounter++;
         if (observer.flags & Flag.MarkForCheck) {
             node = node.prev_observer;
             continue;
@@ -133,6 +150,7 @@ function markObserversForCheck(computation: Data) {
         markObserversForCheck(observer);
         node = node.prev_observer;
     }
+    computation.flags -= Flag.Marking;
 }
 
 function accessData(data: Data) {
@@ -142,19 +160,21 @@ function accessData(data: Data) {
         } else if (currentCollecting.flags & Flag.MaybeStable) {
             logMaybeStable(currentCollecting, data);
         }
-        if (data.flags & Flag.Zombie) {
-            if ((currentCollecting.flags & Flag.Zombie) === 0) {
-                data.flags -= Flag.Zombie;
-            }
+        if (
+            currentCollecting.flags & Flag.Suspensed && // data can be suspensed?
+            data.flags & Flag.Suspending
+        ) {
+            throw new Suspend(noop);
         }
     }
     return data.value;
 }
 
-function accessComputation(data: Computation) {
-    if (__DEV__ && data.flags & Flag.Computing) {
-        console.error(`Circular dependency detected.`);
-        return data.value;
+function accessComputation<T>(data: Computation<T>): T | undefined {
+    if (data.flags & Flag.Estimating) {
+        // self referenced estimation.
+        data.flags |= Flag.Stale;
+        return data.value; //?wtf
     }
     if (currentCollecting !== null) {
         if (currentCollecting.flags & Flag.MaybeStable) {
@@ -162,23 +182,46 @@ function accessComputation(data: Computation) {
         } else if (currentCollecting.flags & Flag.Unstable) {
             insertNewSource(currentCollecting, data);
         }
-        if (data.flags & Flag.Zombie) {
-            if ((currentCollecting.flags & Flag.Zombie) === 0) {
-                data.flags -= Flag.Zombie;
-                data.value = updateComputation(data);
-                data.flags -= Flag.MarkForCheck;
-            }
-        }
-    } else {
-        if (data.flags & (Flag.MarkForCheck | Flag.Zombie)) {
-            // potential optimization: memo? that's too complex.
-            data.flags |= Flag.Computing;
-            const currentValue = data.collect();
-            data.flags -= Flag.Computing;
-            return currentValue;
+        if (
+            currentCollecting.flags & Flag.Suspensed &&
+            data.flags & Flag.Suspending
+        ) {
+            throw new Suspend(noop); //TODO: current cancel?
         }
     }
+    if (data.flags & Flag.Stale) {
+        estimateComputation(data, data.collect);
+    }
     return data.value;
+}
+
+/**
+ * Make computation not stale.
+ * Make sure computation is stale
+ * @param comp
+ * @returns
+ */
+function estimateComputation(comp: Computation, expr: Function) {
+    if (__DEV__ && (comp.flags & Flag.Stale) === 0) {
+        throw Error('Only stale computation can be estimated.');
+    }
+    comp.flags |= Flag.Estimating;
+    while (true) {
+        comp.flags -= Flag.Stale;
+        const value = updateComputationOneEpoch(comp, expr);
+        if (comp.flags & Flag.Stale) {
+            if (comp.value === value) {
+                comp.flags -= Flag.Stale;
+                break;
+            } else {
+                comp.value = value;
+            }
+        } else {
+            comp.value = value;
+            break;
+        }
+    }
+    comp.flags -= Flag.Estimating;
 }
 
 function logMaybeStable(accessor: Computation, data: Data) {
@@ -195,13 +238,41 @@ function logMaybeStable(accessor: Computation, data: Data) {
     }
 }
 
-function collectSourceAndRecomputeComputation(computation: Computation) {
+function collectSourceAndRecomputeComputation(
+    computation: Computation,
+    computeExpr: Function
+) {
     const stored = currentCollecting;
     currentCollecting = computation;
     computation.checkNode = computation.first_source;
-    computation.flags |= Flag.Computing;
-    const currentValue = computation.collect();
-    computation.flags -= Flag.Computing;
+
+    let currentValue;
+
+    if (computation.flags & Flag.Suspensed) {
+        (computation as Suspense).currentCancel?.(); // if is suspending, cancel last (maybe no effect)
+        (computation as Suspense).currentCancel = undefined;
+        try {
+            computation.flags |= Flag.Suspending;
+            currentValue = computeExpr(computation.value);
+            computation.flags -= Flag.Suspending;
+        } catch (e) {
+            if (e instanceof Suspend) {
+                // a _behavior_ should have been collected and it will schedule an update later.
+                if (e instanceof SuspendWithFallback) {
+                    currentValue = e.fallback;
+                } else {
+                    currentValue = (computation as Suspense).fallback;
+                }
+                (computation as Suspense).currentCancel = e.cancel;
+            } else {
+                throw e;
+            }
+        } finally {
+        }
+    } else {
+        currentValue = computeExpr(computation.value);
+    }
+
     if (computation.flags & Flag.MaybeStable) {
         // check the real used deps is lesser than assumed.
         if (computation.checkNode !== null) {
@@ -223,17 +294,18 @@ function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
     return ret;
 }
 
-function updateComputation(computation: Computation) {
+function updateComputationOneEpoch(computation: Computation, expr: Function) {
     if (computation.flags & Flag.Unstable) {
         cleanupComputation(computation, null);
     }
-    const currentValue = collectSourceAndRecomputeComputation(computation);
+    const currentValue = collectSourceAndRecomputeComputation(
+        computation,
+        expr
+    );
 
     if (computation.flags & Flag.NotReady) {
         computation.flags -= Flag.NotReady;
-        if (computation.flags & Flag.Stable) {
-            computation.flags -= Flag.MaybeStable;
-        }
+        computation.flags -= Flag.MaybeStable;
     }
     return currentValue;
 }
@@ -242,121 +314,121 @@ function cleanupComputation(
     cell: Computation,
     until: SourceLinkNode<any> | null | 0 // it is guaranteed to be inside sources link list.
 ) {
-    let source = cell.last_source;
-    while (source !== null && source !== until) {
-        const lastobserver = source.source.last_observer!;
-        source.source.last_observer = lastobserver.prev_observer;
-        if (lastobserver.prev_observer !== null) {
-            lastobserver.prev_observer.next_observer = null; // as it is the new tail.
+    let lastSource = cell.last_source;
+    while (lastSource !== null && lastSource !== until) {
+        lastSource.next_source = null; // not necessary? but give GC a chance?
+        const observerRef = lastSource.observer_ref;
+        if (observerRef.next_observer) {
+            observerRef.next_observer.prev_observer = observerRef.prev_observer;
+        } else {
+            // observerRef is the last observer
+            lastSource.source.last_observer = observerRef.prev_observer;
         }
-        if (lastobserver === source.observer_ref) {
-            source = source.prev_source;
-            continue;
+        if (observerRef.prev_observer) {
+            observerRef.prev_observer.next_observer = observerRef.next_observer;
+        } else {
+            // it's the first observer: noop
         }
-        const co_ref = source.observer_ref; // this one should be before lastobserver, so let lastobserver take its place.
-        // lastobserver.index = co_ref.index;
-        lastobserver.prev_observer = co_ref.prev_observer;
-        if (lastobserver.prev_observer !== null) {
-            // it's the new prev
-            lastobserver.prev_observer.next_observer = lastobserver;
-        }
-        lastobserver.next_observer = co_ref.next_observer;
-        if (lastobserver.next_observer !== null) {
-            // it's the new next
-            lastobserver.next_observer.prev_observer = lastobserver;
-        }
-        // here co_ref has been refed by no object, wait to be GC.
-        source = source.prev_source;
-        // source?.next = null; // no need to do this
+        // observerRef.prev_observer = null; // don't do this! propagate() still need it!
+        lastSource = lastSource.prev_source;
     }
     if (!until) {
         // it is a full clean
         cell.first_source = null;
         cell.last_source = null;
+        if (cell.flags & Flag.Stable) {
+            cell.flags |= Flag.NotReady | Flag.MaybeStable;
+        }
     } else {
         cell.last_source = until;
     }
 }
 
-function propagate(data: Data) {
-    let notZombie = false;
-    // if maybe stale (not for data)
-    if (data.flags & Flag.MarkForCheck) {
-        if (data.flags & Flag.Computation) {
-            if (__TEST__ && (data as Computation).depsCounter !== 0) {
-                throw 'this should never happen.';
-            }
-            if (data.flags & Flag.Stale) {
-                const currentValue = updateComputation(data as Computation);
-                // compare value , if changed, mark as changed
-                if (currentValue !== data.value) {
-                    data.value = currentValue;
-                    data.flags |= Flag.Changed;
+function propagate(data: Data): void {
+    while (true) {
+        if (data.flags & Flag.MarkForCheck) {
+            if (data.flags & Flag.Computation) {
+                if (__TEST__ && (data as Computation).depsCounter !== 0) {
+                    throw 'this should never happen.';
                 }
-                data.flags -= Flag.Stale;
+                if (data.flags & Flag.Stale) {
+                    if (data.flags & Flag.Lazy) {
+                        // lazy comp will keep stale? until re-estimated.
+                        data.flags |= Flag.Changed;
+                    } else {
+                        const currentValue = updateComputationOneEpoch(
+                            data as Computation,
+                            (data as Computation).collect
+                        );
+                        // compare value , if changed, mark as changed
+                        if (currentValue !== data.value) {
+                            data.value = currentValue;
+                            data.flags |= Flag.Changed;
+                        }
+                        data.flags -= Flag.Stale;
+                    }
+                }
             }
-        } else if (data.flags & Flag.RenderEffect) {
-            if (data.flags & Flag.Stale) {
-                data.flags |= Flag.Changed;
-                // render effect will keep stale? until outside render execute.
+            data.flags -= Flag.MarkForCheck;
+        } else {
+            if (
+                data.flags & Flag.Computation &&
+                data.last_observer === null &&
+                data.last_effect === null
+            ) {
+                cleanupComputation(data as Computation, 0);
+                data.flags |= Flag.Stale;
             }
+            break;
         }
-        data.flags -= Flag.MarkForCheck;
-        // now it is definitely not stale!
-    }
-    // if changed
-    if (data.flags & Flag.Changed) {
-        let observer = data.last_observer;
-        while (observer !== null) {
-            let current = observer.observer;
-            if (current.flags & Flag.Zombie) {
+        // if changed
+        if (data.flags & Flag.Changed) {
+            let observer = data.last_observer;
+            while (observer !== null) {
+                let current = observer.observer;
+                if ((current.flags & Flag.MarkForCheck) === 0) {
+                    current.flags |= Flag.MarkForCheck | Flag.Stale; // self referenced or circular referenced.
+                    observer = observer.prev_observer;
+                    continue;
+                }
+                current.flags |= Flag.Stale;
+                current.depsCounter--;
+                if (current.depsCounter === 0) {
+                    propagate(current);
+                }
                 observer = observer.prev_observer;
-                continue;
             }
-            if (__TEST__ && (current.flags & Flag.MarkForCheck) === 0) {
-                throw 'should never happen'; // how is this possible? It could not even be mocked in unit tests.
+            data.flags -= Flag.Changed;
+            if ((data.flags & Flag.MarkForCheck) === 0 && data.last_effect) {
+                //ensure markforcheck is zero: no loopback.
+                let watcher: WatcherNode | null = data.last_effect;
+                while (watcher !== null) {
+                    effects.push(watcher.fn);
+                    watcher = watcher.prev;
+                }
             }
-            current.flags |= Flag.Stale;
-            current.depsCounter--;
-            if (current.depsCounter === 0 && propagate(current)) {
-                notZombie = true;
-            }
-            observer = observer.prev_observer;
-        }
-        data.flags -= Flag.Changed;
-        if (data.last_effect) {
-            notZombie = true;
-            let watcher: WatcherNode | null = data.last_effect;
-            while (watcher !== null) {
-                effects.push(watcher.fn);
-                watcher = watcher.prev;
-            }
-        }
-    } else {
-        let observer = data.last_observer;
-        while (observer !== null) {
-            let current = observer.observer;
-            if (current.flags & Flag.Zombie) {
+        } else {
+            let observer = data.last_observer;
+            while (observer !== null) {
+                let current = observer.observer;
+                if ((current.flags & Flag.MarkForCheck) === 0) {
+                    // loop back but without any change
+                    observer = observer.prev_observer;
+                    continue;
+                }
+                current.depsCounter--;
+                if (current.depsCounter === 0) {
+                    propagate(current);
+                }
                 observer = observer.prev_observer;
-                continue;
             }
-            current.depsCounter--;
-            if (current.depsCounter === 0 && propagate(current)) {
-                notZombie = true;
-            }
-            observer = observer.prev_observer;
         }
-        if (data.last_effect) {
-            notZombie = true;
+
+        if (data.flags & Flag.MarkForCheck) {
+            // and Stale definitely
+            markObserversForCheck(data); // tail: refresh
         }
     }
-    if (!notZombie) {
-        data.flags |= Flag.Zombie;
-        if (data.flags & Flag.Computation) {
-            data.flags |= Flag.MarkForCheck;
-        }
-    }
-    return notZombie;
 }
 
 function watch(data: Data, sideEffect: Function) {
@@ -370,12 +442,8 @@ function watch(data: Data, sideEffect: Function) {
         );
         return { disposed: true } as WatcherNode;
     }
-    if (data.flags & Flag.Zombie) {
-        data.flags -= Flag.Zombie;
-        if (data.flags & Flag.Computation) {
-            data.value = updateComputation(data as Computation);
-            data.flags -= Flag.MarkForCheck;
-        }
+    if (data.flags & Flag.Stale && (data.flags & Flag.Lazy) === 0) {
+        estimateComputation(data as Computation, (data as Computation).collect);
     }
 
     const node: WatcherNode = {
@@ -392,7 +460,6 @@ function watch(data: Data, sideEffect: Function) {
     return node;
 }
 
-// TODO: Make node zombie if no watcher.
 function disposeWatcher(watcher: WatcherNode) {
     if (__TEST__ && currentCollecting) {
         console.error('Violated action.');
@@ -489,86 +556,40 @@ function insertNewObserver(
     }
 }
 
-function createRenderEffect() {
-    // a renderEffect can never be zombie!
-    const ret: Computation<null> = {
-        flags: Flag.RenderEffect | Flag.Zombie | Flag.MaybeStable | Flag.Stale,
+function createLazy<T>(initial?: T) {
+    const ret: Computation<T> = {
+        flags: Flag.Computation | Flag.Lazy | Flag.MaybeStable | Flag.Stale,
         last_effect: null,
         last_observer: null,
-        value: null,
+        value: (undefined as any) as T,
         first_source: null,
         last_source: null,
         collect: null as any,
         depsCounter: 0,
         checkNode: null,
     };
-    // ret.last_effect!.data = ret;
+    if (initial !== undefined) {
+        ret.value = initial;
+    }
     return ret;
 }
 
-function executeRenderEffect<T>(
-    computation: Computation<null>,
-    fn: (...args: any[]) => T,
-    ...args: any[]
-) {
+function executeLazy<T>(computation: Computation<T>, fn: (current: T) => T) {
     if (__TEST__ && inTransaction) {
         throw Error('should be not in transaction');
     }
     if (__TEST__ && currentCollecting) {
         throw Error('should be not in computation');
     }
-    if (computation.flags & Flag.Zombie) {
-        // potential optimization: memo? that's too complex.
-        computation.flags |= Flag.Computing;
-        const currentValue = fn(...args);
-        computation.flags -= Flag.Computing;
-        return currentValue;
-    }
     if (computation.flags & Flag.Stale) {
-        if (computation.flags & Flag.Unstable) {
-            cleanupComputation(computation, null);
-        }
-        currentCollecting = computation;
-        computation.checkNode = computation.first_source;
-        computation.flags |= Flag.Computing;
-        const currentValue = fn(...args);
-        computation.flags -= Flag.Computing;
-        if (computation.flags & Flag.MaybeStable) {
-            // check the real used deps is lesser than assumed.
-            if (computation.checkNode !== null) {
-                // collected source num is less than expected
-                // but it's fine as we remove the extra sources.
-                cleanupComputation(
-                    computation,
-                    computation.checkNode.prev_source
-                ); // if last_source after checknode?
-            }
-        }
-        computation.checkNode = null;
-        currentCollecting = null;
-        computation.value = currentValue as any; // memo
-
-        computation.flags -= Flag.Stale;
-        return currentValue;
+        estimateComputation(computation, fn);
     }
     return (computation.value as any) as T;
 }
 
-/**
- *
- * @param computation
- * @deprecated
- */
-function cleanupRenderEffect(computation: Computation<null>) {
-    cleanupComputation(computation, null);
-    disposeWatcher(computation.last_effect!);
-}
-
-// cleanup render effect?
-
 function createData<T>(value: T): Data<T> {
     return {
-        flags: Flag.Data | Flag.Zombie,
+        flags: Flag.Data,
         last_effect: null,
         last_observer: null,
         value,
@@ -576,30 +597,50 @@ function createData<T>(value: T): Data<T> {
 }
 
 function createComputation<T>(
-    fn: () => T,
+    fn: (current: T) => T,
     options?: {
-        static: boolean;
+        initial?: T;
+        static?: boolean;
         sources?: Data[];
     }
 ) {
     const ret: Computation<T> = {
-        flags:
-            Flag.Computation |
-            Flag.Zombie |
-            Flag.MarkForCheck |
-            Flag.MaybeStable,
+        flags: Flag.Computation | Flag.MaybeStable | Flag.Stale,
         last_effect: null,
         last_observer: null,
-        value: null,
+        value: undefined,
         first_source: null,
         last_source: null,
         collect: fn,
         depsCounter: 0,
         checkNode: null,
     };
-    if (options?.static) {
-        ret.flags |= Flag.Stable | Flag.NotReady;
+    if (options) {
+        if (options.static) {
+            ret.flags |= Flag.Stable | Flag.NotReady;
+        }
+        if (options.initial !== undefined) {
+            ret.value = options.initial;
+        }
     }
+    return ret;
+}
+
+function createSuspended<T, F>(fn: (current: T | F) => T, fallback: F) {
+    const ret: Suspense<T, F> = {
+        flags:
+            Flag.Computation | Flag.Suspensed | Flag.MaybeStable | Flag.Stale,
+        last_effect: null,
+        last_observer: null,
+        value: undefined,
+        first_source: null,
+        last_source: null,
+        collect: fn,
+        depsCounter: 0,
+        checkNode: null,
+        fallback,
+        currentCancel: undefined,
+    };
     return ret;
 }
 
@@ -675,15 +716,47 @@ export class ComputationalBehavior<T> extends Behavior<T> {
     }
 }
 
+export class Lazy<T> {
+    constructor(private internal: Computation<T>) {}
+
+    execute(expr: (current: T) => T) {
+        return executeLazy<T>(this.internal, expr);
+    }
+
+    watch(watchFn: (value: T) => Cleanable): TeardownLogic {
+        let lastDisposer: Cleanable = undefined;
+        const watcher = watch(this.internal, () => {
+            doCleanup(lastDisposer);
+            lastDisposer = watchFn(this.internal.value!);
+        });
+        return () => disposeWatcher(watcher!);
+    }
+}
+
 export function mutable<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
     const internal = createData(initialValue);
     return [new Behavior(internal), (v) => setData(internal, v, true)];
 }
 
-export function computed<T>(expr: () => T, staticDependencies = false) {
+export function lazy<T>(initial?: T) {
+    return new Lazy<T>(createLazy(initial));
+}
+
+export function computed<T>(
+    expr: (current: T) => T,
+    staticDependencies = false
+): Behavior<T> {
     const internal = createComputation(expr, {
         static: staticDependencies,
     });
+    return new ComputationalBehavior(internal);
+}
+
+export function suspended<T, F = T>(
+    expr: (current: T | F) => T,
+    fallback: F
+): Behavior<T> {
+    const internal = createSuspended(expr, fallback);
     return new ComputationalBehavior(internal);
 }
 
@@ -733,7 +806,9 @@ export {
     createComputation,
     untrack,
     cleanupComputation,
-    createRenderEffect,
-    executeRenderEffect,
-    cleanupRenderEffect,
+    createLazy,
+    executeLazy,
+    createSuspended,
+    Suspend,
+    SuspendWithFallback,
 };
