@@ -15,15 +15,6 @@ import {
     executeLazy,
 } from './behavior';
 
-/**
- * TODO: add comments explaining all the mechanism
- * MaybeStale/Stale
- * MaybeStable/Stable/Unstable
- * RenderEffect
- * Zombie
- * MarkForCheck
- */
-
 describe('core/behavior', () => {
     var noop = () => {};
 
@@ -77,7 +68,7 @@ describe('core/behavior', () => {
         const watcher = watch(c, () => {
             expect(c.flags & Flag.MarkForCheck).toBeFalsy();
         });
-        cleanupComputation(c, 0);
+        cleanupComputation(c, null);
         expect(c.last_source).toEqual(null);
         expect(a.last_observer).toEqual(null);
 
@@ -91,7 +82,7 @@ describe('core/behavior', () => {
             expect(c.flags & Flag.MarkForCheck).toBeFalsy();
         });
         expect(c.last_source.source === a).toBeTruthy();
-        cleanupComputation(c, 0);
+        cleanupComputation(c, null);
         expect(c.last_source === null).toBeTruthy();
         expect(a.last_observer === null).toBeTruthy();
 
@@ -108,9 +99,9 @@ describe('core/behavior', () => {
         const watcher2 = watch(d, noop);
         const watcher3 = watch(e, noop);
         expect(d.last_source.source === a).toBeTruthy();
-        cleanupComputation(d, 0);
-        cleanupComputation(e, 0);
-        cleanupComputation(c, 0);
+        cleanupComputation(d, null);
+        cleanupComputation(e, null);
+        cleanupComputation(c, null);
         expect(d.last_source === null).toBeTruthy();
         expect(a.last_observer === null).toBeTruthy();
 
@@ -163,11 +154,11 @@ describe('core/behavior', () => {
         const c = compute(() => readData(a) + readData(b));
         const d = compute(() => readData(a));
         const e = compute(() => readCompute(c) + readCompute(d));
-        expect(c.flags & Flag.NotReady).toBeFalsy();
+        expect(c.flags & Flag.DepsNeverChange).toBeFalsy();
         expect(readCompute(c)).toEqual(3);
         expect(readCompute(d)).toEqual(1);
         // expect(c.flags & Flag.NotReady).toBeFalsy();
-        expect(c.flags & Flag.MaybeStable).toBeTruthy();
+        expect(c.flags & Flag.DepsMaybeStable).toBeTruthy();
         const watcher = watch(e, noop);
         setData(a, 2);
         disposeWatcher(watcher);
@@ -220,12 +211,12 @@ describe('core/behavior', () => {
         setData(a, 0);
         expect(c.value).toBe(2);
         expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(c.flags & Flag.MaybeStable).toBeFalsy();
+        expect(c.flags & Flag.DepsMaybeStable).toBeFalsy();
         setData(b, 0);
         expect(d.value).toBe(0);
         expect(e.value).toBe(0);
         expect(b.last_observer.prev_observer).toBeFalsy();
-        expect(e.flags & Flag.MaybeStable).toBeTruthy();
+        expect(e.flags & Flag.DepsMaybeStable).toBeTruthy();
         disposeWatcher(watcher);
     });
 
@@ -337,7 +328,6 @@ describe('core/behavior', () => {
     //         return readData(a);
     //     }); // memo result
     //     expect(result5).toBe(4);
-
     //     cleanupRenderEffect(reff);
     // });
 
@@ -356,6 +346,5 @@ describe('core/behavior', () => {
         const watcher1 = watch(c, noop);
 
         disposeWatcher(watcher1);
-        console.log(c);
     });
 });
