@@ -1,5 +1,5 @@
 import { Cleanable, Symbol_observable, TeardownLogic } from '../types';
-import { doCleanup, noop } from '../utils';
+import { doCleanup, noop, panic } from '../utils';
 
 const enum Flag {
     /**
@@ -181,7 +181,7 @@ function accessData(data: Data) {
 
 function accessComputation<T>(data: Computation<T>): T | undefined {
     if (__DEV__ && data.flags & Flag.Lazy) {
-        throw Error('should not happen');
+        panic(4);
     }
     if (currentCollecting !== null) {
         if (currentCollecting.flags & Flag.DepsMaybeStable) {
@@ -328,7 +328,6 @@ function cleanupComputation(
 ) {
     let lastSource = computation.last_source!;
     while (lastSource !== until) {
-        lastSource.next_source = null; // might make GC happy...
         const obRef = lastSource.observer_ref;
         if (obRef.next_observer) {
             obRef.next_observer.prev_observer = obRef.prev_observer;
@@ -340,17 +339,16 @@ function cleanupComputation(
         } else {
             lastSource.source.first_observer = obRef.next_observer;
         }
-        lastSource = lastSource.prev_source!; // actually it might be null, but if it's null then until must be null.
-    }
-    if (!until) {
-        // it is a full clean
-        computation.first_source = null;
-        computation.last_source = null;
-        if (computation.flags & Flag.DepsNeverChange) {
-            computation.flags |= Flag.DepsMaybeStable;
+        computation.last_source = lastSource = lastSource.prev_source!; // actually it might be null, but if it's null then until must be null.
+        if (lastSource) {
+            lastSource.next_source = null;
+        } else {
+            // full clean
+            computation.first_source = null;
+            if (computation.flags & Flag.DepsNeverChange) {
+                computation.flags |= Flag.DepsMaybeStable;
+            }
         }
-    } else {
-        computation.last_source = until;
     }
 }
 
@@ -359,7 +357,7 @@ function propagate(data: Data): void {
     if (data.flags & Flag.MarkForCheck) {
         if (data.flags & Flag.Computation) {
             if (__TEST__ && (data as Computation).depsCounter !== 0) {
-                throw Error('this should never happen.');
+                panic(2); //should not happen
             }
             if (data.flags & Flag.Stale) {
                 if (data.flags & Flag.Lazy) {
@@ -381,7 +379,7 @@ function propagate(data: Data): void {
         }
         data.flags &= ~Flag.MarkForCheck;
     } else {
-        throw Error('Then why would you propagate?');
+        panic(1); //should not happen
     }
     while (true) {
         // if changed
@@ -391,6 +389,11 @@ function propagate(data: Data): void {
                 let current = observer.observer;
                 if (current.flags & Flag.Propagating) {
                     current.flags |= Flag.ConflictLoop; // self referenced or circular referenced.
+                    observer = observer.next_observer;
+                    continue;
+                }
+                if ((current.flags & Flag.MarkForCheck) === 0) {
+                    // new observers might be added (and they don't need to be propagated.)
                     observer = observer.next_observer;
                     continue;
                 }
@@ -417,6 +420,10 @@ function propagate(data: Data): void {
                     observer = observer.next_observer;
                     continue;
                 }
+                if ((current.flags & Flag.MarkForCheck) === 0) {
+                    observer = observer.next_observer;
+                    continue;
+                }
                 current.depsCounter--;
                 if (current.depsCounter === 0) {
                     propagate(current);
@@ -428,7 +435,7 @@ function propagate(data: Data): void {
         if (data.flags & Flag.ConflictLoop) {
             data.flags -= Flag.ConflictLoop;
             if (data.flags & Flag.Lazy) {
-                throw Error('should not happen.');
+                panic(5);
             } else {
                 const currentValue = doComputation(
                     data as Computation,
@@ -455,7 +462,7 @@ function propagate(data: Data): void {
         cleanupComputation(data as Computation, null);
         data.flags |= Flag.Stale;
     }
-    data.flags &= ~Flag.Propagating;
+    data.flags -= Flag.Propagating;
 }
 
 function watch(data: Data, sideEffect: Function) {
@@ -737,10 +744,12 @@ export class Behavior<T> {
     watch(watchFn: (value: T) => Cleanable): TeardownLogic {
         let lastDisposer: Cleanable = undefined;
         const watcher = watch(this.internal, () => {
-            doCleanup(lastDisposer);
             lastDisposer = watchFn(this.internal.value!);
         });
-        return () => disposeWatcher(watcher!);
+        return () => {
+            doCleanup(lastDisposer);
+            disposeWatcher(watcher!);
+        };
     }
 
     /**
@@ -797,12 +806,13 @@ export function lazy<T>(initial?: T) {
 
 export function computed<T>(
     expr: (current: T) => T,
-    staticDependencies = false
+    options?: {
+        static?: boolean;
+        initial?: T;
+    }
 ): Behavior<T> {
-    const internal = createComputation(expr, {
-        static: staticDependencies,
-    });
-    return new ComputationalBehavior(internal);
+    const internal = createComputation(expr, options);
+    return new ComputationalBehavior(internal) as Behavior<T>;
 }
 
 export function suspended<T, F = T>(
@@ -829,19 +839,25 @@ export function combined<
 >(obj: C): Behavior<ExtractBehaviorProperty<C>>;
 export function combined(obj: object): Behavior<any> {
     if (obj instanceof Array) {
-        return computed(() => {
-            return obj.map((x) => {
-                return x.value;
-            });
-        }, true);
-    }
-    return computed(() => {
-        return Object.fromEntries(
-            Object.entries(obj).map(([key, value]) => {
-                return [key, value.value];
-            })
+        return computed(
+            () => {
+                return obj.map((x) => {
+                    return x.value;
+                });
+            },
+            { static: true }
         );
-    }, true);
+    }
+    return computed(
+        () => {
+            return Object.fromEntries(
+                Object.entries(obj).map(([key, value]) => {
+                    return [key, value.value];
+                })
+            );
+        },
+        { static: true }
+    );
 }
 
 export {

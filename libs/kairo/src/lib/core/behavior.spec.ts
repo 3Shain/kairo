@@ -1,350 +1,227 @@
 import {
-    createComputation as compute,
-    createData as data,
-    accessData as readData,
-    accessComputation as readCompute,
-    watch,
-    disposeWatcher,
-    cleanupComputation,
+    Behavior,
+    Computation,
+    computed,
     Flag,
-    setData as _setData,
+    lazy,
+    mutable,
     runInTransaction,
-    Data,
-    untrack,
-    createLazy,
-    executeLazy,
 } from './behavior';
 
 describe('core/behavior', () => {
-    var noop = () => {};
+    const noop = () => {};
 
-    const setData = (a: Data<any>, v: number) => _setData(a, v, true);
+    function hasFlag(c: any, f: Flag) {
+        return c['internal'].flags & f;
+    }
+
+    function numOfObserverNodes(c: any) {
+        let last = c['internal'].last_observer;
+        let count = 0;
+        while (last !== null) {
+            count++;
+            last = last.prev_observer;
+        }
+        return count;
+    }
+
+    function numOfSourceNodes(c: any) {
+        let last = (c['internal'] as Computation).last_source;
+        let count = 0;
+        while (last !== null) {
+            count++;
+            last = last.prev_source;
+        }
+        return count;
+    }
 
     it('should establish a reactive relation', () => {
-        const a = data(0);
-        const b = data(0);
-        const c = compute(() => readData(a) + readData(b));
-        const d = compute(() => readData(a) + readData(b));
+        const [a, setA] = mutable(0);
+        const b = computed(() => a.value * 2);
+        const c = computed(() => b.value * 2);
+        expect(c.value).toBe(0);
+        setA(1);
+        expect(c.value).toBe(4);
         let result = 0;
-        const watcher = watch(c, () => {
-            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-            result = c.value;
+        const stopWatch = c.watch((value) => {
+            result = value;
         });
-        let result2 = 0;
-        const watcher2 = watch(d, () => {
-            expect(d.flags & Flag.MarkForCheck).toBeFalsy();
-            result2 = d.value;
-        });
-        const e = compute(() => readData(c) + readData(d), {
-            static: true,
-        });
-        const watcher3 = watch(e, noop);
-        expect(e.flags & Flag.Stale).toBeFalsy();
-        expect(e.last_source).toBeTruthy();
-
-        setData(a, 1);
-        expect(result).toEqual(1);
-        expect(result2).toEqual(1);
-
-        setData(b, 2);
-        expect(result).toEqual(3);
-        expect(result2).toEqual(3);
-
-        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(d.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(e.depsCounter).toEqual(0);
-        expect(e.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(e.value).toEqual(6);
-
-        disposeWatcher(watcher3);
-        disposeWatcher(watcher);
-        disposeWatcher(watcher2);
-    });
-
-    it('cleanupComputaion do clean up', () => {
-        const a = data(0);
-        const b = data(0);
-        const c = compute(() => readData(a) + readData(b));
-        const watcher = watch(c, () => {
-            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        });
-        cleanupComputation(c, null);
-        expect(c.last_source).toEqual(null);
-        expect(a.last_observer).toEqual(null);
-
-        disposeWatcher(watcher);
-    });
-
-    it('cleanupComputaion do clean up for single source computation', () => {
-        const a = data(0);
-        const c = compute(() => readData(a));
-        const watcher = watch(c, () => {
-            expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        });
-        expect(c.last_source.source === a).toBeTruthy();
-        cleanupComputation(c, null);
-        expect(c.last_source === null).toBeTruthy();
-        expect(a.last_observer === null).toBeTruthy();
-
-        disposeWatcher(watcher);
-    });
-
-    it('cleanupComputaion do clean up for single source computation', () => {
-        const a = data(0);
-        const b = data(1);
-        const c = compute(() => readData(a) + readData(b));
-        const d = compute(() => readData(a));
-        const e = compute(() => readData(a));
-        const watcher = watch(c, noop);
-        const watcher2 = watch(d, noop);
-        const watcher3 = watch(e, noop);
-        expect(d.last_source.source === a).toBeTruthy();
-        cleanupComputation(d, null);
-        cleanupComputation(e, null);
-        cleanupComputation(c, null);
-        expect(d.last_source === null).toBeTruthy();
-        expect(a.last_observer === null).toBeTruthy();
-
-        disposeWatcher(watcher);
-        disposeWatcher(watcher2);
-        disposeWatcher(watcher3);
-    });
-
-    it('no propagation if no watcher', () => {
-        const a = data(0);
-        const b = data(0);
-        const c = compute(() => readData(a) + readData(b));
         runInTransaction(() => {
-            setData(a, 1);
-            setData(a, 1); // redunant set.
-            setData(b, 2);
+            setA(2);
+            setA(2);
+            setA(3);
         });
-        expect(c.value).toEqual(undefined); // change is not propagated
-        expect(c.flags & Flag.Stale).toBeTruthy();
-
-        expect(readCompute(c)).toEqual(3); // accessComputation
-        expect(c.flags & Flag.Stale).toBeFalsy(); // now it's active (but might be disposed later.)
+        expect(result).toBe(12);
+        stopWatch();
     });
 
-    it('runInTransaction guarantees consistancy', () => {
-        const a = data(0);
-        const b = data(0);
-        const c = compute(() => readData(a) + readData(b));
-
-        const watcher = watch(c, () => {
-            /**noop */
+    it('should establish a reactive relation (static)', () => {
+        const [a, setA] = mutable(0);
+        const b = computed(() => a.value * 2, { static: true });
+        const c = computed(() => b.value * 2, { static: true });
+        expect(c.value).toBe(0);
+        setA(1);
+        expect(c.value).toBe(4);
+        let result = 0;
+        const stopWatch = c.watch((value) => {
+            result = value;
         });
-
         runInTransaction(() => {
-            setData(a, 1);
-            expect(c.value).toEqual(0);
-            setData(b, 2);
-            expect(c.value).toEqual(0);
+            setA(2);
+            setA(2);
+            setA(3);
         });
+        expect(result).toBe(12);
+        stopWatch();
 
-        expect(c.value).toEqual(3);
-        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-
-        disposeWatcher(watcher);
+        expect(numOfObserverNodes(a)).toBe(1);
+        setA(0);
+        expect(numOfObserverNodes(a)).toBe(0);
     });
 
-    it('1', () => {
-        const a = data(1);
-        const b = data(2);
-        const c = compute(() => readData(a) + readData(b));
-        const d = compute(() => readData(a));
-        const e = compute(() => readCompute(c) + readCompute(d));
-        expect(c.flags & Flag.DepsNeverChange).toBeFalsy();
-        expect(readCompute(c)).toEqual(3);
-        expect(readCompute(d)).toEqual(1);
-        // expect(c.flags & Flag.NotReady).toBeFalsy();
-        expect(c.flags & Flag.DepsMaybeStable).toBeTruthy();
-        const watcher = watch(e, noop);
-        setData(a, 2);
-        disposeWatcher(watcher);
-    });
+    // it('should establish a reactive relation', () => {});
 
-    it('2', () => {
-        const a = data(1);
-        const b = data(2);
-        const c = compute(() => {
-            if (readData(a)) {
-                return readData(b);
+    it('unused computation should be cleaned up', () => {
+        const [a, setA] = mutable(0);
+        const b = computed(() => a.value * 2);
+        const c = computed(() => {
+            if (a.value >= 0) {
+                return b.value;
             }
-            return 0;
+            return 1;
         });
-        const d = compute(() => (a.value ? readData(a) : 0));
-        const e = compute(() => readCompute(c) + readCompute(d));
-        const watcher = watch(e, noop);
-        setData(a, 0);
-        disposeWatcher(watcher);
+        const stopWatch = c.watch(noop);
+
+        setA(-1);
+
+        expect(hasFlag(b, Flag.Stale)).toBeTruthy();
+        expect(numOfSourceNodes(b)).toBe(0);
+        expect(numOfObserverNodes(b)).toBe(0);
+        expect(numOfObserverNodes(a)).toBe(1);
+        expect(numOfSourceNodes(c)).toBe(1);
+
+        setA(1);
+
+        expect(hasFlag(b, Flag.Stale)).toBeFalsy();
+        expect(numOfSourceNodes(b)).toBe(1);
+        expect(numOfObserverNodes(b)).toBe(1);
+        expect(numOfObserverNodes(a)).toBe(2);
+        expect(numOfSourceNodes(c)).toBe(2);
+
+        stopWatch();
     });
 
-    it('3', () => {
-        const a = data(1);
-        const b = data(2);
-        const c = compute(() => {
-            if (!readData(a)) {
-                return readData(b);
+    it('unused computation should be cleaned up (2)', () => {
+        const [a, setA] = mutable(0);
+        const b1 = computed(() => a.value * 2);
+        const b2 = computed(() => a.value * 4);
+        const c = computed(() => {
+            if (a.value >= 0) {
+                return b1.value;
             }
-            return 0;
+            return b2.value;
         });
-        const d = compute(() => (a.value ? 0 : readData(a)));
-        const e = compute(() => readCompute(c) + readCompute(d));
-        const watcher = watch(e, noop);
-        setData(a, 0);
-        disposeWatcher(watcher);
+        const stopWatch = c.watch(noop);
+
+        setA(-1);
+
+        expect(hasFlag(b1, Flag.Stale)).toBeTruthy();
+        expect(hasFlag(c, Flag.DepsUnstable)).toBeTruthy();
+        expect(numOfSourceNodes(b1)).toBe(0);
+        expect(numOfObserverNodes(b1)).toBe(0);
+        expect(numOfObserverNodes(a)).toBe(2);
+        expect(numOfSourceNodes(c)).toBe(2);
+
+        setA(1);
+
+        expect(hasFlag(b1, Flag.Stale)).toBeFalsy();
+        expect(numOfSourceNodes(b1)).toBe(1);
+        expect(numOfObserverNodes(b1)).toBe(1);
+        expect(numOfObserverNodes(a)).toBe(2);
+        expect(numOfSourceNodes(c)).toBe(2);
+
+        stopWatch();
     });
 
-    it('4', () => {
-        const a = data(1);
-        const b = data(2);
-        const c = compute(() => {
-            if (!readData(a)) {
-                return readData(b);
-            }
-            return readData(a);
+    it('lazy', () => {
+        const l = lazy<number>();
+
+        const [a, setA] = mutable(0);
+        const b = computed(() => a.value * 2);
+
+        let updated = false;
+        l.watch(() => {
+            updated = true;
         });
-        const d = compute(() => (a.value ? readData(b) : readData(a)));
-        const e = compute(() => readCompute(c) + readCompute(d));
-        const watcher = watch(e, noop);
-        setData(a, 0);
-        expect(c.value).toBe(2);
-        expect(c.flags & Flag.MarkForCheck).toBeFalsy();
-        expect(c.flags & Flag.DepsMaybeStable).toBeFalsy();
-        setData(b, 0);
-        expect(d.value).toBe(0);
-        expect(e.value).toBe(0);
-        expect(b.last_observer.prev_observer).toBeFalsy();
-        expect(e.flags & Flag.DepsMaybeStable).toBeTruthy();
-        disposeWatcher(watcher);
+
+        expect(
+            l.execute(() => {
+                return a.value + b.value;
+            })
+        ).toBe(0);
+        expect(numOfSourceNodes(l as any)).toBe(2);
+
+        setA(1);
+
+        expect(updated).toBeTruthy();
+        expect(hasFlag(l, Flag.Stale)).toBeTruthy();
+        expect(
+            l.execute(() => {
+                return a.value + b.value;
+            })
+        ).toBe(3);
+        expect(hasFlag(l, Flag.Stale)).toBeFalsy();
     });
 
-    it('zombie relationship', () => {
-        const a = data(0);
-        const b = data(0);
-
-        const keep_a_b_alive = compute(() => readData(a) + readData(b));
-        const keep_a_b_alive_watcher = watch(keep_a_b_alive, noop);
-
-        const c = compute(() => readData(a) + readData(b));
-        const d = compute(() => readData(a));
-        const e = compute(() => readCompute(c) + readCompute(d));
-        const watcher = watch(e, noop);
-        setData(a, 1);
-        setData(b, 2);
-        expect(c.value).toBe(3);
-        disposeWatcher(watcher);
-        setData(a, 0);
-        setData(b, 2);
-        // expect(c.flags & Flag.Zombie).toBeTruthy(); // c is not zombie yet
-        setData(a, 1);
-        expect(c.flags & Flag.Stale).toBeTruthy();
-
-        disposeWatcher(keep_a_b_alive_watcher);
-    });
-
-    it('untrack', () => {
-        const a = data(1);
-        const b = compute(() => untrack(() => a.value));
-
-        const watcher = watch(b, noop);
-
-        setData(a, 2);
-
-        expect(b.value).toBe(1);
-
-        disposeWatcher(watcher);
-    });
-
-    it('unchanged computation', () => {
-        const a = data(1);
-        const b = data(2);
-        const c = compute(() => {
-            readData(a);
-            return 0;
+    // TODO: it still fails: cyclic dependencies can not properly cleaned up.
+    it('cyclic dependencies: sr latch', () => {
+        const [S, setS] = mutable(false);
+        const [R, setR] = mutable(false);
+        const Q = computed(() => {
+            const r = R.value,
+                nq = NQ.value;
+            return !(r || nq);
         });
-        const d = compute(() => readData(b));
-        const e = compute(() => readCompute(c) + readCompute(d));
+        const NQ = computed(() => {
+            const s = S.value,
+                q = Q.value;
+            return !(s || q);
+        });
 
-        const watcher1 = watch(e, noop);
-        const watcher2 = watch(e, noop);
-        const watcher3 = watch(e, noop);
+        expect(Q.value).toBeFalsy();
+        expect(NQ.value).toBeTruthy();
 
-        setData(a, 2); // should propagate c but makes no effect.
+        expect(numOfSourceNodes(Q)).toBe(2); //NQ R
+        expect(numOfSourceNodes(NQ)).toBe(2); //Q S
 
-        disposeWatcher(watcher3); // dispose in different order.
-        disposeWatcher(watcher1);
-        disposeWatcher(watcher2);
-    });
+        const stopWatch = Q.watch(noop);
 
-    // it('renderEffect should works', () => {
-    //     let effectCount = 0;
+        /** S _/‾\_ */
+        setS(true);
+        setS(false);
+        expect(Q.value).toBeTruthy();
+        expect(NQ.value).toBeFalsy();
+        /** R _/‾\_ */
+        setR(true);
+        setR(false);
+        expect(Q.value).toBeFalsy();
+        expect(NQ.value).toBeTruthy();
 
-    //     const reff = createRenderEffect(() => {
-    //         effectCount++;
-    //     });
 
-    //     const a = data(1);
-    //     const b = data(2);
+        expect(numOfSourceNodes(Q)).toBe(2); //NQ R
+        expect(numOfSourceNodes(NQ)).toBe(2); //Q S
 
-    //     const result = executeRenderEffect(reff, () => {
-    //         return readData(a) + readData(b);
-    //     });
+        stopWatch();
 
-    //     expect(result).toBe(3);
+        expect(numOfSourceNodes(Q)).toBe(2); //NQ R
+        expect(numOfSourceNodes(NQ)).toBe(2); //Q S
 
-    //     setData(a, 2);
-    //     setData(b, 3);
+        setS(true);
+        setS(false);
 
-    //     expect(effectCount).toBe(2);
+        // expect(numOfSourceNodes(Q)).toBe(2); //NQ R
+        // expect(numOfSourceNodes(NQ)).toBe(0); //Q S
 
-    //     setData(b, 3);
-    //     const result2 = executeRenderEffect(reff, () => {
-    //         return readData(a);
-    //     });
-
-    //     expect(result2).toBe(2);
-
-    //     setData(a, 4);
-
-    //     const result3 = executeRenderEffect(reff, () => {
-    //         return readData(b);
-    //     });
-    //     const result4 = executeRenderEffect(reff, () => {
-    //         return readData(b);
-    //     }); // memo result
-
-    //     expect(result3).toBe(3);
-    //     expect(result3).toBe(result4);
-    //     // expect(effectCount).toBe(3);
-
-    //     expect(reff.flags & Flag.Unstable).toBeTruthy();
-
-    //     setData(b,0);
-
-    //     // executeRenderEffect will not eager update if it is not stale (marked stale by previous dependencies)
-    //     const result5 = executeRenderEffect(reff, () => {
-    //         return readData(a);
-    //     }); // memo result
-    //     expect(result5).toBe(4);
-    //     cleanupRenderEffect(reff);
-    // });
-
-    it('self referenced computation', () => {
-        const a = data(1);
-        const c = compute(
-            () => {
-                if (readCompute(c) < 10) {
-                    return readCompute(c) + readData(a);
-                }
-                return readCompute(c);
-            },
-            { initial: 0 }
-        );
-
-        const watcher1 = watch(c, noop);
-
-        disposeWatcher(watcher1);
+        expect(numOfObserverNodes(S)).toBe(0);
     });
 });

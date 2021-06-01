@@ -17,3 +17,7 @@ export function doCleanup(cleanup: Cleanable) {
         }
     }
 }
+
+export function panic(code: number){
+    throw new Error(`Fatal error code (${code}): please file an issue to report this.`)
+}
