@@ -136,7 +136,18 @@ export function executeRunnable<T>(
     resumeTask(undefined); //start synchronously.
 
     return () => {
-        settled || (currentDisposer?.(), (settled = true));
+        if(!settled){
+            try {
+                currentDisposer?.();
+            } catch(e){
+                if(!(e instanceof CanceledError)){
+                    throw e;
+                }
+            }
+            finally {
+                settled = true;
+            }
+        }
     };
 }
 
