@@ -1,4 +1,5 @@
-import { TeardownLogic } from '../types';
+import { Cleanable, TeardownLogic } from '../types';
+import { doCleanup } from '../utils';
 
 interface SubscriptionNode {
     next: SubscriptionNode | null;
@@ -58,14 +59,28 @@ export class EventStream<T> {
 
     private next(value: T) {
         let p = this.head;
+        const handlers = [] as Function[];
         while (p !== null) {
-            p.handler(value);
+            handlers.push(p.handler);
             p = p.next;
+        }
+        // linked list is mutable data structure thus a immutable snapshot of subscriptions is required.
+        // then you can subscribe or unsubscirbe inside a handler.
+        while (handlers.length) {
+            handlers.pop()!(value);
         }
     }
 
-    listen(handler: (value: T) => void): TeardownLogic {
-        return this.__internal_subscribe(handler);
+    listen(handler: (value: T) => Cleanable): TeardownLogic {
+        let lastDisposer: Cleanable = undefined;
+        const unsubscribe = this.__internal_subscribe((value) => {
+            doCleanup(lastDisposer);
+            lastDisposer = handler(value);
+        });
+        return () => {
+            doCleanup(lastDisposer);
+            unsubscribe();
+        };
     }
 
     transform<R>(transformFn: (value: T) => R) {
