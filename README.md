@@ -1,6 +1,7 @@
 # Kairo.js
 
 ![](https://img.shields.io/npm/l/kairo) ![npm version](https://img.shields.io/npm/v/kairo) ![discord](https://img.shields.io/discord/759760966191153192)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2F3Shain%2Fkairo.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2F3Shain%2Fkairo?ref=badge_shield)
 
 ## ☝️ Kairo is
 
@@ -495,3 +496,6 @@ Currently I've hosted a [Discord](https://discord.gg/pDkYpa6Mxu) server. Feel fr
 ## License
 
 MIT License © 2021 3Shain [san3shain@gmail.com](mailto:san3shain@gmail.com)
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2F3Shain%2Fkairo.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2F3Shain%2Fkairo?ref=badge_large)
