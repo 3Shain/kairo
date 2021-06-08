@@ -1,6 +1,6 @@
 {
   "name": "@kairo/angular",
-  "version": "11.0.0",
+  "version": "12.0.0-rc.0",
   "description": "Angular integration for kairo",
   "peerDependencies": {
     "@angular/common": ">=11.0.0",
