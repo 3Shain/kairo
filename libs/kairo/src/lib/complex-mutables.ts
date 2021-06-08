@@ -1,8 +1,7 @@
-import { createData, setData } from './core/behavior';
-import { Behavior } from './public-api';
-import { produce } from 'immer';
+import { createData, setData, Behavior } from './core/behavior';
 
 interface MutableArray<R> {
+    length: number;
     setAt(index: number, value: R): void;
     push(...items: R[]): number;
     pop(): R | undefined;
@@ -12,15 +11,22 @@ interface MutableArray<R> {
     reverse(): R[];
 }
 
-export function mutableArray<R>(
+export function mutArray<R>(
     initial: Array<R>
 ): [Behavior<R[]>, MutableArray<R>] {
     const array = initial;
     const internal = createData(array);
-    // array.
     return [
         new Behavior(internal),
         {
+            set length(value: number) {
+                array.length = value;
+                setData(internal, array, false);
+                return;
+            },
+            get length() {
+                return array.length;
+            },
             setAt(index: number, value: R) {
                 array[index] = value;
                 setData(internal, array, false);
@@ -66,7 +72,7 @@ export interface MutableSet<T> {
     clear(): void;
 }
 
-export function mutableSet<T>(
+export function mutSet<T>(
     initial?: Iterable<T>
 ): [Behavior<Set<T>>, MutableSet<T>] {
     const set = new Set<T>(initial);
@@ -98,7 +104,7 @@ export interface MutableMap<K, V> {
     clear(): void;
 }
 
-export function mutableMap<K, V>(
+export function mutMap<K, V>(
     initial?: Iterable<[K, V]>
 ): [Behavior<Map<K, V>>, MutableMap<K, V>] {
     const map = new Map(initial ? [...initial] : []);
@@ -121,16 +127,5 @@ export function mutableMap<K, V>(
                 return this;
             },
         },
-    ];
-}
-
-export function immer<T extends object>(
-    initialValue: T
-): [Behavior<T>, (recipe: (current: T) => T) => void] {
-    const internal = createData(initialValue);
-    return [
-        new Behavior(internal),
-        (recipe: (draft: T) => T) =>
-            setData(internal, produce(internal.value!, recipe), true),
     ];
 }

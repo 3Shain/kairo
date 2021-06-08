@@ -16,10 +16,10 @@ import { RemoveBehaviors } from './types';
 
 export function kairoApp(setup?: (app: App) => void) {
     return (app: App) => {
-        const scope = new Scope(() => {
-            setup?.(app);
-        });
-
+        const scope = new Scope();
+        const endScope = scope.beginScope();
+        setup?.(app);
+        endScope();
         app.provide(SCOPE, scope);
     };
 }
@@ -32,7 +32,38 @@ export function setupKairo<Props, Bindings>(
     ) => Bindings
 ): (props: Props, ctx: SetupContext) => RemoveBehaviors<Bindings> {
     return function (props: Props, setupContext: SetupContext) {
-        const scope = new Scope(() => {
+        const scope = new Scope(inject(SCOPE, undefined));
+
+        let detachHandler: Function | null = null;
+
+        onMounted(() => {
+            detachHandler = scope.attach();
+        });
+
+        onUnmounted(() => {
+            detachHandler!();
+            detachHandler = null;
+        });
+
+        let deactivating = false;
+
+        onActivated(() => {
+            if (deactivating) {
+                detachHandler = scope.attach();
+                deactivating = false;
+            }
+        });
+
+        onDeactivated(() => {
+            detachHandler!();
+            detachHandler = null;
+            deactivating = true;
+        });
+
+        provide(SCOPE, scope);
+
+        const endScope = scope.beginScope();
+        const exported = (() => {
             const exposed = setup(
                 {
                     ...props,
@@ -71,35 +102,8 @@ export function setupKairo<Props, Bindings>(
                     return [key, value];
                 })
             );
-        }, inject(SCOPE, undefined));
-
-        let detachHandler: Function | null = null;
-
-        onMounted(() => {
-            detachHandler = scope.attach();
-        });
-
-        onUnmounted(() => {
-            detachHandler!();
-            detachHandler = null;
-        });
-
-        let deactivating = false;
-
-        onActivated(() => {
-            if (deactivating) {
-                detachHandler = scope.attach();
-                deactivating = false;
-            }
-        });
-
-        onDeactivated(() => {
-            detachHandler!();
-            detachHandler = null;
-            deactivating = true;
-        });
-
-        provide(SCOPE, scope);
-        return scope.exported as RemoveBehaviors<Bindings>;
+        })();
+        endScope();
+        return exported as RemoveBehaviors<Bindings>;
     };
 }

@@ -34,13 +34,14 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? () => C : ExtractBehaviorProperty<T>;
 export function useInject(token: any, options: any): any {
-    // TODO:
-    // runIfScopeExist(() => {
-    //     throw Error('Use `inject` instead of `useInject` if inside a scope.');
-    // });
+    if (Scope.current) {
+        throw Error('Use `inject` instead of `useInject` if inside a scope.');
+    }
     const context = useContext(KairoContext);
     let expose = {};
-    const scope = new Scope(() => {
+    const scope = new Scope(context);
+    {
+        const endScope = scope.beginScope();
         const resolve = inject(token, options);
         if (typeof resolve !== 'object' || resolve === null) {
             return resolve;
@@ -63,7 +64,8 @@ export function useInject(token: any, options: any): any {
                 expose[key] = value;
             }
         }
-    }, context);
+        endScope();
+    }
     createEffect(() => {
         const dispose = scope.attach();
         onCleanup(dispose);

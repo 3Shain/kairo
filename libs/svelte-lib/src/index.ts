@@ -1,1 +1,1 @@
-export { withKairo } from './lib/with-kairo';
+export { beginScope } from './lib/with-kairo';

@@ -5,7 +5,10 @@ module.exports = {
   // for more information about preprocessors
   preprocess: [
     sveltePreprocess({
-      ...kairo()
+      'babel': kairo({
+        sourceMaps: 'inline',
+      }),
+      'sourceMap': true
     })
   ],
 };

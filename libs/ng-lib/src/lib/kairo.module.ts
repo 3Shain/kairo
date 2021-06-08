@@ -5,29 +5,32 @@ import {
     SkipSelf,
     InjectionToken,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { KairoScopeRef, KairoScopeRefImpl } from './kairo.service';
+import { ScopeRef, KairoScopeRefImpl } from './kairo.service';
 import { Scope } from 'kairo';
 
 const SETUP_FUNCTION = new InjectionToken<() => void>('kairo setup function');
 
 export function setupRootScope(setup: () => void) {
-    const scope = new Scope(setup);
+    const scope = new Scope();
+    const endScope = scope.beginScope();
+    setup();
+    endScope();
     const ngService = new KairoScopeRefImpl();
     ngService.scope = scope;
     return ngService;
 }
 
 export function setupModuleScope(parent: KairoScopeRefImpl, setup: () => void) {
-    const scope = new Scope(setup, null, parent.scope);
+    const scope = new Scope(null, parent.scope);
+    const endScope = scope.beginScope();
+    setup();
+    endScope();
     const ngService = new KairoScopeRefImpl();
     ngService.scope = scope;
     return ngService;
 }
 
-@NgModule({
-    imports: [CommonModule],
-})
+@NgModule({})
 export class KairoModule {
     private detachHandler: () => void;
     constructor(private scopeRef: KairoScopeRefImpl) {
@@ -53,7 +56,7 @@ export class KairoModule {
                     deps: [SETUP_FUNCTION],
                 },
                 {
-                    provide: KairoScopeRef,
+                    provide: ScopeRef,
                     useExisting: KairoScopeRefImpl,
                 },
             ],
@@ -77,7 +80,7 @@ export class KairoModule {
                     ],
                 },
                 {
-                    provide: KairoScopeRef,
+                    provide: ScopeRef,
                     useExisting: KairoScopeRefImpl,
                 },
             ],

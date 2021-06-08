@@ -1,9 +1,10 @@
-<script lang="ts" kairo>
+<script kairo>
     import { effect, inject } from 'kairo';
     import { TOKEN } from './lib';
 
-    export let prop: number = 0;
-    console.log(prop);
+    export let prop = 0;
+    
+    console.log('tile');
 
     effect(() => {
         return () => {
@@ -11,14 +12,14 @@
         };
     });
 
+
     $: {
-        console.log('www ' + prop);
+        console.log('aaaaaaa ' + prop);
     }
 
     const count = inject(TOKEN);
 </script>
 
 <h1>
-    Halo~~~~~ {$count}
-    {prop}
+    Halo~~~~~ {$count} {prop}
 </h1>

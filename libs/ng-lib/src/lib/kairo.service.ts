@@ -13,7 +13,7 @@ import {
 import { Observable, ReplaySubject } from 'rxjs';
 import { publishReplay, refCount, switchMap } from 'rxjs/operators';
 
-export abstract class KairoScopeRef {
+export abstract class ScopeRef {
     public readonly scope: Scope;
 
     abstract useInject<T>(
@@ -83,7 +83,9 @@ export class KairoScopeRefImpl {
         return this.init$.pipe(
             switchMap(() => {
                 return new Observable<any>((observer) => {
-                    const scope = new Scope(() => {
+                    const scope = new Scope(this.scope); // it should be avaliable
+                    const endScope = scope.beginScope();
+                    (() => {
                         const resolve = inject(token, options);
                         if (typeof resolve !== 'object' || resolve === null) {
                             observer.next(resolve);
@@ -116,7 +118,8 @@ export class KairoScopeRefImpl {
                             }
                         }
                         observer.next(expose);
-                    }, this.scope); // it should be avaliable
+                    })();
+                    endScope();
                     return scope.attach();
                 });
             }),

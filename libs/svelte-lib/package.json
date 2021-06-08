@@ -3,7 +3,8 @@
     "description": "Svelte integration for kairo",
     "peerDependencies": {
         "kairo": "0.0.0",
-        "svelte": ">=3.0.0"
+        "svelte": ">=3.0.0",
+        "babel-types": "*"
     },
     "exports": {
         "./transformer": {

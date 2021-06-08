@@ -28,7 +28,39 @@ export function withKairo<Props>(
     ) => VNodeChild | object
 ) {
     return defineComponent<Props>(function (props, ctx) {
-        const scope = new Scope(() => {
+        const scope = new Scope(inject(SCOPE, undefined));
+
+        let detachHandler: Function | null = null;
+
+        onMounted(() => {
+            detachHandler = scope.attach();
+        });
+
+        onUnmounted(() => {
+            detachHandler!();
+            detachHandler = null;
+        });
+
+        let deactivating = false;
+
+        onActivated(() => {
+            if (deactivating) {
+                detachHandler = scope.attach();
+                deactivating = false;
+            }
+        });
+
+        onDeactivated(() => {
+            detachHandler!();
+            detachHandler = null;
+            deactivating = true;
+        });
+
+        provide(SCOPE, scope);
+
+        const endScope = scope.beginScope();
+
+        const exported = (() => {
             const renderFn = setup(
                 {
                     ...props,
@@ -68,36 +100,8 @@ export function withKairo<Props>(
                     })
                 );
             };
-        }, inject(SCOPE, undefined));
-
-        let detachHandler: Function | null = null;
-
-        onMounted(() => {
-            detachHandler = scope.attach();
-        });
-
-        onUnmounted(() => {
-            detachHandler!();
-            detachHandler = null;
-        });
-
-        let deactivating = false;
-
-        onActivated(() => {
-            if (deactivating) {
-                detachHandler = scope.attach();
-                deactivating = false;
-            }
-        });
-
-        onDeactivated(() => {
-            detachHandler!();
-            detachHandler = null;
-            deactivating = true;
-        });
-
-        provide(SCOPE, scope);
-
-        return scope.exported;
+        })();
+        endScope();
+        return exported;
     });
 }

@@ -3,5 +3,8 @@
   "include": ["**/*.ts"],
   "compilerOptions": {
     "types": ["jest", "node"]
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true
   }
 }

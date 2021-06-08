@@ -43,8 +43,37 @@ export function useInject<T>(
     }
 ): T extends Behavior<infer C> ? Ref<C> : ExtractBehaviorProperty<T>;
 export function useInject(token: any, options: any): any {
+    const scope = new Scope(vueInject(SCOPE));
+
+    let detachHandler: Function | null = null;
+
+    onMounted(() => {
+        detachHandler = scope.attach();
+    });
+
+    onUnmounted(() => {
+        detachHandler!();
+        detachHandler = null;
+    });
+
+    let deactivating = false;
+
+    onActivated(() => {
+        if (deactivating) {
+            detachHandler = scope.attach();
+            deactivating = false;
+        }
+    });
+
+    onDeactivated(() => {
+        detachHandler!();
+        detachHandler = null;
+        deactivating = true;
+    });
+
+    const endScope = scope.beginScope();
     let expose = {};
-    const scope = new Scope(() => {
+    {
         const resolve = inject(token, options);
         if (typeof resolve !== 'object' || resolve === null) {
             return resolve;
@@ -73,33 +102,7 @@ export function useInject(token: any, options: any): any {
                 expose[key] = value;
             }
         }
-    }, vueInject(SCOPE));
-
-    let detachHandler: Function | null = null;
-
-    onMounted(() => {
-        detachHandler = scope.attach();
-    });
-
-    onUnmounted(() => {
-        detachHandler!();
-        detachHandler = null;
-    });
-
-    let deactivating = false;
-
-    onActivated(() => {
-        if (deactivating) {
-            detachHandler = scope.attach();
-            deactivating = false;
-        }
-    });
-
-    onDeactivated(() => {
-        detachHandler!();
-        detachHandler = null;
-        deactivating = true;
-    });
-
+    }
+    endScope();
     return reactive(expose);
 }

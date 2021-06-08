@@ -1,7 +1,18 @@
 import { Behavior } from 'kairo';
 
-export interface NgSetup<Component> {
-    ngSetup(
-        useProp: <P>(thunk: (instance: Component) => P) => Behavior<P>
-    ): object;
+export function ngSetup<Props, Model extends object>(
+    setup: (
+        props: Props,
+        useProps: <T>(thunk: (props: Props) => T) => Behavior<T>
+    ) => Model
+) {
+    return (class {
+        ngSetup = setup;
+    } as unknown) as {
+        new (): ToModel<Model>;
+    };
 }
+
+type ToModel<T> = {
+    [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
+};

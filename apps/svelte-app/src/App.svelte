@@ -1,4 +1,4 @@
-<script lang="ts" kairo="root">
+<script kairo="root" lang="ts">
     import {
         animation,
         effect,
@@ -13,8 +13,7 @@
     } from 'kairo';
 import Child from './Child.svelte';
 import { TOKEN } from './lib';
-
-    let ref$$: HTMLDivElement;
+    let ref: HTMLDivElement;
 
     const [position, setPosition] = mutable([0, 0]);
 
@@ -24,7 +23,8 @@ import { TOKEN } from './lib';
 
     effect(() =>
         position.watch(([x, y]) => {
-            if (ref$$) ref$$.style.transform = `translate3d(${x}px,${y}px,0px)`;
+            if (ref) ref.style.transform = `translate3d(${x}px,${y}px,0px)`;
+            console.log('edit one file');
         })
     );
 
@@ -113,7 +113,7 @@ import { TOKEN } from './lib';
     <div class="box">
         <div
             class="stick"
-            bind:this={ref$$}
+            bind:this={ref}
             on:mouseup={onmouseup}
             on:mousedown={dnd}
             on:mousemove={onmousemove}

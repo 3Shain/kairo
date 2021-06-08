@@ -1,4 +1,4 @@
-import { mutableArray } from './complex-mutables';
+import { mutArray } from './complex-mutables';
 
 describe('complex-mutables', () => {
     const noop = () => {};
@@ -7,7 +7,7 @@ describe('complex-mutables', () => {
         const [
             array,
             { push, pop, unshift, shift, reverse, setAt, splice },
-        ] = mutableArray([]);
+        ] = mutArray([]);
 
         const dispose = array.watch(noop); // watch it to make propagation works
 

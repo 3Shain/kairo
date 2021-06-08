@@ -112,9 +112,13 @@ Object.defineProperty(ComputationalBehavior.prototype, 'value', {
     },
 });
 
-function KairoApp(props: { globalSetup: () => void; children: JSX.Element }) {
-    const scope = new Scope(props.globalSetup, null);
-
+function KairoApp(props: { globalSetup?: () => void; children: JSX.Element }) {
+    const scope = new Scope(null);
+    {
+        const endScope = scope.beginScope();
+        props.globalSetup?.();
+        endScope();
+    }
     createEffect(() => {
         const dispose = scope.attach();
         onCleanup(dispose);
@@ -129,7 +133,7 @@ function KairoApp(props: { globalSetup: () => void; children: JSX.Element }) {
 }
 
 function withKairo<Props>(
-    component: (
+    setup: (
         props: Props,
         useProp: <P>(selector: (x: Props) => P) => Behavior<P>
     ) => Component<Props>
@@ -141,20 +145,22 @@ function withKairo<Props>(
     ) => {
         const parent = useContext(KairoContext);
 
-        const scope = new Scope(() => {
-            return component(
-                {
-                    ...props,
-                } as any,
-                (thunk) => {
-                    const [prop, setProp] = mutable(thunk(props));
-                    createComputed(() => {
-                        setProp(thunk(props));
-                    });
-                    return prop;
-                }
-            );
-        }, parent);
+        const scope = new Scope(parent);
+
+        const endScope = scope.beginScope();
+        const Component = setup(
+            {
+                ...props,
+            } as any,
+            (thunk) => {
+                const [prop, setProp] = mutable(thunk(props));
+                createComputed(() => {
+                    setProp(thunk(props));
+                });
+                return prop;
+            }
+        );
+        endScope();
 
         createEffect(() => {
             const dispose = scope.attach();
@@ -164,7 +170,7 @@ function withKairo<Props>(
         return createComponent(KairoContext.Provider, {
             value: scope,
             get children() {
-                return createComponent(scope.exported, props);
+                return createComponent(Component, props);
             },
         });
     };

@@ -26,7 +26,10 @@ export {
     combined,
     computed,
     suspended,
-    lazy
+    lazy,
+    runInTransaction as transaction,
+    untrack,
+    __current_collecting
 } from './core/behavior';
 export type { ExtractBehaviorProperty } from './core/behavior';
 export { EventStream, stream, never, merged } from './core/stream';
@@ -34,9 +37,5 @@ export { inject, provide, effect, Scope, Token } from './core/scope';
 export type { Provider, Factory } from './core/scope';
 export { held, reduced } from './derived';
 export * from './read';
-export {
-    runInTransaction as transaction,
-    untrack,
-    __current_collecting,
-} from './core/behavior';
 export * from './core/schedule';
+export * from './complex-mutables';

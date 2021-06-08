@@ -6,34 +6,35 @@ import { KairoContext } from './context';
 export const KairoApp: React.FunctionComponent<{
     globalSetup: () => void;
 }> = (props) => {
-    const kairoScope = useMemo(
-        () =>
-            new Scope(() => {
-                let propsSetter = [];
-                $$CURRENT_HOOKS = [];
-                const renderFn = props.globalSetup();
-                Object.freeze(propsSetter);
-                const hooks = $$CURRENT_HOOKS;
-                $$CURRENT_HOOKS = null;
-                return {
-                    renderFn,
-                    hooks,
-                };
-            }),
-        []
-    );
-    const { hooks } = kairoScope.exported;
+    const kairoScope = useMemo(() => {
+        const scope = new Scope();
+        const endScope = scope.beginScope();
+
+        let propsSetter = [];
+        $$CURRENT_HOOKS = [];
+        const renderFn = props.globalSetup();
+        Object.freeze(propsSetter);
+        const hooks = $$CURRENT_HOOKS;
+        $$CURRENT_HOOKS = null;
+        endScope();
+        return {
+            renderFn,
+            hooks,
+            scope,
+        };
+    }, []);
+    const { hooks, scope } = kairoScope;
 
     for (const hook of hooks) {
         hook(props);
     }
 
     useEffect(() => {
-        return kairoScope.attach();
+        return scope.attach();
     }, []);
 
     return (
-        <KairoContext.Provider value={kairoScope}>
+        <KairoContext.Provider value={scope}>
             {props.children}
         </KairoContext.Provider>
     );
@@ -59,54 +60,56 @@ export function withKairo<Props>(
     return function KairoComponent(props: PropsWithChildren<Props>) {
         const parentScope = useContext(KairoContext);
         const [_, setTick] = useState(0);
-        const kairoScope = useMemo(
-            () =>
-                new Scope(() => {
-                    let tick = 0;
-                    const propsSetter = [];
-                    $$CURRENT_HOOKS = [];
-                    const renderFn = setup(props, (selector) => {
-                        const [beh, set] = mut(selector(props));
-                        propsSetter.push((p: Props) => set(selector(p)));
-                        return beh;
-                    });
-                    Object.freeze(propsSetter);
-                    $$CURRENT_HOOKS.push((currentProps: Props) => {
-                        // the length should be fixed
-                        if (propsSetter.length) {
-                            useEffect(() => {
-                                // a hook to detect props change
-                                transaction(() => {
-                                    propsSetter.forEach((x) => x(currentProps));
-                                });
-                            });
-                        }
-                    });
-                    const renderComp = lazy<ReturnType<typeof renderFn>>();
-                    effect(() => {
-                        const stop = renderComp.watch(() => {
-                            setTick(++tick);
-                        });
-                        renderComp.execute(() => renderFn(props)); // start
-                        return () => {
-                            stop()
-                        };
-                    });
+        const kairoScope = useMemo(() => {
+            const scope = new Scope(parentScope);
+            const endScope = scope.beginScope();
 
-                    const hooks = $$CURRENT_HOOKS;
-                    $$CURRENT_HOOKS = null;
-                    return {
-                        renderFn,
-                        hooks,
-                        renderComp,
-                    };
-                }, parentScope),
-            []
-        );
-        const { hooks, renderFn, renderComp } = kairoScope.exported;
+            let tick = 0;
+            const propsSetter = [];
+            $$CURRENT_HOOKS = [];
+            const renderFn = setup(props, (selector) => {
+                const [beh, set] = mut(selector(props));
+                propsSetter.push((p: Props) => set(selector(p)));
+                return beh;
+            });
+            Object.freeze(propsSetter);
+            $$CURRENT_HOOKS.push((currentProps: Props) => {
+                // the length should be fixed
+                if (propsSetter.length) {
+                    useEffect(() => {
+                        // a hook to detect props change
+                        transaction(() => {
+                            propsSetter.forEach((x) => x(currentProps));
+                        });
+                    });
+                }
+            });
+            const renderComp = lazy<ReturnType<typeof renderFn>>();
+            effect(() => {
+                const stop = renderComp.watch(() => {
+                    setTick(++tick);
+                });
+                renderComp.execute(() => renderFn(props)); // start
+                return () => {
+                    stop();
+                };
+            });
+
+            const hooks = $$CURRENT_HOOKS;
+            $$CURRENT_HOOKS = null;
+
+            endScope();
+            return {
+                renderFn,
+                hooks,
+                renderComp,
+                scope,
+            };
+        }, []);
+        const { hooks, renderFn, renderComp, scope } = kairoScope;
 
         useEffect(() => {
-            return kairoScope.attach();
+            return scope.attach();
         }, []);
 
         for (const hook of hooks) {
@@ -114,7 +117,7 @@ export function withKairo<Props>(
         }
 
         return (
-            <KairoContext.Provider value={kairoScope}>
+            <KairoContext.Provider value={scope}>
                 {renderComp.execute(() => renderFn(props))}
             </KairoContext.Provider>
         );

@@ -277,13 +277,17 @@ export const KairoStaticBridge: Bridge = {
         };
     },
     computed: (fn) => {
-        const d = computed(fn, true);
+        const d = computed(fn, {
+            static: true
+        });
         return {
             read: () => d.value,
         };
     },
     watch: (read, effect) => {
-        const g = computed(read, true);
+        const g = computed(read, {
+            static: true
+        });
         g.watch(effect);
         effect(read());
         return () => {};

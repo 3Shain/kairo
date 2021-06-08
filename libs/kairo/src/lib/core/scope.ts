@@ -4,27 +4,28 @@ import { BloomFilter } from '../utils/bloom-filter';
 
 type SideEffect = () => Cleanable;
 
-class Scope<TExport = any> {
-    public readonly exported: TExport;
-
+class Scope {
     private sideEffects: SideEffect[] = [];
     private injections: Map<object, any> = new Map();
     private injections_bloom: BloomFilter;
 
     constructor(
-        setup: () => TExport,
         public readonly parentScope?: Scope,
         public readonly rootScope?: Scope
     ) {
-        const stored = Scope._currentScope;
         this.injections_bloom = new BloomFilter(
             8,
             4,
             parentScope?.injections_bloom.buckets
         );
+    }
+
+    beginScope() {
+        const stored = Scope._currentScope;
         Scope._currentScope = this;
-        this.exported = setup();
-        Scope._currentScope = stored;
+        return () => {
+            Scope._currentScope = stored;
+        };
     }
 
     private static _currentScope: Scope | null = null;
