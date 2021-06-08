@@ -77,6 +77,21 @@ interface ObserverLinkNode<T> {
     // source_ref: SourceLinkNode<any>;
 }
 
+interface RefLinkNode<T> {
+    head: RefLinkNode<T>;
+    next_ref: RefLinkNode<T> | null;
+    value: T;
+}
+
+function emptyHeadRefNode() {
+    return {
+        get head() {
+            return this;
+        },
+        next_ref: null,
+    } as RefLinkNode<undefined>;
+}
+
 interface Data<T = any> {
     flags: Flag;
     value: T | undefined;
@@ -87,10 +102,11 @@ interface Data<T = any> {
 }
 
 interface Computation<T = any> extends Data<T> {
+    checkNode: SourceLinkNode<Data> | null;
     first_source: SourceLinkNode<Data> | null;
     last_source: SourceLinkNode<Data> | null;
     collect: Function;
-    checkNode: SourceLinkNode<Data> | null;
+    refNode: RefLinkNode<any>;
 }
 
 interface Suspense<T = any, F = undefined> extends Computation<T> {
@@ -255,6 +271,32 @@ function logMaybeStable(accessor: Computation, data: Data) {
     }
 }
 
+function ref<T>(value: T | (() => T)) {
+    if (currentCollecting) {
+        const currentRef = currentCollecting.refNode.next_ref;
+        if (currentRef === null) {
+            const newNode = {
+                head: currentCollecting.refNode.head,
+                next_ref: null,
+                value: value instanceof Function ? value() : value,
+            } as RefLinkNode<T>;
+            currentCollecting.refNode = newNode;
+        } else {
+            currentCollecting.refNode = currentRef;
+        }
+        const node = currentCollecting.refNode;
+        return {
+            get current() {
+                return node.value;
+            },
+            set current(v: T) {
+                node.value = v;
+            },
+        };
+    }
+    throw Error('should only used inside computations.');
+}
+
 function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
     const stored = currentCollecting;
     currentCollecting = null;
@@ -309,6 +351,7 @@ function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
         }
     }
     computation.checkNode = null;
+    computation.refNode = computation.refNode.head;
     currentCollecting = stored;
 
     if (computation.flags & Flag.DepsNeverChange) {
@@ -376,6 +419,8 @@ function propagate(data: Data): void {
                     data.flags &= ~Flag.Stale;
                 }
             }
+        } else {
+            data.flags &= ~Flag.Stale; //data can be stale
         }
         data.flags &= ~Flag.MarkForCheck;
     } else {
@@ -397,7 +442,7 @@ function propagate(data: Data): void {
                     observer = observer.next_observer;
                     continue;
                 }
-                current.flags |= Flag.Stale;
+                current.flags |= Flag.Stale; // bug: data can be stale, too.
                 current.depsCounter--;
                 if (current.depsCounter === 0) {
                     propagate(current);
@@ -618,11 +663,12 @@ function createLazy<T>(initial?: T) {
         first_observer: null,
         last_observer: null,
         value: (undefined as any) as T,
+        checkNode: null,
         first_source: null,
         last_source: null,
         collect: null as any,
         depsCounter: 0,
-        checkNode: null,
+        refNode: emptyHeadRefNode(),
     };
     if (initial !== undefined) {
         ret.value = initial;
@@ -666,10 +712,11 @@ function createComputation<T>(
         last_observer: null,
         depsCounter: 0,
         value: undefined,
+        checkNode: null,
         first_source: null,
         last_source: null,
         collect: fn,
-        checkNode: null,
+        refNode: emptyHeadRefNode(),
     };
     if (options) {
         if (options.static) {
@@ -694,10 +741,11 @@ function createSuspended<T, F>(fn: (current: T | F) => T, fallback: F) {
         last_observer: null,
         depsCounter: 0,
         value: undefined,
+        checkNode: null,
         first_source: null,
         last_source: null,
         collect: fn,
-        checkNode: null,
+        refNode: emptyHeadRefNode(),
         fallback,
         currentCancel: undefined,
     };
@@ -795,9 +843,20 @@ export class Lazy<T> {
     }
 }
 
-export function mutable<T>(initialValue: T): [Behavior<T>, (value: T) => void] {
+export function mutable<T>(
+    initialValue: T
+): [Behavior<T>, (value: T | ((current: T) => T)) => void] {
     const internal = createData(initialValue);
-    return [new Behavior(internal), (v) => setData(internal, v, true)];
+    return [
+        new Behavior(internal),
+        (v) => {
+            if (v instanceof Function) {
+                setData(internal, v(internal.value!), true);
+            } else {
+                setData(internal, v, true);
+            }
+        },
+    ];
 }
 
 export function lazy<T>(initial?: T) {
@@ -878,6 +937,7 @@ export {
     createLazy,
     executeLazy,
     createSuspended,
+    ref,
     Suspend,
     SuspendWithFallback,
 };
