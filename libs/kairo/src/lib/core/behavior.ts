@@ -40,6 +40,7 @@ const enum Flag {
     Marking = 0x2000,
     Propagating = 0x4000,
     ConflictLoop = 0x8000,
+    NoConflictLoop = 0x10000,
 }
 
 class Suspend {
@@ -74,7 +75,6 @@ interface ObserverLinkNode<T> {
     prev_observer: ObserverLinkNode<T> | null;
     next_observer: ObserverLinkNode<T> | null;
     observer: T;
-    // source_ref: SourceLinkNode<any>;
 }
 
 interface RefLinkNode<T> {
@@ -382,6 +382,8 @@ function cleanupComputation(
         } else {
             lastSource.source.first_observer = obRef.next_observer;
         }
+        if (obRef.observer !== computation) throw panic(200);
+        obRef.observer = null;
         computation.last_source = lastSource = lastSource.prev_source!; // actually it might be null, but if it's null then until must be null.
         if (lastSource) {
             lastSource.next_source = null;
@@ -395,7 +397,16 @@ function cleanupComputation(
     }
 }
 
-function propagate(data: Data): void {
+function deepCleanup(computation: Computation) {
+    cleanupComputation(computation, null);
+    let lastObserver = computation.last_observer;
+    while (lastObserver !== null) {
+        deepCleanup(lastObserver.observer);
+        lastObserver = computation.last_observer; // I bet it's changed.
+    }
+}
+
+function propagate(data: Data): number {
     data.flags |= Flag.Propagating;
     if (data.flags & Flag.MarkForCheck) {
         if (data.flags & Flag.Computation) {
@@ -426,7 +437,9 @@ function propagate(data: Data): void {
     } else {
         panic(1); //should not happen
     }
+    let state: number;
     while (true) {
+        state = data.last_effect ? 0b000 : 0b111;
         // if changed
         if (data.flags & Flag.Changed) {
             let observer = data.first_observer;
@@ -435,6 +448,7 @@ function propagate(data: Data): void {
                 if (current.flags & Flag.Propagating) {
                     current.flags |= Flag.ConflictLoop; // self referenced or circular referenced.
                     observer = observer.next_observer;
+                    state &= 0b101;
                     continue;
                 }
                 if ((current.flags & Flag.MarkForCheck) === 0) {
@@ -445,7 +459,9 @@ function propagate(data: Data): void {
                 current.flags |= Flag.Stale; // bug: data can be stale, too.
                 current.depsCounter--;
                 if (current.depsCounter === 0) {
-                    propagate(current);
+                    state &= propagate(current);
+                } else {
+                    state &= 0b001;
                 }
                 observer = observer.next_observer;
             }
@@ -462,7 +478,9 @@ function propagate(data: Data): void {
             while (observer !== null) {
                 let current = observer.observer;
                 if (current.flags & Flag.Propagating) {
+                    current.flags |= Flag.NoConflictLoop; // self referenced or circular referenced.
                     observer = observer.next_observer;
+                    state &= 0b101;
                     continue;
                 }
                 if ((current.flags & Flag.MarkForCheck) === 0) {
@@ -471,7 +489,9 @@ function propagate(data: Data): void {
                 }
                 current.depsCounter--;
                 if (current.depsCounter === 0) {
-                    propagate(current);
+                    state &= propagate(current);
+                } else {
+                    state &= 0b001;
                 }
                 observer = observer.next_observer;
             }
@@ -492,22 +512,24 @@ function propagate(data: Data): void {
                     data.flags |= Flag.Changed;
                 }
             }
-            // data.flags |= Flag.MarkForCheck;
             markObserversForCheck(data);
-            // data.flags &= ~Flag.MarkForCheck;
         } else {
             break;
         }
     }
-    if (
-        data.flags & Flag.Computation &&
-        data.last_observer === null &&
-        data.last_effect === null
-    ) {
-        cleanupComputation(data as Computation, null);
-        data.flags |= Flag.Stale;
+    if (data.flags & Flag.Computation) {
+        if (data.flags & Flag.NoConflictLoop) {
+            data.flags -= Flag.NoConflictLoop;
+            if (state === 0b101) state = 0b111; // pure cyclic
+        }
+        if (!(data.last_observer || data.last_effect)) state = 0b111;
+        if (state === 0b111) {
+            deepCleanup(data as Computation);
+            data.flags |= Flag.Stale;
+        }
     }
     data.flags -= Flag.Propagating;
+    return state;
 }
 
 function watch(data: Data, sideEffect: Function) {

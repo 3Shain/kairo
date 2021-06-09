@@ -208,7 +208,10 @@ export const KairoBridge: Bridge = {
         transaction(fn);
     },
     root: (fn) => {
-        new Scope(fn);
+        const scope = new Scope();
+        const end = scope.beginScope();
+        fn();
+        end();
     },
 };
 
@@ -278,7 +281,7 @@ export const KairoStaticBridge: Bridge = {
     },
     computed: (fn) => {
         const d = computed(fn, {
-            static: true
+            static: true,
         });
         return {
             read: () => d.value,
@@ -286,7 +289,7 @@ export const KairoStaticBridge: Bridge = {
     },
     watch: (read, effect) => {
         const g = computed(read, {
-            static: true
+            static: true,
         });
         g.watch(effect);
         effect(read());
@@ -296,6 +299,9 @@ export const KairoStaticBridge: Bridge = {
         transaction(fn);
     },
     root: (fn) => {
-        new Scope(fn);
+        const scope = new Scope();
+        const end = scope.beginScope();
+        fn();
+        end();
     },
 };

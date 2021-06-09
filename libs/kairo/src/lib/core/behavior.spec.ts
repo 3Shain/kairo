@@ -219,9 +219,10 @@ describe('core/behavior', () => {
         setS(true);
         setS(false);
 
-        // expect(numOfSourceNodes(Q)).toBe(2); //NQ R
-        // expect(numOfSourceNodes(NQ)).toBe(0); //Q S
+        expect(numOfSourceNodes(NQ)).toBe(0); //Q S
+        expect(numOfSourceNodes(Q)).toBe(0); //NQ R
 
         expect(numOfObserverNodes(S)).toBe(0);
+        expect(numOfObserverNodes(R)).toBe(0);
     });
 });
