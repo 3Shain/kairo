@@ -30,6 +30,8 @@ export function setupModuleScope(parent: KairoScopeRefImpl, setup: () => void) {
     return ngService;
 }
 
+const noop = () => {};
+
 @NgModule({})
 export class KairoModule {
     private detachHandler: () => void;
@@ -42,13 +44,13 @@ export class KairoModule {
         this.detachHandler!();
     }
 
-    static forRoot(setup: () => void): ModuleWithProviders<KairoModule> {
+    static forRoot(setup?: () => void): ModuleWithProviders<KairoModule> {
         return {
             ngModule: KairoModule,
             providers: [
                 {
                     provide: SETUP_FUNCTION,
-                    useValue: setup,
+                    useValue: setup ?? noop,
                 },
                 {
                     provide: KairoScopeRefImpl,
@@ -63,13 +65,13 @@ export class KairoModule {
         };
     }
 
-    static forChild(setup: () => void): ModuleWithProviders<KairoModule> {
+    static forChild(setup?: () => void): ModuleWithProviders<KairoModule> {
         return {
             ngModule: KairoModule,
             providers: [
                 {
                     provide: SETUP_FUNCTION,
-                    useValue: setup,
+                    useValue: setup ?? noop,
                 },
                 {
                     provide: KairoScopeRefImpl,

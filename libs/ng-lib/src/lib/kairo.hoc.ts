@@ -9,9 +9,11 @@ import {
     Injector,
     SimpleChanges,
     Provider,
+    ɵDirectiveDef as DirectiveDef,
 } from '@angular/core';
-import { mutable, transaction, isBehavior, action, Scope, effect } from 'kairo';
+import { mutable, transaction, isBehavior, action, Scope, effect, provide } from 'kairo';
 import { ScopeRef, KairoScopeRefImpl } from './kairo.service';
+import { NG_INJECTOR } from './tokens';
 
 export function WithKairo(obj?: {
     /**
@@ -28,10 +30,12 @@ export function WithKairo(obj?: {
     viewProviders?: Provider[];
 }) {
     return <T>(componentType: Type<T>) => {
-        const componentDef = componentType['ɵcmp'] as ComponentDef<unknown>;
-        const originFac = componentType['ɵfac'];
+        const componentDef =
+            (componentType['ɵcmp'] as ComponentDef<unknown>) ??
+            (componentType['ɵdir'] as DirectiveDef<unknown>);
+        const factory = componentType['ɵfac'];
         componentType['ɵfac'] = (...args: any) => {
-            const origin = originFac(...args);
+            const origin = factory(...args);
             origin['__kairo_parent_scope__'] = ɵɵdirectiveInject(
                 KairoScopeRefImpl,
                 InjectFlags.SkipSelf
@@ -64,8 +68,10 @@ export function WithKairo(obj?: {
                 ],
                 [...(obj?.viewProviders ?? [])]
             ),
-            (def: ComponentDef<unknown>) => {
-                (def.onPush as any) = true;
+            (def: ComponentDef<unknown> | DirectiveDef<unknown>) => {
+                if ('onPush' in def) {
+                    (def.onPush as any) = true;
+                }
 
                 const hasInputs = Object.keys(componentDef.inputs).length > 0;
 
@@ -112,6 +118,7 @@ export function WithKairo(obj?: {
 
                             this.__kairo_scope__.scope = scope;
                             const endScope = scope.beginScope();
+                            provide(NG_INJECTOR,this.__injector__);
                             Object.assign(
                                 this,
                                 (() => {
@@ -132,7 +139,7 @@ export function WithKairo(obj?: {
                                     if (resolve === undefined) {
                                         return {};
                                     }
-                                    if (typeof resolve != 'object') {
+                                    if (typeof resolve !== 'object') {
                                         throw Error(
                                             `ngSetup() is expected to return an object, but it got ${typeof resolve}`
                                         );
@@ -142,8 +149,9 @@ export function WithKairo(obj?: {
                                     )) {
                                         if (isBehavior(value)) {
                                             effect(() =>
-                                                value.watch((v) => {
-                                                    this[key] = v;
+                                                value.watch((updatedValue) => {
+                                                    this[key] = updatedValue;
+                                                    changeDetector.markForCheck();
                                                 })
                                             );
                                             resolve[key] = value.value;
@@ -151,6 +159,8 @@ export function WithKairo(obj?: {
                                             typeof value === 'function'
                                         ) {
                                             resolve[key] = action(value as any);
+                                        } else {
+                                            resolve[key] = value;
                                         }
                                     }
                                     return resolve;
