@@ -30,14 +30,14 @@ import {
     computed as mbxComputed,
     reaction,
     transaction as mtrs,
-    action,
+    action as mbxAction,
 } from 'mobx';
 
-interface ReadableCell<T> {
+export interface ReadableCell<T> {
     read(): T;
 }
 
-interface WriteableCell<T> extends ReadableCell<T> {
+export interface WriteableCell<T> extends ReadableCell<T> {
     write(v: T): void;
 }
 
@@ -70,9 +70,15 @@ export const SBridge: Bridge = {
         };
     },
     watch: (read, effect) => {
-        S(() => {
-            effect(read());
-        });
+        S.on(
+            read,
+            (x) => {
+                effect(x);
+                return x;
+            },
+            undefined,
+            true
+        );
         return () => {};
         // S.effect
     },
@@ -105,10 +111,14 @@ export const VueReactiveBridge: Bridge = {
         };
     },
     watch: (read, effect) => {
-        vEffect(() => {
-            effect(read()); // no value for ?
+        return vEffect(() => {
+            return read();
+        }, {
+            lazy: false,
+            scheduler: (x) => {
+                effect(undefined);
+            },
         });
-        return () => {};
     },
     batch: (fn) => {
         fn(); // no such way
@@ -139,7 +149,6 @@ export const SolidBridge: Bridge = {
         createComputed(() => {
             effect(read());
         });
-        effect(read());
         return () => {
             // no disposor
         };
@@ -157,7 +166,7 @@ export const MobxBridge: Bridge = {
         const s = observable.box(initial);
         return {
             read: () => s.get(),
-            write: action((x) => {
+            write: mbxAction((x) => {
                 s.set(x);
             }),
         };
@@ -169,8 +178,7 @@ export const MobxBridge: Bridge = {
         };
     },
     watch: (read, effect) => {
-        reaction(read, effect, { fireImmediately: true });
-        // bug: fireImmediately doesn't really fire...
+        reaction(read, effect, { fireImmediately: false });
         return () => {
             // no disposor
         };
@@ -201,7 +209,6 @@ export const KairoBridge: Bridge = {
     watch: (read, effect) => {
         const g = computed(read);
         g.watch(effect);
-        // effect(read())
         return () => {};
     },
     batch: (fn) => {
@@ -232,7 +239,6 @@ export const KairoInternal: Bridge = {
     watch: (read, effect) => {
         const g = createComputation(read, { static: false });
         watch(g, effect);
-        effect(read());
         return () => {};
     },
     batch: (fn) => {
@@ -260,7 +266,6 @@ export const KairoInternalStatic: Bridge = {
     watch: (read, effect) => {
         const g = createComputation(read, { static: true });
         watch(g, effect);
-        effect(read());
         return () => {};
     },
     batch: (fn) => {
@@ -292,7 +297,6 @@ export const KairoStaticBridge: Bridge = {
             static: true,
         });
         g.watch(effect);
-        effect(read());
         return () => {};
     },
     batch: (fn) => {
