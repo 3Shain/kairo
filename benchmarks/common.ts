@@ -44,7 +44,7 @@ export interface WriteableCell<T> extends ReadableCell<T> {
 export interface Bridge {
     cell<T>(value: T): WriteableCell<T>;
     computed<T>(fn: () => T): ReadableCell<T>;
-    watch<T>(read: () => T, effect: (value: T) => void): () => void;
+    watch<T>(read: () => T, effect: () => void): () => void;
     batch(fn: () => void): void;
     root(fn: () => void): void;
 }
@@ -73,7 +73,7 @@ export const SBridge: Bridge = {
         S.on(
             read,
             (x) => {
-                effect(x);
+                effect();
                 return x;
             },
             undefined,
@@ -111,14 +111,17 @@ export const VueReactiveBridge: Bridge = {
         };
     },
     watch: (read, effect) => {
-        return vEffect(() => {
-            return read();
-        }, {
-            lazy: false,
-            scheduler: (x) => {
-                effect(undefined);
+        return vEffect(
+            () => {
+                return read();
             },
-        });
+            {
+                lazy: false,
+                scheduler: (x) => {
+                    effect();
+                },
+            }
+        );
     },
     batch: (fn) => {
         fn(); // no such way
@@ -146,8 +149,14 @@ export const SolidBridge: Bridge = {
         };
     },
     watch: (read, effect) => {
+        let first = false;
         createComputed(() => {
-            effect(read());
+            read();
+            if (!first) {
+                first = true;
+                return;
+            }
+            effect();
         });
         return () => {
             // no disposor

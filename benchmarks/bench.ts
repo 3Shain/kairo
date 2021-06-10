@@ -7,6 +7,7 @@ import {
     ReadableCell,
     SBridge,
     VueReactiveBridge,
+    SolidBridge,
 } from './common';
 
 declare global {
@@ -14,12 +15,13 @@ declare global {
     const __TEST__: boolean;
 }
 
-let results = [];
-
 (global as any).__DEV__ = false;
 (global as any).__TEST__ = false;
 const suite = new Suite('reactive');
 suite
+    .add(`Solid`, () => {
+        ReactiveTest(SolidBridge);
+    })
     .add(`Vue`, () => {
         ReactiveTest(VueReactiveBridge);
     })
@@ -27,7 +29,7 @@ suite
         ReactiveTest(MobxBridge);
     })
     .add(`Kairo`, () => {
-        ReactiveTest(KairoInternal);
+        ReactiveTest(KairoBridge);
     })
     .add(`S.js`, () => {
         ReactiveTest(SBridge);
@@ -36,18 +38,13 @@ suite
         console.log(e.target.error);
     })
     .on('cycle', (s) => {
-        // console.log(String(s.target));
-        results.push(String(s.target));
+        console.log(String(s.target));
         global.gc();
     })
     .run({
         async: true,
     })
-    .on('complete', () => {
-        results.forEach((s) => {
-            console.log(s);
-        });
-    });
+    .on('complete', () => {});
 
 function ReactiveTest(bridge: Bridge) {
     bridge.root(() => {
@@ -55,41 +52,45 @@ function ReactiveTest(bridge: Bridge) {
         {
             let head = bridge.cell(0);
             let current = head as ReadableCell<number>;
-            for (let i = 0; i < 1500; i++) {
+            for (let i = 0; i < 500; i++) {
                 let c = current;
                 current = bridge.computed(() => {
                     return c.read() + 1;
                 });
             }
             head.write(1);
+            const atleast = callAtLeast(500);
             bridge.watch(
                 () => current.read(),
-                () => {}
+                () => atleast.call()
             );
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 500; i++) {
                 head.write(i);
-                assert(current.read(), 1500 + i);
+                assert(current.read(), 500 + i);
             }
+            atleast.assert();
         }
 
         /** broad propagation */
         {
-            let head2 = bridge.cell(0);
-            let current2 = head2 as ReadableCell<number>;
+            let head = bridge.cell(0);
+            let current = head as ReadableCell<number>;
             for (let i = 0; i < 2000; i++) {
-                current2 = bridge.computed(() => {
-                    return head2.read() + i;
+                current = bridge.computed(() => {
+                    return head.read() + i;
                 });
             }
-            head2.write(1);
+            head.write(1);
+            const atleast = callAtLeast(500);
             bridge.watch(
-                () => current2.read(),
-                () => {}
+                () => current.read(),
+                () => atleast.call()
             );
-            for (let i = 0; i < 100; i++) {
-                head2.write(i);
-                assert(current2.read(), i + 1999);
+            for (let i = 0; i < 500; i++) {
+                head.write(i);
+                assert(current.read(), i + 1999);
             }
+            atleast.assert();
         }
 
         /** diamond propagation */
@@ -108,14 +109,16 @@ function ReactiveTest(bridge: Bridge) {
             });
             head.write(1);
             assert(sum.read(), 2 * 1500);
+            const atleast = callAtLeast(500);
             bridge.watch(
                 () => sum.read(),
-                () => {}
+                () => atleast.call()
             );
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 500; i++) {
                 head.write(i);
                 assert(sum.read(), (i + 1) * 1500);
             }
+            atleast.assert();
         }
 
         /** triangle propagation */
@@ -135,13 +138,15 @@ function ReactiveTest(bridge: Bridge) {
             });
             head.write(1);
             assert(sum.read(), 1125750);
-            const atleast = callAtLeast();
+            const atleast = callAtLeast(100);
             bridge.watch(
                 () => sum.read(),
                 () => atleast.call()
             );
-            head.write(2);
-            assert(sum.read(), 1127250);
+            for (let i = 0; i < 100; i++) {
+                head.write(i);
+                assert(sum.read(), 1125750 - 1500 + i * 1500);
+            }
 
             atleast.assert();
         }
@@ -173,7 +178,22 @@ function ReactiveTest(bridge: Bridge) {
 
         /** avoidable change propagation  */
         {
-            // TBD
+            let head = bridge.cell(0);
+            let computed1 = bridge.computed(() => head.read());
+            let computed2 = bridge.computed(() => (computed1.read(), 0));
+            let computed3 = bridge.computed(() => computed2.read() + 1);
+            let computed4 = bridge.computed(() => computed3.read() + 2);
+            let computed5 = bridge.computed(() => computed4.read() + 3);
+            head.write(1);
+            bridge.watch(
+                () => computed5.read(),
+                () => {} // might be not called (optimization)
+            );
+            assert(computed5.read(), 6);
+            for (let i = 0; i < 100; i++) {
+                head.write(i);
+                assert(computed5.read(), 6);
+            }
         }
 
         /** unstable observers */
@@ -189,7 +209,7 @@ function ReactiveTest(bridge: Bridge) {
                 return result;
             });
             head.write(1);
-            // assert(current.read(), 1500);
+            assert(current.read(), 3000);
             const atleast = callAtLeast(10);
             bridge.watch(
                 () => current.read(),
@@ -197,10 +217,10 @@ function ReactiveTest(bridge: Bridge) {
             );
             for (let i = 0; i < 10; i++) {
                 head.write(i);
-                // assert(current.read(), i * 1500);
+                assert(current.read(), i % 2 ? i * 2 * 1500 : i * -1500);
             }
 
-            // atleast.assert();
+            atleast.assert();
         }
 
         /** mux propagaion */
@@ -241,11 +261,11 @@ function callAtLeast(time: number = 1) {
     return {
         call: () => {
             count++;
-            if (count > time) console.log('llll');
+            if (count > time) console.log('More call than expected.');
         },
         assert: () => {
             if (count < time) {
-                console.log('Assertation failed');
+                throw Error('Not enough call.');
             }
         },
     };
