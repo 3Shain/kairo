@@ -7,7 +7,7 @@ import {
   runInTransaction,
 } from './cell';
 
-describe('core/cell', () => {
+describe('cell', () => {
   const noop = () => {};
 
   function hasFlag(c: any, f: Flag) {

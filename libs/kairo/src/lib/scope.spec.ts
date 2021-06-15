@@ -1,6 +1,6 @@
 import { Scope, inject, Token, provide } from './scope';
 
-describe('core/scope', () => {
+describe('scope', () => {
   const MockValue = {};
 
   const MockToken = Token.for('mock_token');

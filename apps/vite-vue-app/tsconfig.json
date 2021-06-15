@@ -13,6 +13,8 @@
     "lib": ["esnext", "dom"],
     "types": ["vite/client"]
   },
+  "files": [],
+  "include": [],
   "references": [
     {
       "path": "./tsconfig.app.json"

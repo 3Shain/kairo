@@ -132,32 +132,6 @@
         }
       }
     },
-    "ng-app-e2e": {
-      "root": "apps/ng-app-e2e",
-      "sourceRoot": "apps/ng-app-e2e/src",
-      "projectType": "application",
-      "architect": {
-        "e2e": {
-          "builder": "@nrwl/cypress:cypress",
-          "options": {
-            "cypressConfig": "apps/ng-app-e2e/cypress.json",
-            "tsConfig": "apps/ng-app-e2e/tsconfig.e2e.json",
-            "devServerTarget": "ng-app:serve"
-          },
-          "configurations": {
-            "production": {
-              "devServerTarget": "ng-app:serve:production"
-            }
-          }
-        },
-        "lint": {
-          "builder": "@nrwl/linter:eslint",
-          "options": {
-            "lintFilePatterns": ["apps/ng-app-e2e/**/*.{js,ts}"]
-          }
-        }
-      }
-    },
     "kairo": {
       "root": "libs/kairo",
       "sourceRoot": "libs/kairo/src",
@@ -255,32 +229,6 @@
           "options": {
             "jestConfig": "apps/react-app/jest.config.js",
             "passWithNoTests": true
-          }
-        }
-      }
-    },
-    "react-app-e2e": {
-      "root": "apps/react-app-e2e",
-      "sourceRoot": "apps/react-app-e2e/src",
-      "projectType": "application",
-      "architect": {
-        "e2e": {
-          "builder": "@nrwl/cypress:cypress",
-          "options": {
-            "cypressConfig": "apps/react-app-e2e/cypress.json",
-            "tsConfig": "apps/react-app-e2e/tsconfig.e2e.json",
-            "devServerTarget": "react-app:serve"
-          },
-          "configurations": {
-            "production": {
-              "devServerTarget": "react-app:serve:production"
-            }
-          }
-        },
-        "lint": {
-          "builder": "@nrwl/linter:eslint",
-          "options": {
-            "lintFilePatterns": ["apps/react-app-e2e/**/*.{js,ts}"]
           }
         }
       }
@@ -425,32 +373,6 @@
           "options": {
             "jestConfig": "apps/svelte-app/jest.config.js",
             "passWithNoTests": true
-          }
-        }
-      }
-    },
-    "svelte-app-e2e": {
-      "root": "apps/svelte-app-e2e",
-      "sourceRoot": "apps/svelte-app-e2e/src",
-      "projectType": "application",
-      "architect": {
-        "e2e": {
-          "builder": "@nrwl/cypress:cypress",
-          "options": {
-            "cypressConfig": "apps/svelte-app-e2e/cypress.json",
-            "tsConfig": "apps/svelte-app-e2e/tsconfig.e2e.json",
-            "devServerTarget": "svelte-app:serve"
-          },
-          "configurations": {
-            "production": {
-              "devServerTarget": "svelte-app:serve:production"
-            }
-          }
-        },
-        "lint": {
-          "builder": "@nrwl/linter:eslint",
-          "options": {
-            "lintFilePatterns": ["apps/svelte-app-e2e/**/*.{js,ts}"]
           }
         }
       }

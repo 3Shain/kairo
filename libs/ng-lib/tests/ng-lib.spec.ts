@@ -1,33 +1,27 @@
 import { TestBed } from '@angular/core/testing';
-import { TestComponent } from './test.component';
+import { TestComponent, TestDirective } from './test.component';
 import { KairoModule } from '../src';
 
 describe('@kairo/angular', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [TestComponent],
-      imports: [KairoModule.forRoot()],
+      declarations: [TestComponent, TestDirective],
+      imports: [],
     }).compileComponents();
   });
 
-  it('should create the app', () => {
+  it('should create the component and directive with no error', () => {
     const fixture = TestBed.createComponent(TestComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
-  });
-
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(TestComponent);
-    const app = fixture.componentInstance;
-    fixture.detectChanges();
     const compiled = fixture.nativeElement;
-    expect(compiled.querySelector('div').textContent).toEqual('12345');
-    app.setCount(54321);
     fixture.detectChanges();
-    expect(compiled.querySelector('div').textContent).toEqual('54321');
+    expect(
+      compiled.querySelector('div').classList.contains('test-class')
+    ).toBeTruthy();
   });
 
-  it('should render title2', () => {
+  it('should work with change detection', () => {
     const fixture = TestBed.createComponent(TestComponent);
     const app = fixture.componentInstance;
     fixture.detectChanges();

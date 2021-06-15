@@ -23,6 +23,17 @@ import {
 import { ScopeRef, KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
 
+interface KairoDirectiveInstance {
+  ɵɵkairoParentScope: KairoScopeRefImpl;
+  ɵɵkairoScope: KairoScopeRefImpl;
+  ɵɵinjector: Injector;
+  ɵɵzone: NgZone;
+  ɵɵkairoDetachFn: Function;
+  ɵɵinit: boolean;
+  ɵɵchangesHook: Function[];
+  ngSetup: Function;
+}
+
 export function WithKairo(obj?: {
   /**
    * Configures the [injector](guide/glossary#injector) of this
@@ -38,144 +49,136 @@ export function WithKairo(obj?: {
   viewProviders?: Provider[];
 }) {
   return <T>(componentType: Type<T>) => {
-    const componentDef =
+    const directiveDefinition =
       (componentType['ɵcmp'] as ComponentDef<unknown>) ??
       (componentType['ɵdir'] as DirectiveDef<unknown>);
-    const factory = componentType['ɵfac'];
+    const factoryOld = componentType['ɵfac'];
+    /** Override component factory */
     Object.defineProperty(componentType, 'ɵfac', {
       get: () => (...args: any) => {
-        const origin = factory(...args);
-        origin['__kairo_parent_scope__'] = ɵɵdirectiveInject(
+        const instance = factoryOld(...args) as KairoDirectiveInstance;
+        instance.ɵɵkairoParentScope = ɵɵdirectiveInject(
           KairoScopeRefImpl,
-          InjectFlags.SkipSelf
+          InjectFlags.SkipSelf | InjectFlags.Optional
         );
-        origin['__kairo_scope__'] = ɵɵdirectiveInject(
+        instance.ɵɵkairoScope = ɵɵdirectiveInject(
           KairoScopeRefImpl,
           InjectFlags.Self
         );
-        origin['__injector__'] = ɵɵdirectiveInject(Injector, InjectFlags.Self);
-        origin['__zone__'] = ɵɵdirectiveInject(NgZone);
-        origin['__init__'] = false;
-        origin['__changesHook__'] = [];
-        return origin;
+        instance.ɵɵinjector = ɵɵdirectiveInject(Injector, InjectFlags.Self);
+        instance.ɵɵzone = ɵɵdirectiveInject(NgZone);
+        instance.ɵɵinit = false;
+        instance.ɵɵchangesHook = [];
+        return instance;
       },
     });
-    const features = [
-      ɵɵProvidersFeature(
-        [
-          {
-            provide: KairoScopeRefImpl,
-            useClass: KairoScopeRefImpl,
-          },
-          {
-            provide: ScopeRef,
-            useExisting: KairoScopeRefImpl,
-          },
-          ...(obj?.providers ?? []),
-        ],
-        [...(obj?.viewProviders ?? [])]
-      ),
-      (def: ComponentDef<unknown> | DirectiveDef<unknown>) => {
-        if ('onPush' in def) {
-          (def.onPush as any) = true;
-        }
+    /**
+     * Setup Angular DI
+     */
+    ɵɵProvidersFeature(
+      [
+        {
+          provide: KairoScopeRefImpl,
+          useClass: KairoScopeRefImpl,
+        },
+        {
+          provide: ScopeRef,
+          useExisting: KairoScopeRefImpl,
+        },
+        ...(obj?.providers ?? []),
+      ],
+      [...(obj?.viewProviders ?? [])]
+    )(directiveDefinition);
+    /**
+     * Setup kairo
+     */
+    ((def: ComponentDef<unknown> | DirectiveDef<unknown>) => {
+      if ('onPush' in def) {
+        (def.onPush as any) = true; // component default onPush
+      }
 
-        const hasInputs = Object.keys(componentDef.inputs).length > 0;
+      const hasInputs = Object.keys(directiveDefinition.inputs).length > 0;
 
-        // ensure these method exist in prototype cuz ivy will store them.
-        const originNgOnChanges = (hasInputs
-          ? def.type.prototype.ngOnChanges
-          : def.type.prototype.ngOnInit) as Function;
-        const originNgOnDestroy = def.type.prototype.ngOnDestroy as Function;
-        def.type.prototype.ngOnDestroy = function (this: {
-          __zone__: NgZone;
-          __kairo_detach__: Function;
-        }) {
-          this.__zone__.runOutsideAngular(() => {
-            this.__kairo_detach__?.(); // it might be undefined (in test)
-          });
-          originNgOnDestroy?.call(this);
-        };
+      // ensure these method exist in prototype cuz ivy will store them.
+      const ngOnChangesOld = (hasInputs
+        ? def.type.prototype.ngOnChanges
+        : def.type.prototype.ngOnInit) as Function;
+      const ngOnDestroyOld = def.type.prototype.ngOnDestroy as Function;
+      def.type.prototype.ngOnDestroy = function (this: KairoDirectiveInstance) {
+        this.ɵɵzone.runOutsideAngular(() => {
+          this.ɵɵkairoDetachFn?.(); // issue: it might be undefined (in test)
+        });
+        ngOnDestroyOld?.call(this);
+      };
 
-        const onChangesOrOnInit = function (
-          this: {
-            __kairo_parent_scope__: KairoScopeRefImpl;
-            __kairo_scope__: KairoScopeRefImpl;
-            __injector__: Injector;
-            __zone__: NgZone;
-            ngSetup: Function;
-            __kairo_detach__: Function;
-            __init__: boolean;
-            __changesHook__: Function[];
-          },
-          changes: SimpleChanges
-        ) {
-          if (!this.__init__) {
-            if (typeof this.ngSetup !== 'function') {
-              console.error(`ngSetup is not declared.`);
-              return;
-            }
-            const changeDetector = this.__injector__.get(ChangeDetectorRef);
-            const scope = new Scope(this.__kairo_parent_scope__.scope);
-            this.__kairo_scope__.scope = scope;
-            this.__zone__.runOutsideAngular(() => {
-              const endScope = scope.beginScope();
-              provide(NG_INJECTOR, this.__injector__);
-              Object.assign(
-                this,
-                (() => {
-                  const resolve = this.ngSetup(this, (thunk: Function) => {
-                    const [beh, setbeh] = mutable(thunk(this));
-                    this.__changesHook__.push((instance: unknown) => {
-                      setbeh(thunk(instance));
-                    });
-                    return beh;
-                  });
-                  if (resolve === undefined) {
-                    return {};
-                  }
-                  if (typeof resolve !== 'object') {
-                    throw Error(
-                      `ngSetup() is expected to return an object, but it got ${typeof resolve}`
-                    );
-                  }
-                  for (const [key, value] of Object.entries(resolve)) {
-                    if (isCell(value)) {
-                      effect(() =>
-                        value.watch((updatedValue) => {
-                          this[key] = updatedValue;
-                          changeDetector.markForCheck();
-                        })
-                      );
-                      resolve[key] = value.value;
-                    } else if (typeof value === 'function') {
-                      resolve[key] = action(value as any);
-                    } else {
-                      resolve[key] = value;
-                    }
-                  }
-                  return resolve;
-                })()
-              );
-              endScope();
-            });
-            this.__kairo_scope__.__initialize();
-            this.__kairo_detach__ = scope.attach();
-            this.__init__ = true;
-          } else {
-            this.__zone__.runOutsideAngular(() => {
-              transaction(() => {
-                this.__changesHook__.forEach((x) => x(this));
-              });
-            });
+      const onChangesOrOnInit = function (
+        this: KairoDirectiveInstance,
+        changes: SimpleChanges
+      ) {
+        if (!this.ɵɵinit) {
+          if (typeof this.ngSetup !== 'function') {
+            console.error(`ngSetup is not declared.`);
+            return;
           }
-          originNgOnChanges?.apply(this, changes);
-        };
+          const changeDetector = this.ɵɵinjector.get(ChangeDetectorRef);
+          const scope = new Scope(this.ɵɵkairoParentScope?.scope);
+          this.ɵɵkairoScope.scope = scope;
+          this.ɵɵzone.runOutsideAngular(() => {
+            const endScope = scope.beginScope();
+            provide(NG_INJECTOR, this.ɵɵinjector);
+            Object.assign(
+              this,
+              (() => {
+                const resolve = this.ngSetup(this, (thunk: Function) => {
+                  const [beh, setbeh] = mutable(thunk(this));
+                  this.ɵɵchangesHook.push((instance: unknown) => {
+                    setbeh(thunk(instance));
+                  });
+                  return beh;
+                });
+                if (resolve === undefined) {
+                  return {};
+                }
+                if (typeof resolve !== 'object') {
+                  throw Error(
+                    `ngSetup() is expected to return an object, but it got ${typeof resolve}`
+                  );
+                }
+                for (const [key, value] of Object.entries(resolve)) {
+                  if (isCell(value)) {
+                    effect(() =>
+                      value.watch((updatedValue) => {
+                        this[key] = updatedValue;
+                        changeDetector.markForCheck();
+                      })
+                    );
+                    resolve[key] = value.value;
+                  } else if (typeof value === 'function') {
+                    resolve[key] = action(value as any);
+                  } else {
+                    resolve[key] = value;
+                  }
+                }
+                return resolve;
+              })()
+            );
+            endScope();
+          });
+          this.ɵɵkairoScope.__initialize();
+          this.ɵɵkairoDetachFn = scope.attach();
+          this.ɵɵinit = true;
+        } else {
+          this.ɵɵzone.runOutsideAngular(() => {
+            transaction(() => {
+              this.ɵɵchangesHook.forEach((x) => x(this));
+            });
+          });
+        }
+        ngOnChangesOld?.apply(this, changes);
+      };
 
-        if (hasInputs) def.type.prototype.ngOnChanges = onChangesOrOnInit;
-        else def.type.prototype.ngOnInit = onChangesOrOnInit;
-      },
-    ];
-    features.forEach((x) => x(componentDef));
+      if (hasInputs) def.type.prototype.ngOnChanges = onChangesOrOnInit;
+      else def.type.prototype.ngOnInit = onChangesOrOnInit;
+    })(directiveDefinition);
   };
 }

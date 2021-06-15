@@ -1,7 +1,7 @@
 import { noop } from './utils';
 import { EventStream, merged, stream } from './stream';
 
-describe('core/stream', () => {
+describe('stream', () => {
   it('should be lazy', () => {
     let EXE_COUNTER = 0;
     const _stream = new EventStream((next) => {
