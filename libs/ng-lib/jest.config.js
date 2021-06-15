@@ -13,6 +13,8 @@ module.exports = {
         ],
       },
     },
+    __DEV__: true,
+    __TEST__: true,
   },
   coverageDirectory: '../../coverage/libs/ng-lib',
   snapshotSerializers: [

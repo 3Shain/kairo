@@ -19,7 +19,7 @@ First of all, you need to setup a global instance of kairo.
 import { kairoApp } from '@kairo/vue';
 
 function globalSetup() {
-    // write your global reactive logic, provide services here.
+  // write your global reactive logic, provide services here.
 }
 
 // following code should be in your entry file.
@@ -44,9 +44,9 @@ There are two methods you can 'kairo-ize' your vue component.
 
 ```vue
 <template>
-    <button @click="setCount(count + 1)">
-        {{ count }}
-    </button>
+  <button @click="setCount(count + 1)">
+    {{ count }}
+  </button>
 </template>
 <script lang="ts">
 import { mutable } from 'kairo';
@@ -97,11 +97,11 @@ import { mutable } from 'kairo';
 import { withKairo } from '@kairo/vue';
 
 const Component = withKairo(() => {
-    const [count, setCount] = mutable(0);
+  const [count, setCount] = mutable(0);
 
-    return () => (
-        <button onClick={() => setCount(count.value + 1)}>{count.value}</button>
-    );
+  return () => (
+    <button onClick={() => setCount(count.value + 1)}>{count.value}</button>
+  );
 });
 ```
 
@@ -189,29 +189,29 @@ It's not necessary to 'withKairo' all components, like presentational components
 
 It works almost the same as `inject`, but the vue integration will do these things:
 
--   If the injected value is a Behavior, then it will be transformed to a vue Ref, and schedule updates when the Behavior changes.
+- If the injected value is a Behavior, then it will be transformed to a vue Ref, and schedule updates when the Behavior changes.
 
-    ```ts
-    // the token you declared (and provide it somewhere (e.g. root))
-    const IS_DARK = InjectToken.for<Behavior<boolean>>('Is dark theme');
+  ```ts
+  // the token you declared (and provide it somewhere (e.g. root))
+  const IS_DARK = InjectToken.for<Behavior<boolean>>('Is dark theme');
 
-    // in your vue component setup()
+  // in your vue component setup()
 
-    const value: Ref<boolean> = useInject(IS_DARK);
-    ```
+  const value: Ref<boolean> = useInject(IS_DARK);
+  ```
 
--   If the injected value is an object containing Behavior properties, then the whole object is transformed to a vue reactive object, and shedule updates when any Behavior changes.
+- If the injected value is an object containing Behavior properties, then the whole object is transformed to a vue reactive object, and shedule updates when any Behavior changes.
 
-    ```ts
-    // the token you declared (and provide it somewhere (e.g. root))
-    const COUNTER = InjectToken.for<{
-        count: Behavior<number>;
-        add: (value: number) => void;
-    }>('A simple counter');
+  ```ts
+  // the token you declared (and provide it somewhere (e.g. root))
+  const COUNTER = InjectToken.for<{
+    count: Behavior<number>;
+    add: (value: number) => void;
+  }>('A simple counter');
 
-    // in your vue component setup()
+  // in your vue component setup()
 
-    const counter = useInject(COUNTER); // the 'counter' is created by reactive()
-    ```
+  const counter = useInject(COUNTER); // the 'counter' is created by reactive()
+  ```
 
--   Otherwise, it returns the inected value.
+- Otherwise, it returns the inected value.

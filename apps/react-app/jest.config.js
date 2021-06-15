@@ -3,7 +3,7 @@ module.exports = {
   preset: '../../jest.preset.js',
   transform: {
     'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json'
+      tsConfig: '<rootDir>/tsconfig.spec.json',
     },
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],

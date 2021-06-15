@@ -12,7 +12,8 @@ yarn add @kairo/angular kairo
 # or use npm
 npm install @kairo/angular kairo
 ```
-<!-- 
+
+<!--
 First of all, import `KairoModule` on your root module.
 
 
@@ -65,7 +66,7 @@ export class CounterComponent extends ngSetup(()=>{
 
 ## Access inputs
 
-Just declare your input property as usual. 
+Just declare your input property as usual.
 Then you can access static input values from the first parameter of setup function. If a input can change over time, th
 
 ```ts
@@ -90,7 +91,7 @@ Currently you might need to do some workaround, like expose the setter of Behavi
 
 Lifecycle is generally not needed in kairo world. If you do need lifecycle hooks, you can still create an event, expose the emit function from reactive zone and call it in your lifecycle hooks.
 
-> If you meet this situation, you probably used either kairo or lifecycle hooks in a wrong way. 
+> If you meet this situation, you probably used either kairo or lifecycle hooks in a wrong way.
 
 
 ## Why dependency injection? -->

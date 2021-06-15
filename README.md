@@ -15,13 +15,13 @@ Three primitives, with some helper functions.
 
 ## 👌 Kairo provides
 
--   An architecture and abstraction of reactive frontend app at an application- as well as component-level.
--   **Simple mental model** and **Great readability** of asynchronous programming.
--   Logic composition & reuse.
--   IoC with Dependency injection.
--   State Management.
--   All features above is avaliable **ACROSS FRAMEWORKS/UI LIBRARIES**.
-    > Currently react, angular, solid, svelte and vue integrations are provided.
+- An architecture and abstraction of reactive frontend app at an application- as well as component-level.
+- **Simple mental model** and **Great readability** of asynchronous programming.
+- Logic composition & reuse.
+- IoC with Dependency injection.
+- State Management.
+- All features above is avaliable **ACROSS FRAMEWORKS/UI LIBRARIES**.
+  > Currently react, angular, solid, svelte and vue integrations are provided.
 
 ## Basic Idea
 
@@ -43,9 +43,9 @@ setCount(1); // mutate
 
 **There are reasons to read by getter and write by a separate function**
 
--   It doesn't break javascript semantics. Read is still read but mutating a data is not the same and shouldn't be treated as object property assignment.
--   It enforces uni-direction data-flow: you can mutate data only if you have the setter. (And usually you shouldn't expose it, keep it _private_)
--   With a `.value` getter, you know you are accessing a Behavior. Thus you know which part of your code is going to 'react'. (While the code is still readable, it increases maintainability a lot!)
+- It doesn't break javascript semantics. Read is still read but mutating a data is not the same and shouldn't be treated as object property assignment.
+- It enforces uni-direction data-flow: you can mutate data only if you have the setter. (And usually you shouldn't expose it, keep it _private_)
+- With a `.value` getter, you know you are accessing a Behavior. Thus you know which part of your code is going to 'react'. (While the code is still readable, it increases maintainability a lot!)
 
 **But keep in mind, not all Behavior is mutable. By definition Behavior just store a varying value.**
 
@@ -72,8 +72,8 @@ Computation can be dynamic (use logic flow statements), but it should be always 
 
 ```ts
 const a = computed(() => {
-    return b.value ? c.value : d.value;
-    // as well as if/for/while etc. is usable (but you probably don't need them all.)
+  return b.value ? c.value : d.value;
+  // as well as if/for/while etc. is usable (but you probably don't need them all.)
 });
 // FP fashion
 const a = b.switch((x) => (x ? c : d));
@@ -87,8 +87,8 @@ Let's return to the basic idea of reactive. We now have data and data depend on 
 
 ```ts
 const stopWatchHandler = count.watch((current) => {
-    console.log(`current value is ${current}`); // log is a typical side effect
-    // and you can e.g. mutate DOM element, but with a nice framework integration you will rarely do this.
+  console.log(`current value is ${current}`); // log is a typical side effect
+  // and you can e.g. mutate DOM element, but with a nice framework integration you will rarely do this.
 });
 
 // at some point, stop watching
@@ -102,13 +102,13 @@ stopWatchHandler();
  * by just copy&paste!
  */
 const Counter = withKairo(() => {
-    const [count, setCount] = mut(0);
-    return () => (
-        <>
-            <span>{count.value}</span>
-            <button onClick={() => setCount(count.value + 1)}>Click me!</button>
-        </>
-    );
+  const [count, setCount] = mut(0);
+  return () => (
+    <>
+      <span>{count.value}</span>
+      <button onClick={() => setCount(count.value + 1)}>Click me!</button>
+    </>
+  );
 });
 ```
 
@@ -177,7 +177,8 @@ const count = reduced(plusEvent, (a, b) => a + b, 0);
 
 const lastEvent = held(plusEvent, 0);
 ```
-<!-- 
+
+<!--
 And Behavior `.changes(scheduler)` can gives an EventStream, but you must provide a `Scheduler`, -->
 
 Like Behavior can be `watch`ed, you can `listen` an EventStream.
@@ -216,7 +217,7 @@ Thle `yield*` statement yields an object whose value is not available at present
 import { task } from 'kairo';
 
 const startTask = task(function* () {
-    const data = yield* eventStream;
+  const data = yield* eventStream;
 });
 
 const taskObject = startTask(); // invoke the task
@@ -232,14 +233,14 @@ You can yield a Promise or [Observable](https://github.com/tc39/proposal-observa
 import { task, resolve } from 'kairo';
 
 const startTask = task(function* () {
-    const body = yield* resolve(
-        fetch('https://api.github.com/').then((x) => x.text())
-    );
+  const body = yield* resolve(
+    fetch('https://api.github.com/').then((x) => x.text())
+  );
 
-    /* https://github.com/tc39/proposal-observable
-     * It only returns the last value (before complete), like AsyncSubject
-     */
-    const last = yield* resolve(observable);
+  /* https://github.com/tc39/proposal-observable
+   * It only returns the last value (before complete), like AsyncSubject
+   */
+  const last = yield* resolve(observable);
 });
 ```
 
@@ -350,52 +351,52 @@ task(function*(){
 
 ```ts
 function useKonami(keys: string[]) {
-    const [keydown, emitkey] = stream<KeyboardEvent>();
+  const [keydown, emitkey] = stream<KeyboardEvent>();
 
-    const keydownCode = keydown.transform((x) => x.code);
+  const keydownCode = keydown.transform((x) => x.code);
 
-    const startTask = task(function* () {
-        while (true) {
-            const key = yield* keydownCode;
-            if (key == keys[0]) {
-                const keysRemain = keys.slice(1).reverse();
-                while (keysRemain.length) {
-                    const next = yield* race([keydownCode, delay(1000)]);
-                    if (next !== keysRemain.pop()) {
-                        console.log('failed');
-                        break;
-                    }
-                    if (keysRemain.length == 0) {
-                        console.log('activated!');
-                    }
-                }
-            }
+  const startTask = task(function* () {
+    while (true) {
+      const key = yield* keydownCode;
+      if (key == keys[0]) {
+        const keysRemain = keys.slice(1).reverse();
+        while (keysRemain.length) {
+          const next = yield* race([keydownCode, delay(1000)]);
+          if (next !== keysRemain.pop()) {
+            console.log('failed');
+            break;
+          }
+          if (keysRemain.length == 0) {
+            console.log('activated!');
+          }
         }
-    });
+      }
+    }
+  });
 
-    effect(() => {
-        window.addEventListener('keydown', emitkey);
-        return () => window.removeEventListener('keydown', emitkey);
-    });
+  effect(() => {
+    window.addEventListener('keydown', emitkey);
+    return () => window.removeEventListener('keydown', emitkey);
+  });
 
-    effect(() => startTask());
+  effect(() => startTask());
 }
 
 useKonami([
-    'ArrowUp',
-    'ArrowUp',
-    'ArrowDown',
-    'ArrowDown',
-    'ArrowLeft',
-    'ArrowRight',
-    'ArrowLeft',
-    'ArrowRight',
+  'ArrowUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowRight',
 ]);
 ```
 
 ## Scope
 
-Scope is introduced to manage side effects. 
+Scope is introduced to manage side effects.
 
 <!-- If you don't know what is side effect, there is a very interesting definition: the code can be executed multiple times at any time with no issues. Let's give some example:
 * A function calculate the sum of two number : no side effect.
@@ -431,11 +432,11 @@ Besides `Token` object, a function can be also treat as a token, such that we ca
 
 ```ts
 function FooService() {
-    // declear your Behaviors, EventStream as well as Task here
+  // declear your Behaviors, EventStream as well as Task here
 
-    return {
-        // and expose them in an object literal
-    };
+  return {
+    // and expose them in an object literal
+  };
 }
 
 // In parent Scope
@@ -449,7 +450,6 @@ const foo = inject(FooService);
 ```
 
 But how can I create a Scope? Well this should be done by integrations already, but you can still check the documentation.
-
 
 ## Integrations
 
@@ -465,29 +465,29 @@ Now you can get start with one of your familiar frameworks. With these integrati
 
 ## Documentation(TBD)
 
--   Behavior related
--   EventStreams related
--   Task related
--   Scope related
+- Behavior related
+- EventStreams related
+- Task related
+- Scope related
 
 > Most features has been introduced in this README, the document will add some specifications. I will be on discord (see below) if you're unclear about something. You can also post it on github Discussion.
 
 ## Todos
 
--   Full API Documentation
--   Common interface of common features (like ajax, frontend-routing, webapi)
--   A tutorial about debug.
--   Unit tests
+- Full API Documentation
+- Common interface of common features (like ajax, frontend-routing, webapi)
+- A tutorial about debug.
+- Unit tests
 
 ## Credit
 
--   **Functional Reactive Programming** : Where the concepts of Behavior and EventStream come from.
--   [RxJS](https://github.com/ReactiveX/rxjs): Another good model of async programming based on observer pattern
--   [S.js](https://github.com/adamhaile/S): Provides such a performant implementation of reactive mechanism. And Kairo was initial based on it, and brought more optimizations.
--   [Vue composition api](https://github.com/vuejs/vue-next): The idea of composition.
--   [Angular](https://github.com/angular/angular): Brings a good structure of web application.
--   [ember-concurrency]() Where my thoughts about `task` comes from
--   [MobX]() More or less gives me some inspiration of API designing
+- **Functional Reactive Programming** : Where the concepts of Behavior and EventStream come from.
+- [RxJS](https://github.com/ReactiveX/rxjs): Another good model of async programming based on observer pattern
+- [S.js](https://github.com/adamhaile/S): Provides such a performant implementation of reactive mechanism. And Kairo was initial based on it, and brought more optimizations.
+- [Vue composition api](https://github.com/vuejs/vue-next): The idea of composition.
+- [Angular](https://github.com/angular/angular): Brings a good structure of web application.
+- [ember-concurrency]() Where my thoughts about `task` comes from
+- [MobX]() More or less gives me some inspiration of API designing
 
 ## Community
 
@@ -496,6 +496,5 @@ Currently I've hosted a [Discord](https://discord.gg/pDkYpa6Mxu) server. Feel fr
 ## License
 
 MIT License © 2021 3Shain [san3shain@gmail.com](mailto:san3shain@gmail.com)
-
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2F3Shain%2Fkairo.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2F3Shain%2Fkairo?ref=badge_large)

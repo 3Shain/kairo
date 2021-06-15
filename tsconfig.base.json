@@ -1,30 +1,31 @@
 {
-    "compileOnSave": false,
-    "compilerOptions": {
-        "rootDir": ".",
-        "sourceMap": true,
-        "declaration": false,
-        "moduleResolution": "node",
-        "emitDecoratorMetadata": true,
-        "experimentalDecorators": true,
-        "importHelpers": true,
-        "noImplicitThis": true,
-        "module": "esnext",
-        "target": "es2015",
-        "allowJs": true,
-        "lib": ["esnext", "dom"],
-        "skipLibCheck": true,
-        "skipDefaultLibCheck": true,
-        "types": ["node"],
-        "baseUrl": ".",
-        "paths": {
-            "kairo": ["libs/kairo/src/index.ts"],
-            "@kairo/angular": ["libs/ng-lib/src/index.ts"],
-            "@kairo/react": ["libs/react-lib/src/index.ts"],
-            "@kairo/vue": ["libs/vue-lib/src/index.ts"],
-            "@kairo/solid": ["libs/solid-lib/src/index.ts"],
-            "@kairo/svelte": ["libs/svelte-lib/src/index.ts"]
-        }
-    },
-    "exclude": ["node_modules", "tmp"]
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "noImplicitThis": true,
+    "module": "esnext",
+    "target": "es2015",
+    "allowJs": true,
+    "lib": ["esnext", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "kairo": ["libs/kairo/src/index.ts"],
+      "@kairo/angular": ["libs/ng-lib/src/index.ts"],
+      "@kairo/react": ["libs/react-lib/src/index.ts"],
+      "@kairo/vue": ["libs/vue-lib/src/index.ts"],
+      "@kairo/solid": ["libs/solid-lib/src/index.ts"],
+      "@kairo/svelte": ["libs/svelte-lib/src/index.ts"]
+    }
+  },
+  "include": ["**/*.d.ts"],
+  "exclude": ["node_modules", "tmp"]
 }

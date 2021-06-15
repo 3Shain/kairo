@@ -4,30 +4,30 @@ import { effect, inject } from 'kairo';
 import { Counter } from './shared';
 
 @Component({
-    template: `<p>current count: {{ testprop }}</p>`,
-    styles: [``],
-    selector: 'rk-child-component',
+  template: `<p>current count: {{ testprop }}</p>`,
+  styles: [``],
+  selector: 'rk-child-component',
 })
 @WithKairo()
 //  implements NgSetup<ChildComponent>
 export class ChildComponent extends ngSetup(
-    (
-        _: {
-            test: string;
-        },
-        useProp
-    ) => {
-        const testprop = useProp((x) => x.test);
+  (
+    _: {
+      test: string;
+    },
+    useProp
+  ) => {
+    const testprop = useProp((x) => x.test);
 
-        const { count } = inject(Counter);
+    const { count } = inject(Counter);
 
-        effect(() => testprop.watch(console.log));
-        return {
-            count,
-            testprop,
-        };
-    }
+    effect(() => testprop.watch(console.log));
+    return {
+      count,
+      testprop,
+    };
+  }
 ) {
-    @Input()
-    test: string;
+  @Input()
+  test: string;
 }

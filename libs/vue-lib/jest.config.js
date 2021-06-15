@@ -13,9 +13,12 @@ module.exports = {
   globals: {
     'ts-jest': {
       tsConfig: '<rootDir>/tsconfig.spec.json',
+      babelConfig: '<rootDir>/babel.config.js',
     },
     'vue-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json',
+      tsConfig: 'libs/vue-lib/tsconfig.spec.json',
     },
+    __DEV__: true,
+    __TEST__: true,
   },
 };

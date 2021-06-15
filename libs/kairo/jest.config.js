@@ -5,8 +5,8 @@ module.exports = {
     'ts-jest': {
       tsConfig: '<rootDir>/tsconfig.spec.json',
     },
-    '__DEV__': true,
-    '__TEST__': true
+    __DEV__: true,
+    __TEST__: true,
   },
   transform: {
     '^.+\\.[tj]sx?$': 'ts-jest',

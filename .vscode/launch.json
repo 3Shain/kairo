@@ -1,39 +1,38 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Bench",
-            "type": "node",
-            "request": "launch",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "runtimeExecutable": "npm",
-            "args": [
-                "run",
-                "bench"
-            ],
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "trace": "all"
-        },
-        {
-            "name": "Jest Tests (kairo)",
-            "type": "node",
-            "request": "launch",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceRoot}/node_modules/.bin/nx",
-            "args": [
-                "test",
-                "kairo",
-                "--runInBand",
-                "-i"
-            ],
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "trace": "all"
-        },
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bench",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeExecutable": "npm",
+      "args": ["run", "bench"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (kairo)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "kairo", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (ng-lib)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "ng-lib", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    }
+  ]
 }

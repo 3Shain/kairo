@@ -33,11 +33,11 @@ Now you can use kairo with svelte by adding a new attribute `kairo`. Use `kairo=
 
 ```html
 <script lang="ts" kairo="root">
-    import { mutable } from 'kairo';
-    const [counter, setCount] = mutable(0);
+  import { mutable } from 'kairo';
+  const [counter, setCount] = mutable(0);
 </script>
 <div>
-    <button on:click="{()=>setCount(counter.value + 1)}">{$count}</button>
+  <button on:click="{()=>setCount(counter.value + 1)}">{$count}</button>
 </div>
 ```
 
@@ -66,10 +66,10 @@ It's strongly discouraged to use two-way bindings with kairo, as it will make th
 
 ```html
 <script lang="ts" kairo>
-    ...
-    let button$$: HTMLButtonElement; 
-    // it's recommended to add double-dollar marks to warn you it's a two-way binding.
-    ...
+  ...
+  let button$$: HTMLButtonElement;
+  // it's recommended to add double-dollar marks to warn you it's a two-way binding.
+  ...
 </script>
 <button bind:this="{button$$}"></button>
 ```

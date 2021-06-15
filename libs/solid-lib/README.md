@@ -8,16 +8,16 @@ First of all, you need to wrap your `<App/>` inside `<KairoApp>`
 
 ```tsx
 function globalSetup() {
-    // write your global reactive logic, provide services here.
+  // write your global reactive logic, provide services here.
 }
 
 render(
-    () => (
-        <KairoApp globalSetup={globalSetup}>
-            <App />
-        </KairoApp>
-    ),
-    document.getElementById('root')
+  () => (
+    <KairoApp globalSetup={globalSetup}>
+      <App />
+    </KairoApp>
+  ),
+  document.getElementById('root')
 );
 ```
 
@@ -38,11 +38,11 @@ import { mutable } from 'kairo';
 import { withKairo } from '@kairo/solid';
 
 const Component = withKairo(() => {
-    const [count, setCount] = mutable(0);
+  const [count, setCount] = mutable(0);
 
-    return () => (
-        <button onClick={() => setCount(count.value + 1)}>{count.value}</button>
-    );
+  return () => (
+    <button onClick={() => setCount(count.value + 1)}>{count.value}</button>
+  );
 });
 ```
 
@@ -113,29 +113,29 @@ It's not necessary to 'withKairo' all components, like presentational components
 
 It works almost the same as `inject`, but the solid integration will do these things:
 
--   If the injected value is a Behavior, then it will be unwrapped to a function, and schedule updates when the Behavior changes.
+- If the injected value is a Behavior, then it will be unwrapped to a function, and schedule updates when the Behavior changes.
 
-    ```ts
-    // the token you declared (and provide it somewhere (e.g. root))
-    const IS_DARK = InjectToken.for<Behavior<boolean>>('Is dark theme');
+  ```ts
+  // the token you declared (and provide it somewhere (e.g. root))
+  const IS_DARK = InjectToken.for<Behavior<boolean>>('Is dark theme');
 
-    // in your functional components
+  // in your functional components
 
-    const value: () => boolean = useInject(IS_DARK);
-    ```
+  const value: () => boolean = useInject(IS_DARK);
+  ```
 
--   If the injected value is an object containing Behavior properties, then these properties will be unwrapped, and shedule updates when any Behavior changes. **And you can't desctruct it, as you will lost 'reactive'**
+- If the injected value is an object containing Behavior properties, then these properties will be unwrapped, and shedule updates when any Behavior changes. **And you can't desctruct it, as you will lost 'reactive'**
 
-    ```ts
-    // the token you declared (and provide it somewhere (e.g. root))
-    const COUNTER = InjectToken.for<{
-        count: Behavior<number>;
-        add: (value: number) => void;
-    }>('A simple counter');
+  ```ts
+  // the token you declared (and provide it somewhere (e.g. root))
+  const COUNTER = InjectToken.for<{
+    count: Behavior<number>;
+    add: (value: number) => void;
+  }>('A simple counter');
 
-    // in your functional components
+  // in your functional components
 
-    const counter = useInject(COUNTER);
-    ```
+  const counter = useInject(COUNTER);
+  ```
 
--   Otherwise, it returns the inected value.
+- Otherwise, it returns the inected value.

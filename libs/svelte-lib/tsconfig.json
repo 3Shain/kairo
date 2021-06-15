@@ -1,18 +1,18 @@
 {
-    "extends": "../../tsconfig.base.json",
-    "compilerOptions": {
-        "allowJs": true,
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
     },
-    "files": [],
-    "include": [],
-    "references": [
-        {
-            "path": "./tsconfig.lib.json"
-        },
-        {
-            "path": "./tsconfig.spec.json"
-        }
-    ]
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ]
 }

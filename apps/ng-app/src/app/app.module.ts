@@ -8,14 +8,14 @@ import { ChildComponent } from './child.component';
 import { CommonModule } from '@angular/common';
 
 @NgModule({
-    declarations: [AppComponent, ChildComponent],
-    imports: [
-        BrowserModule,
-        HttpClientModule,
-        KairoModule.forRoot(() => {}),
-        CommonModule,
-    ],
-    providers: [],
-    bootstrap: [AppComponent],
+  declarations: [AppComponent, ChildComponent],
+  imports: [
+    BrowserModule,
+    HttpClientModule,
+    KairoModule.forRoot(() => {}),
+    CommonModule,
+  ],
+  providers: [],
+  bootstrap: [AppComponent],
 })
 export class AppModule {}

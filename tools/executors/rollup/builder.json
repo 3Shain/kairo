@@ -1,9 +1,9 @@
 {
-    "builders": {
-        "package": {
-            "implementation": "./package",
-            "schema": "./schema.json",
-            "description": "Package by rollup."
-        }
+  "builders": {
+    "package": {
+      "implementation": "./package",
+      "schema": "./schema.json",
+      "description": "Package by rollup."
     }
+  }
 }

@@ -1,19 +1,14 @@
-<button (click)="minus()">
-    minus
-</button>
+<button (click)="minus()">minus</button>
 <span>
-    {{count}}
+  {{ count }}
 </span>
 <span>
-    {{doubled}}
+  {{ doubled }}
 </span>
-<button (click)="plus()">
-    plus
-</button>
+<button (click)="plus()">plus</button>
 <!-- <button (click)="theTask()">
     start task
 </button> -->
-<ng-container *ngIf="count%10">
-
-    <rk-child-component [test]="msg"></rk-child-component>
+<ng-container *ngIf="count % 10">
+  <rk-child-component [test]="msg"></rk-child-component>
 </ng-container>

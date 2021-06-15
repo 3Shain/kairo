@@ -3,7 +3,7 @@
   "compilerOptions": {
     "sourceMap": false,
     "types": ["node"],
-    "declaration": true,
+    "declaration": true
   },
   "files": [],
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx"],

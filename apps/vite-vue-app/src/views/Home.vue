@@ -2,7 +2,10 @@
   <div class="home">
     <!-- <HelloWorld msg="Welcome to Your Vue.js + TypeScript App" /> -->
     <CC :test="counter">
-      <HelloWorld msg="Welcome to Your Vue.js + TypeScript App" :count="counter" />
+      <HelloWorld
+        msg="Welcome to Your Vue.js + TypeScript App"
+        :count="counter"
+      />
       <!-- <p v-if="counter%2==0">show</p> -->
     </CC>
   </div>
@@ -17,16 +20,16 @@ export default defineComponent({
   name: 'Home',
   components: {
     HelloWorld,
-    CC
+    CC,
   },
-  setup: ()=>{
+  setup: () => {
     const counter = ref(0);
-    setInterval(()=>{
+    setInterval(() => {
       counter.value++;
-    },1000);
+    }, 1000);
     return {
-      counter
-    }
-  }
+      counter,
+    };
+  },
 });
 </script>
