@@ -1,0 +1,17 @@
+name: "Nx CI"
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout and install
+      - name: checkout
+        uses: actions/checkout@v2
+      - uses: c-hive/gha-yarn-cache@v1
+      - name: Install deps
+        run: yarn install
+      - uses: mansagroup/nrwl-nx-action@v2.0.4
+        with:
+          projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib
+          targets: test
+          affected: true
