@@ -47,7 +47,7 @@ function debounce<T>(time: number): Scheduler<T> {
 
 function throttle<T>(time: number): Scheduler<T> {
   let timeoutId: any = undefined;
-  let lastFired: number = 0;
+  let lastFired = 0;
 
   return (next) => {
     return (payload) => {

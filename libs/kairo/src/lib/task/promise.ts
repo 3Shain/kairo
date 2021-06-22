@@ -27,7 +27,7 @@ export class CancellablePromise<T> extends Promise<T> implements Runnable<T> {
       // disposer is guaranteed to be not executed after: 1.fulfilled 2.rejected 3.disposed once(which is also reject)
       // resolve in dispose? I think it's valid. And default behavior is reject after disposer executed, but user
       // can reject/resolve in disposer and default behavior is ignored.
-      let dispose = executor(
+      const dispose = executor(
         (v) => {
           resolve(v);
           settled = true;

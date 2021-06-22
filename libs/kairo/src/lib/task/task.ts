@@ -16,7 +16,7 @@ export function executeRunnable<T>(
 ): TeardownLogic {
   let currentDisposer: Function | null = null;
 
-  let iter = runnable[Symbol.iterator]();
+  const iter = runnable[Symbol.iterator]();
   let settled = false;
 
   function takeControl(yieldedObject: TaskYieldable<T>) {
@@ -284,8 +284,8 @@ type ResolveAll<T> = {
 function* any<T>(tasks: Iterable<T>): Runnable<ResolveAll<T>> {
   return yield (success, fail) => {
     let count = 0;
-    let errors: any[] = [];
-    let disposers: TeardownLogic[] = [];
+    const errors: any[] = [];
+    const disposers: TeardownLogic[] = [];
     let sync = true;
     let errorCount = 0;
     for (const task of tasks) {

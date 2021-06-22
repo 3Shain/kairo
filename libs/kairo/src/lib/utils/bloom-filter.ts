@@ -33,7 +33,7 @@ export class BloomFilter {
   add(item: string) {
     const locations = this.locations(item);
     for (let i = 0; i < this.numOfHash; i++) {
-      let num = locations[i];
+      const num = locations[i];
       this.buckets[num >> 5] |= 1 << (num & MASK);
     }
   }
@@ -41,7 +41,7 @@ export class BloomFilter {
   test(item: string) {
     const locations = this.locations(item);
     for (let i = 0; i < this.numOfHash; i++) {
-      let num = locations[i];
+      const num = locations[i];
       if ((this.buckets[num >> 5] & (1 << (num & MASK))) === 0) {
         return false;
       }
@@ -69,10 +69,10 @@ export class BloomFilter {
 // Nonstandard variation: this function optionally takes a seed value that is incorporated
 // into the offset basis. According to http://www.isthe.com/chongo/tech/comp/fnv/index.html
 // "almost any offset_basis will serve so long as it is non-zero".
-function fnv_1a(v: string, seed: number = 0) {
-  var a = 2166136261 ^ seed;
-  for (var i = 0, n = v.length; i < n; ++i) {
-    var c = v.charCodeAt(i),
+function fnv_1a(v: string, seed = 0) {
+  let a = 2166136261 ^ seed;
+  for (let i = 0, n = v.length; i < n; ++i) {
+    const c = v.charCodeAt(i),
       d = c & 0xff00;
     if (d) a = fnv_multiply(a ^ (d >> 8));
     a = fnv_multiply(a ^ (c & 0xff));

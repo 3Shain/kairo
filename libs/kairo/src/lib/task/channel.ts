@@ -14,7 +14,7 @@ function eventReaderBase<T>(
   until: EventStream<any>
 ): ReadableChannel<T> {
   let closed = false;
-  let bufferQueue: any[] = [];
+  const bufferQueue: any[] = [];
   let continuation: Function | null = null;
   const stopUntilListener = until.listen((next) => {
     if (!closed) {

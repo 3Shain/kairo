@@ -1,6 +1,8 @@
 {
   "version": "0.2.0",
   "configurations": [
+
+
     {
       "name": "Bench",
       "type": "node",
@@ -30,6 +32,28 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceRoot}/node_modules/.bin/nx",
       "args": ["test", "ng-lib", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (solid-lib)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "solid-lib", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (vue-lib)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "vue-lib", "--runInBand", "-i"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "trace": "all"
