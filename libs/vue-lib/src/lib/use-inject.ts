@@ -76,6 +76,7 @@ export function useInject(token: any, options: any): any {
   {
     const resolve = inject(token, options);
     if (typeof resolve !== 'object' || resolve === null) {
+      endScope();
       return resolve;
     }
     if (isCell(resolve)) {
@@ -85,6 +86,7 @@ export function useInject(token: any, options: any): any {
           tRef.value = updated;
         })
       );
+      endScope();
       return tRef;
     }
     for (const [key, value] of Object.entries(resolve)) {
