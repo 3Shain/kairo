@@ -13,12 +13,15 @@ import {
 import {
   Cell,
   ComputationalCell,
-  mutable,
+  isCell,
+  mutValue,
   Scope,
   __current_collecting,
 } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
+
+let $$READ_AS_PROP = false;
 
 /**
  * side effects
@@ -35,6 +38,9 @@ Object.defineProperty(Cell.prototype, 'value', {
   ) {
     if (__current_collecting()) {
       return originalGetter.call(this);
+    }
+    if ($$READ_AS_PROP) {
+      throw this;
     }
     if (getListener()) {
       if (!this.signal_ref) {
@@ -77,6 +83,9 @@ Object.defineProperty(ComputationalCell.prototype, 'value', {
     if (__current_collecting()) {
       return originalComputationGetter.call(this);
     }
+    if ($$READ_AS_PROP) {
+      throw this;
+    }
     if (getListener()) {
       if (!this.signal_ref) {
         this.signal_ref = new WeakMap();
@@ -104,7 +113,7 @@ Object.defineProperty(ComputationalCell.prototype, 'value', {
   },
 });
 
-function KairoApp(props: { globalSetup?: () => void; children: JSX.Element }) {
+function KairoApp(props: { globalSetup?: () => void; children?: JSX.Element }) {
   const scope = new Scope(null);
   {
     const endScope = scope.beginScope();
@@ -145,11 +154,19 @@ function withKairo<Props>(
         ...props,
       } as any,
       (thunk) => {
-        const [prop, setProp] = mutable(thunk(props));
-        createComputed(() => {
-          setProp(thunk(props));
-        });
-        return prop;
+        try {
+          $$READ_AS_PROP = true;
+          const [prop, setProp] = mutValue(thunk(props));
+          createComputed(() => {
+            setProp(thunk(props));
+          });
+          return prop;
+        } catch (e) {
+          if (isCell(e)) return e as Cell<any>;
+          else throw e;
+        } finally {
+          $$READ_AS_PROP = false;
+        }
       }
     );
     endScope();
