@@ -13,6 +13,6 @@ jobs:
         run: yarn install
       - uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib
+          projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib,preact-lib
           targets: test
           affected: true
