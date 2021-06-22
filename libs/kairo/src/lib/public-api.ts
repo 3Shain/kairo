@@ -23,6 +23,7 @@ export {
   Cell as Behavior,
   mutable,
   mutable as mut,
+  mutValue,
   constant,
   combined,
   computed,
@@ -41,3 +42,4 @@ export * from './read';
 export * from './schedule';
 export * from './complex-mutables';
 export * from './task';
+export * from './reference';

@@ -444,7 +444,7 @@ function propagate(data: Data): number {
     if (data.flags & Flag.Changed) {
       let observer = data.first_observer;
       while (observer !== null) {
-        let current = observer.observer;
+        const current = observer.observer;
         if (current.flags & Flag.Propagating) {
           current.flags |= Flag.ConflictLoop; // self referenced or circular referenced.
           observer = observer.next_observer;
@@ -476,7 +476,7 @@ function propagate(data: Data): number {
     } else {
       let observer = data.first_observer;
       while (observer !== null) {
-        let current = observer.observer;
+        const current = observer.observer;
         if (current.flags & Flag.Propagating) {
           current.flags |= Flag.NoConflictLoop; // self referenced or circular referenced.
           observer = observer.next_observer;
@@ -705,7 +705,7 @@ function executeLazy<T>(computation: Computation<T>, fn: (current: T) => T) {
   if (computation.flags & Flag.Stale) {
     estimateComputation(computation, fn);
   }
-  return (computation.value as any) as T;
+  return fn(computation.value!); // TODO: type not correct
 }
 
 function createData<T>(value: T): Data<T> {
@@ -862,7 +862,10 @@ export class Lazy<T> {
 
 export function mutable<T>(
   initialValue: T
-): [Cell<T>, (value: T | ((current: T) => T)) => void] {
+): [
+  Cell<T>,
+  (value: (T extends Function ? never : T) | ((current: T) => T)) => void
+] {
   const internal = createData(initialValue);
   return [
     new Cell(internal),
@@ -870,8 +873,23 @@ export function mutable<T>(
       if (v instanceof Function) {
         setData(internal, v(internal.value!), true);
       } else {
-        setData(internal, v, true);
+        setData(internal, v as any, true);
       }
+    },
+  ];
+}
+
+export function mutValue<T>(
+  initialValue: T
+): [
+  Cell<T>,
+  (value: T) => void
+] {
+  const internal = createData(initialValue);
+  return [
+    new Cell(internal),
+    (v) => {
+      setData(internal, v as any, true);
     },
   ];
 }
