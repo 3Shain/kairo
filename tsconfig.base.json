@@ -23,7 +23,8 @@
       "@kairo/react": ["libs/react-lib/src/index.ts"],
       "@kairo/vue": ["libs/vue-lib/src/index.ts"],
       "@kairo/solid": ["libs/solid-lib/src/index.ts"],
-      "@kairo/svelte": ["libs/svelte-lib/src/index.ts"]
+      "@kairo/svelte": ["libs/svelte-lib/src/index.ts"],
+      "@kairo/preact": ["libs/preact-lib/src/index.ts"]
     }
   },
   "include": ["**/*.d.ts"],

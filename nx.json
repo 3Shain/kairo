@@ -21,6 +21,7 @@
     "ng-lib": { "tags": [] },
     "react-app": { "tags": [] },
     "react-lib": { "tags": [] },
+    "preact-lib": { "tags": [] },
     "vue-lib": { "tags": [] },
     "solid-lib": { "tags": [] },
     "svelte-lib": { "tags": [] },

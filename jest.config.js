@@ -6,6 +6,7 @@ module.exports = {
     '<rootDir>/libs/react-lib',
     '<rootDir>/libs/vue-lib',
     '<rootDir>/libs/solid-lib',
-    '<rootDir>/libs/svelte-lib',
+    '<rootDir>/libs/svelte-lib',,
+    '<rootDir>/libs/preact-lib',
   ],
 };

@@ -439,6 +439,35 @@
           }
         }
       }
+    },
+    "preact-lib": {
+      "root": "libs/preact-lib",
+      "sourceRoot": "libs/preact-lib/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": ["kairo", "preact"],
+            "bundleName": "kairo-preact",
+            "copy": []
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": ["libs/preact-lib/**/*.{ts,tsx,js,jsx}"]
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/preact-lib"],
+          "options": {
+            "jestConfig": "libs/preact-lib/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
     }
   }
 }
