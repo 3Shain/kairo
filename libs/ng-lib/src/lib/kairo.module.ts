@@ -37,7 +37,6 @@ export class KairoModule {
   private detachHandler: () => void;
   constructor(private scopeRef: KairoScopeRefImpl) {
     this.detachHandler = this.scopeRef.scope.attach();
-    this.scopeRef.__initialize();
   }
 
   ngOnDestroy() {

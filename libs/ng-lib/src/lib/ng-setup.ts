@@ -1,5 +1,5 @@
 import { InjectFlags, Type, AbstractType, InjectionToken } from '@angular/core';
-import { Behavior, inject } from 'kairo';
+import { Behavior, inject, Reference } from 'kairo';
 import { NG_INJECTOR } from './tokens';
 
 export function ngSetup<Props, Model extends object>(
@@ -11,9 +11,13 @@ export function ngSetup<Props, Model extends object>(
   return (class {
     ngSetup = setup;
   } as unknown) as {
-    new (): ToModel<Model>;
+    new (): Pick<ToModel<Model>, ExcludeReference<Model>>;
   };
 }
+
+type ExcludeReference<T> = {
+  [P in keyof T]: T[P] extends Reference<any> ? never : P;
+}[keyof T];
 
 type ToModel<T> = {
   [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
