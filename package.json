@@ -87,7 +87,6 @@
     "@nrwl/eslint-plugin-nx": "11.3.1",
     "@nrwl/jest": "11.3.1",
     "@nrwl/linter": "11.3.1",
-    "@nrwl/react": "11.3.1",
     "@nrwl/tao": "11.3.1",
     "@nrwl/web": "11.3.1",
     "@nrwl/workspace": "11.3.1",
