@@ -1,4 +1,4 @@
-import { transaction, Cell, Scope, effect, mut, lazy } from 'kairo';
+import { transaction, Cell, Scope, effect, lazy, mutValue } from 'kairo';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 import { KairoContext } from './context';
@@ -68,7 +68,7 @@ export function withKairo<Props>(
       const propsSetter = [];
       $$CURRENT_HOOKS = [];
       const renderFn = setup(props, (selector) => {
-        const [beh, set] = mut(selector(props));
+        const [beh, set] = mutValue(selector(props));
         propsSetter.push((p: Props) => set(selector(p)));
         return beh;
       });
