@@ -1,9 +1,14 @@
 <template>
-  <!-- <div id="nav">
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </div> -->
-  <router-view />
 </template>
+<script lang="ts">
+import { setupKairo } from '@kairo/vue'
+import { defineComponent } from 'vue'
+
+export default defineComponent({
+    setup: setupKairo(()=>{
+        return {};
+    })
+})
+</script>
 
 <style></style>
