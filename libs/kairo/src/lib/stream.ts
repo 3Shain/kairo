@@ -1,3 +1,4 @@
+import { runInTransaction } from './cell';
 import { Cleanable, TeardownLogic } from './types';
 import { doCleanup } from './utils';
 
@@ -8,18 +9,17 @@ interface SubscriptionNode {
 }
 
 export class EventStream<T> {
-  constructor(
-    private onSubscribe: (next: (value: T) => void) => TeardownLogic
-  ) {}
+  constructor(private producer: (next: (value: T) => void) => Cleanable) {}
 
   *[Symbol.iterator]() {
     return (yield this) as T;
   }
 
-  private currentSubscription: TeardownLogic | null = null;
+  private disposeProducer: Cleanable | null = null;
 
   private head: SubscriptionNode | null = null;
   private tail: SubscriptionNode | null = null;
+  private propagating = false;
 
   private __internal_subscribe(handler: (value: T) => void) {
     const node: SubscriptionNode = {
@@ -31,7 +31,7 @@ export class EventStream<T> {
       this.head = node;
       this.tail = node;
       // activate
-      this.currentSubscription = this.onSubscribe((s) => this.next(s));
+      this.disposeProducer = this.producer((s) => this.next(s));
     } else {
       this.tail!.next = node;
       this.tail = node;
@@ -51,15 +51,20 @@ export class EventStream<T> {
       }
       if (!this.head) {
         // deactivate
-        this.currentSubscription!();
+        doCleanup(this.disposeProducer!);
       }
     };
     return subscription;
   }
 
   private next(value: T) {
+    if (this.propagating) {
+      console.error(`A loop occured.`); // TODO: detailed error message.
+      return;
+    }
+    this.propagating = true;
     let p = this.head;
-    const handlers = [] as Function[];
+    const handlers: Function[] = [];
     while (p !== null) {
       handlers.push(p.handler);
       p = p.next;
@@ -69,6 +74,7 @@ export class EventStream<T> {
     while (handlers.length) {
       handlers.pop()!(value);
     }
+    this.propagating = false;
   }
 
   listen(handler: (value: T) => Cleanable): TeardownLogic {
@@ -96,8 +102,13 @@ export class EventStream<T> {
   }
 
   static create<T>(): [EventStream<T>, (payload: T) => void] {
-    const stream = never<T>();
-    return [stream, (payload: T) => stream.next(payload)];
+    const stream = new EventStream<T>(() => {
+      return () => {};
+    });
+    return [
+      stream,
+      (payload: T) => runInTransaction(() => stream.next(payload)),
+    ];
   }
 }
 
@@ -106,9 +117,8 @@ export function stream<T = any>() {
 }
 
 export function never<T = never>() {
-  return new EventStream<T>(() => {
-    return () => {};
-  });
+  const [stream] = EventStream.create<T>();
+  return stream;
 }
 
 type ExtractEventStream<T> = {

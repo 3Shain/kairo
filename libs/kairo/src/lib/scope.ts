@@ -2,10 +2,10 @@ import { Cleanable } from './types';
 import { doCleanup } from './utils';
 import { BloomFilter } from './utils/bloom-filter';
 
-type SideEffect = () => Cleanable;
+type OnMountLogic = () => Cleanable;
 
 class Scope {
-  private sideEffects: SideEffect[] = [];
+  private onmountLogics: OnMountLogic[] = [];
   private injections: Map<object, any> = new Map();
   private injections_bloom: BloomFilter;
 
@@ -36,18 +36,17 @@ class Scope {
     throw new TypeError('Not inside a scope.');
   }
 
-  __internal_registerEffect(effect: SideEffect) {
+  registerOnMountLogic(logic: OnMountLogic) {
     if (this !== Scope.current) {
       throw new TypeError('Invalid opearation');
     }
-    this.sideEffects.push(effect);
+    this.onmountLogics.push(logic);
   }
 
-  __internal_registerProvider(arg0: any, arg1?: any): any {
-    // TODO
-    // if (this.sealed) {
-    //     throw Error('Sealed');
-    // }
+  registerProvider(arg0: any, arg1?: any): any {
+    if (this !== Scope.current) {
+      throw new TypeError('Invalid opearation');
+    }
     if (arg0 instanceof Token) {
       this.injections_bloom.add(arg0.name);
       this.injections.set(arg0, arg1);
@@ -76,7 +75,7 @@ class Scope {
     }
   }
 
-  __internal_inject(
+  inject(
     token: {
       name: string;
     },
@@ -111,7 +110,7 @@ class Scope {
       throw TypeError('Scope has been attached');
     }
     this.attached = true;
-    const cleanups = this.sideEffects.map((x) => x());
+    const cleanups = this.onmountLogics.map((x) => x());
     return () => {
       this.attached = false;
       cleanups.forEach(doCleanup);
@@ -119,8 +118,8 @@ class Scope {
   }
 }
 
-function effect(effectFn: SideEffect) {
-  Scope.current.__internal_registerEffect(effectFn);
+function mount(onmount: OnMountLogic) {
+  Scope.current.registerOnMountLogic(onmount);
 }
 
 class Token<T> {
@@ -164,7 +163,7 @@ function provide<T>(providers: Provider<T>): T;
 function provide<T>(factory: Factory<T>, args?: any[]): T;
 function provide<T>(provide: Token<T>, value: T): T;
 function provide<T>(arg0: any, arg1?: any): any {
-  return Scope.current.__internal_registerProvider(arg0, arg1);
+  return Scope.current.registerProvider(arg0, arg1);
 }
 
 function inject<T>(
@@ -195,7 +194,7 @@ function inject(
   },
   options?: any
 ): any {
-  return Scope.current.__internal_inject(token, options);
+  return Scope.current.inject(token, options);
 }
 
-export { inject, provide, effect, Token, Scope, Factory, Provider };
+export { inject, provide, mount, Token, Scope, Factory, Provider };

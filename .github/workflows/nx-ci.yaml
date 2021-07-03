@@ -16,3 +16,15 @@ jobs:
           projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib,preact-lib
           targets: test
           affected: true
+      - id: get-bench-result
+        run: |
+          body=$(npm run bench)
+          body="${body//'%'/'%25'}"
+          body="${body//$'\n'/'%0A'}"
+          body="${body//$'\r'/'%0D'}" 
+          echo ::set-output name=body::$body
+
+      - name: Report benchmark result
+        uses: peter-evans/commit-comment@v1
+        with:
+          body: ${{ steps.get-bench-result.outputs.body }}

@@ -1,6 +1,6 @@
 import {
   computed,
-  mutable as data,
+  mutValue as data,
   Scope,
   transaction,
 } from '../libs/kairo/src';
@@ -118,6 +118,7 @@ export const VueReactiveBridge: Bridge = {
       {
         lazy: false,
         scheduler: (x) => {
+          read(); // set _dirty to false, to make it sync.
           effect();
         },
       }
@@ -318,3 +319,33 @@ export const KairoStaticBridge: Bridge = {
     end();
   },
 };
+
+
+export function assert(exp: any, value: any) {
+  if (exp !== value) throw Error('Assertation failed');
+}
+
+export function callAtLeast(time: number = 1,allowMore:boolean = false) {
+  let count = 0;
+
+  return {
+    call: () => {
+      count++;
+      if (count > time&&!allowMore) console.log(`More call than expected. Expect ${time} got ${count}`);
+    },
+    assert: () => {
+      if (count < time) {
+        throw Error(`Not enough call. Expect ${time} got ${count}`);
+      }
+    },
+  };
+}
+
+export function busy() {
+  let a = 0;
+  for (let i = 0; i < 1_00; i++) {
+    a++;
+  }
+}
+
+export type Case = (bridge:Bridge)=>()=>any;

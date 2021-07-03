@@ -171,6 +171,12 @@ export function task<TaskFn extends (...args: any[]) => Runnable<any>>(
   } as (...params: Parameters<TaskFn>) => Task<GeneratorReturnType<TaskFn>>;
 }
 
+export function start<T>(runnable: Runnable<T>) {
+  return new CancellablePromise<T>((resolve, reject) => {
+    return executeRunnable(runnable, resolve, reject);
+  });
+}
+
 export function* delay(time: number): Runnable<void> {
   return (yield (resume) => {
     const id = setTimeout((s) => resume(s), time);

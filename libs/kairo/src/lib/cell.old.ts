@@ -37,6 +37,10 @@ const enum Flag {
   Suspensed = 0x400,
   Suspending = 0x800,
   Lazy = 0x1000,
+  Marking = 0x2000,
+  Propagating = 0x4000,
+  ConflictLoop = 0x8000,
+  NoConflictLoop = 0x10000,
 }
 
 class Suspend {
@@ -73,6 +77,21 @@ interface ObserverLinkNode<T> {
   observer: T;
 }
 
+interface RefLinkNode<T> {
+  head: RefLinkNode<T>;
+  next_ref: RefLinkNode<T> | null;
+  value: T;
+}
+
+function emptyHeadRefNode() {
+  return {
+    get head() {
+      return this;
+    },
+    next_ref: null,
+  } as RefLinkNode<undefined>;
+}
+
 interface Data<T = any> {
   flags: Flag;
   value: T | undefined;
@@ -87,6 +106,7 @@ interface Computation<T = any> extends Data<T> {
   first_source: SourceLinkNode<Data> | null;
   last_source: SourceLinkNode<Data> | null;
   collect: Function;
+  refNode: RefLinkNode<any>;
 }
 
 interface Suspense<T = any, F = undefined> extends Computation<T> {
@@ -121,56 +141,41 @@ function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
     return;
   }
   data.flags |= Flag.Changed;
-  addDirtyData(data);
+  dirtyDataQueue.push(data);
 }
 
+const dirtyDataQueue: Data[] = [];
 const effects: Function[] = [];
-let last: ObserverLinkNode<any> | null = null;
-let first: ObserverLinkNode<any> | null = null;
 
-function addDirtyData(data: Data) {
-  if (first === null) {
-    first = {
-      prev_observer: null,
-      next_observer: null,
-      observer: data,
-    };
-    last = first;
-  } else {
-    const tmp = last;
-    last!.next_observer = last = {
-      prev_observer: tmp,
-      next_observer: null,
-      observer: data,
-    };
-  }
-}
-
-function markObserversForCheck(data: {
+function markObserversForCheck(computation: {
   flags: Flag;
   last_observer: ObserverLinkNode<Computation> | null;
 }) {
-  const stack: Data[] = [];
-  let p = data.last_observer;
-  while (p !== null) {
-    stack.push(p.observer);
-    p = p.prev_observer;
-  }
-  while (stack.length) {
-    const node = stack.pop()!;
-    const observer = node;
+  computation.flags |= Flag.Marking;
+  let node = computation.last_observer;
+  while (node !== null) {
+    const observer = node.observer;
+    if (observer.flags & Flag.Marking) {
+      // skip circular observer.
+      node = node.prev_observer;
+      continue;
+    }
+    if (observer.flags & Flag.Propagating) {
+      // skip circular observer.
+      node = node.prev_observer;
+      continue;
+    }
     observer.depsCounter++;
     if (observer.flags & Flag.MarkForCheck) {
+      node = node.prev_observer;
       continue;
     }
     observer.flags |= Flag.MarkForCheck;
-    // traveled
-    let p = node.last_observer;
-    while (p !== null) {
-      stack.push(p.observer);
-      p = p.prev_observer;
-    }
+    markObserversForCheck(observer);
+    node = node.prev_observer;
   }
+  computation.flags &= ~Flag.Marking;
+  return;
 }
 
 function accessData(data: Data) {
@@ -194,15 +199,6 @@ function accessComputation<T>(data: Computation<T>): T | undefined {
   if (__DEV__ && data.flags & Flag.Lazy) {
     panic(4);
   }
-  if (data.flags & Flag.Estimating) {
-    // self referenced estimation.
-    return data.value; // prev_state
-  }
-  if (data.flags & Flag.MarkForCheck) {
-    // in propagation
-    // access a computation which depends on current collector
-    return data.value; // prev_state
-  }
   if (currentCollecting !== null) {
     if (currentCollecting.flags & Flag.DepsMaybeStable) {
       logMaybeStable(currentCollecting, data);
@@ -215,6 +211,16 @@ function accessComputation<T>(data: Computation<T>): T | undefined {
     ) {
       throw new Suspend(noop); //TODO: current cancel?
     }
+  }
+  if (data.flags & Flag.Estimating) {
+    // self referenced estimation.
+    data.flags |= Flag.Stale;
+    return data.value; // prev_state
+  }
+  if (data.flags & Flag.MarkForCheck) {
+    // in propagation
+    // access a computation which depends on current collector
+    return data.value; // prev_state
   }
   if (data.flags & Flag.Stale) {
     estimateComputation(data, data.collect);
@@ -233,9 +239,21 @@ function estimateComputation(comp: Computation, expr: Function) {
     throw Error('Only stale computation can be estimated.');
   }
   comp.flags |= Flag.Estimating;
-  comp.flags &= ~Flag.Stale;
-  const value = doComputation(comp, expr);
-  comp.value = value;
+  while (true) {
+    comp.flags &= ~Flag.Stale;
+    const value = doComputation(comp, expr);
+    if (comp.flags & Flag.Stale) {
+      if (comp.value === value) {
+        comp.flags &= ~Flag.Stale;
+        break;
+      } else {
+        comp.value = value;
+      }
+    } else {
+      comp.value = value;
+      break;
+    }
+  }
   comp.flags &= ~Flag.Estimating;
 }
 
@@ -251,6 +269,32 @@ function logMaybeStable(accessor: Computation, data: Data) {
   } else {
     accessor.checkNode = accessor.checkNode.next_source;
   }
+}
+
+function ref<T>(value: T | (() => T)) {
+  if (currentCollecting) {
+    const currentRef = currentCollecting.refNode.next_ref;
+    if (currentRef === null) {
+      const newNode = {
+        head: currentCollecting.refNode.head,
+        next_ref: null,
+        value: value instanceof Function ? value() : value,
+      } as RefLinkNode<T>;
+      currentCollecting.refNode = newNode;
+    } else {
+      currentCollecting.refNode = currentRef;
+    }
+    const node = currentCollecting.refNode;
+    return {
+      get current() {
+        return node.value;
+      },
+      set current(v: T) {
+        node.value = v;
+      },
+    };
+  }
+  throw Error('should only used inside computations.');
 }
 
 function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
@@ -307,6 +351,7 @@ function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
     }
   }
   computation.checkNode = null;
+  computation.refNode = computation.refNode.head;
   currentCollecting = stored;
 
   if (computation.flags & Flag.DepsNeverChange) {
@@ -362,6 +407,7 @@ function deepCleanup(computation: Computation) {
 }
 
 function propagate(data: Data): number {
+  data.flags |= Flag.Propagating;
   if (data.flags & Flag.MarkForCheck) {
     if (data.flags & Flag.Computation) {
       if (__TEST__ && (data as Computation).depsCounter !== 0) {
@@ -391,57 +437,98 @@ function propagate(data: Data): number {
   } else {
     panic(1); //should not happen
   }
-  let state: number = data.last_effect ? 0b000 : 0b111;
-  if (data.flags & Flag.Changed) {
-    let observer = data.first_observer;
-    while (observer !== null) {
-      const current = observer.observer;
-      if ((current.flags & Flag.MarkForCheck) === 0) {
+  let state: number;
+  while (true) {
+    state = data.last_effect ? 0b000 : 0b111;
+    // if changed
+    if (data.flags & Flag.Changed) {
+      let observer = data.first_observer;
+      while (observer !== null) {
+        const current = observer.observer;
+        if (current.flags & Flag.Propagating) {
+          current.flags |= Flag.ConflictLoop; // self referenced or circular referenced.
+          observer = observer.next_observer;
+          state &= 0b101;
+          continue;
+        }
+        if ((current.flags & Flag.MarkForCheck) === 0) {
+          // new observers might be added (and they don't need to be propagated.)
+          observer = observer.next_observer;
+          continue;
+        }
+        current.flags |= Flag.Stale; // bug: data can be stale, too.
+        current.depsCounter--;
+        if (current.depsCounter === 0) {
+          state &= propagate(current);
+        } else {
+          state &= 0b001;
+        }
         observer = observer.next_observer;
-        continue;
       }
-      current.flags |= Flag.Stale; // bug: data can be stale, too.
-      current.depsCounter--;
-      if (current.depsCounter === 0) {
-        state &= propagate(current);
-      } else {
-        state &= 0b001;
+      data.flags &= ~Flag.Changed;
+      if ((data.flags & Flag.ConflictLoop) === 0 && data.last_effect) {
+        let watcher: WatcherNode | null = data.last_effect;
+        while (watcher !== null) {
+          effects.push(watcher.fn);
+          watcher = watcher.prev;
+        }
       }
-      observer = observer.next_observer;
-    }
-    data.flags &= ~Flag.Changed;
-    if (data.last_effect) {
-      // todo?
-      let watcher: WatcherNode | null = data.last_effect;
-      while (watcher !== null) {
-        effects.push(watcher.fn);
-        watcher = watcher.prev;
-      }
-    }
-  } else {
-    let observer = data.first_observer;
-    while (observer !== null) {
-      const current = observer.observer;
-      if ((current.flags & Flag.MarkForCheck) === 0) {
+    } else {
+      let observer = data.first_observer;
+      while (observer !== null) {
+        const current = observer.observer;
+        if (current.flags & Flag.Propagating) {
+          current.flags |= Flag.NoConflictLoop; // self referenced or circular referenced.
+          observer = observer.next_observer;
+          state &= 0b101;
+          continue;
+        }
+        if ((current.flags & Flag.MarkForCheck) === 0) {
+          observer = observer.next_observer;
+          continue;
+        }
+        current.depsCounter--;
+        if (current.depsCounter === 0) {
+          state &= propagate(current);
+        } else {
+          state &= 0b001;
+        }
         observer = observer.next_observer;
-        continue;
       }
-      current.depsCounter--;
-      if (current.depsCounter === 0) {
-        state &= propagate(current);
+    }
+
+    if (data.flags & Flag.ConflictLoop) {
+      data.flags -= Flag.ConflictLoop;
+      if (data.flags & Flag.Lazy) {
+        panic(5);
       } else {
-        state &= 0b001;
+        const currentValue = doComputation(
+          data as Computation,
+          (data as Computation).collect
+        );
+        // compare value , if changed, mark as changed
+        if (currentValue !== data.value) {
+          data.value = currentValue;
+          data.flags |= Flag.Changed;
+        }
       }
-      observer = observer.next_observer;
+      markObserversForCheck(data);
+    } else {
+      break;
     }
   }
   if (data.flags & Flag.Computation) {
-    // if (!(data.last_observer || data.last_effect)) state = 0b111;
+    if (data.flags & Flag.NoConflictLoop) {
+      data.flags -= Flag.NoConflictLoop;
+      if (state === 0b101) state = 0b111; // pure cyclic
+    }
+    if (!(data.last_observer || data.last_effect)) state = 0b111;
     if (state === 0b111) {
       deepCleanup(data as Computation);
       data.flags |= Flag.Stale;
     }
   }
+  data.flags -= Flag.Propagating;
   return state;
 }
 
@@ -502,6 +589,25 @@ function runInTransaction<T>(fn: () => T) {
   const retValue = fn();
   inTransaction = false;
 
+  let last: ObserverLinkNode<any> | null = null;
+  let first: ObserverLinkNode<any> | null = null;
+  while (dirtyDataQueue.length) {
+    const previous = last;
+    last = {
+      prev_observer: previous,
+      next_observer: null,
+      // source_ref: null as any,
+      observer: dirtyDataQueue.pop(),
+      breakLoop: false,
+      walked: false,
+    } as ObserverLinkNode<any>;
+    if (previous) {
+      previous.next_observer = last;
+    } else {
+      first = last;
+    }
+  }
+
   const data = {
     flags: Flag.Changed | Flag.MarkForCheck,
     first_observer: first,
@@ -510,8 +616,6 @@ function runInTransaction<T>(fn: () => T) {
     value: undefined,
     depsCounter: 0,
   };
-  first = null;
-  last = null;
   markObserversForCheck(data);
   propagate(data);
 
@@ -586,6 +690,7 @@ function createLazy<T>(initial?: T) {
     last_source: null,
     collect: null as any,
     depsCounter: 0,
+    refNode: emptyHeadRefNode(),
   };
   if (initial !== undefined) {
     ret.value = initial;
@@ -633,6 +738,7 @@ function createComputation<T>(
     first_source: null,
     last_source: null,
     collect: fn,
+    refNode: emptyHeadRefNode(),
   };
   if (options) {
     if (options.static) {
@@ -658,6 +764,7 @@ function createSuspended<T, F>(fn: (current: T | F) => T, fallback: F) {
     first_source: null,
     last_source: null,
     collect: fn,
+    refNode: emptyHeadRefNode(),
     fallback,
     currentCancel: undefined,
   };
@@ -864,6 +971,7 @@ export {
   createLazy,
   executeLazy,
   createSuspended,
+  ref,
   Suspend,
   SuspendWithFallback,
 };

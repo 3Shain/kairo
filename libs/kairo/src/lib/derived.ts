@@ -1,10 +1,10 @@
 import { EventStream } from './stream';
-import { effect } from './scope';
+import { mount } from './scope';
 import { mutValue } from './cell';
 
 export function held<T>(stream: EventStream<T>, initial: T) {
   const [behavior, setBehavior] = mutValue(initial);
-  effect(() => stream.listen(setBehavior));
+  mount(() => stream.listen(setBehavior));
   return behavior;
 }
 
@@ -14,7 +14,7 @@ export function reduced<T, R>(
   initial: R
 ) {
   const [behavior, setBehavior] = mutValue(initial);
-  effect(() =>
+  mount(() =>
     stream.listen((next) => {
       setBehavior(reducer(behavior.value, next));
     })

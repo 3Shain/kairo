@@ -1,12 +1,14 @@
+const identity = <T>(x: T) => x;
+
 class Reference<T = any> {
   get bind(): any {
     return (x: any) => {
-      this._current = x;
+      this._current = this._setter(x);
     };
   }
 
   set bind(x: any) {
-    this._current = x;
+    this._current = this._setter(x);
   }
 
   get current(): T | null {
@@ -14,14 +16,26 @@ class Reference<T = any> {
   }
 
   set current(value: T | null) {
-    this._current = value;
+    this._current = this._setter(value);
   }
 
-  constructor(private _current: T | null = null) {}
+  constructor(private _current: T | null = null, private _setter: Function) {}
 }
 
-function reference<T>(initialValue?: T) {
-  return new Reference(initialValue);
+class DerivedReference<T> implements ReadonlyReference<T>{
+  constructor(private _getter:Function) {}
+
+  get current(){
+    return this._getter();
+  }
 }
 
-export { Reference, reference };
+interface ReadonlyReference<T> {
+  readonly current: T;
+}
+
+function reference<T>(initialValue?: T, setter: (s: any) => T = identity) {
+  return new Reference(initialValue, setter);
+}
+
+export { Reference, ReadonlyReference, reference };

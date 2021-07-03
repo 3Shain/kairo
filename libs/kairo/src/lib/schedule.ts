@@ -1,33 +1,10 @@
+import { mount } from './scope';
+import { EventStream, stream } from './stream';
 import { TeardownLogic } from './types';
-import { nextTick } from './utils/next-tick';
 
-interface Scheduler<T> {
-  (next: (payload: T) => void): (payload: T) => void | TeardownLogic;
+interface Scheduler<T, R = T> {
+  (next: (payload: R) => void): (payload: T) => void | TeardownLogic;
 }
-
-const asap: Scheduler<any> = (next) => {
-  return (payload) => {
-    nextTick(() => {
-      next(payload);
-    });
-  };
-};
-
-const asapInTransaction: Scheduler<any> = (next) => {
-  return (payload) => {
-    nextTick(() => {
-      next(payload);
-    });
-  };
-};
-
-const async: Scheduler<any> = (next) => {
-  return (payload) => {};
-};
-
-const asyncInTransaction: Scheduler<any> = (next) => {
-  return (payload) => {};
-};
 
 function debounce<T>(time: number): Scheduler<T> {
   let timeoutId: any = undefined; // number or NodeJS.Timeout
@@ -68,27 +45,26 @@ function throttle<T>(time: number): Scheduler<T> {
   };
 }
 
-const animation: Scheduler<any> = (next) => {
+const animation = <T>(next: (payload: T) => void) => {
   let rafId = 0;
 
-  return (payload) => {
-    if (rafId !== 0) {
-      cancelAnimationFrame(rafId);
-    }
+  return (payload: T) => {
+    // last rafId is auto disposed
     rafId = requestAnimationFrame(() => {
       next(payload);
       rafId = 0;
     });
+    return () => cancelAnimationFrame(rafId);
   };
 };
 
-export {
-  Scheduler,
-  async,
-  asap,
-  asyncInTransaction,
-  asapInTransaction,
-  debounce,
-  throttle,
-  animation,
-};
+function scheduled<T, R = T>(
+  source: EventStream<T>,
+  scheduler: Scheduler<T, R>
+) {
+  const [dest, emitDest] = stream<R>();
+  mount(() => source.listen(scheduler(emitDest)));
+  return dest;
+}
+
+export { scheduled, Scheduler, debounce, throttle, animation };
