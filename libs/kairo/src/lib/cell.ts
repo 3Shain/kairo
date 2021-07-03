@@ -339,6 +339,17 @@ function cleanupComputation(
     }
     if (obRef.observer !== computation) throw panic(200);
     obRef.observer = null;
+    // last source
+    const source = lastSource.source;
+    if (
+      source.flags & Flag.Computation &&
+      source.last_observer == null &&
+      source.last_effect == null
+    ) {
+      // TODO: estimate the worst case?
+      cleanupComputation(source as Computation, null);
+      source.flags |= Flag.Stale;
+    }
     computation.last_source = lastSource = lastSource.prev_source!; // actually it might be null, but if it's null then until must be null.
     if (lastSource) {
       lastSource.next_source = null;
@@ -349,15 +360,6 @@ function cleanupComputation(
         computation.flags |= Flag.DepsMaybeStable;
       }
     }
-  }
-}
-
-function deepCleanup(computation: Computation) {
-  cleanupComputation(computation, null);
-  let lastObserver = computation.last_observer;
-  while (lastObserver !== null) {
-    deepCleanup(lastObserver.observer);
-    lastObserver = computation.last_observer; // I bet it's changed.
   }
 }
 
@@ -436,9 +438,8 @@ function propagate(data: Data): number {
     }
   }
   if (data.flags & Flag.Computation) {
-    // if (!(data.last_observer || data.last_effect)) state = 0b111;
     if (state === 0b111) {
-      deepCleanup(data as Computation);
+      cleanupComputation(data as Computation, null);
       data.flags |= Flag.Stale;
     }
   }

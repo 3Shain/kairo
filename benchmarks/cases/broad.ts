@@ -4,14 +4,13 @@ export function broadPropagation(bridge: Bridge) {
   /** broad propagation */
   {
     let head = bridge.cell(0);
-    let current = head as ReadableCell<number>;
+    let last = head as ReadableCell<number>;
     for (let i = 0; i < 50; i++) {
-      current = bridge.computed(() => {
+      let current = bridge.computed(() => {
         return head.read() + i;
       });
-      let c = current;
       let current2 = bridge.computed(() => {
-        return c.read() + i;
+        return current.read() + 1;
       });
       bridge.watch(
         () => current2.read(),
@@ -19,6 +18,7 @@ export function broadPropagation(bridge: Bridge) {
           callCounter?.();
         }
       );
+      last = current2;
     }
 
     let callCounter: Function = null;
@@ -29,7 +29,7 @@ export function broadPropagation(bridge: Bridge) {
       callCounter = () => atleast.call();
       for (let i = 0; i < 50; i++) {
         head.write(i);
-        assert(current.read(), i + 49);
+        assert(last.read(), i  + 50);
       }
       callCounter = null;
       atleast.assert();

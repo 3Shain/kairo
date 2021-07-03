@@ -64,9 +64,9 @@ function doTest(test: Case) {
 
 doTest(deepPropagation);
 doTest(broadPropagation);
-// doTest(diamond);
-// doTest(triangle);
-// doTest(mux);
-// doTest(repeatedObservers);
-// doTest(unstable);
-// doTest(avoidablePropagation);
+doTest(diamond);
+doTest(triangle);
+doTest(mux);
+doTest(repeatedObservers);
+doTest(unstable);
+doTest(avoidablePropagation);

@@ -92,7 +92,6 @@ describe('cell', () => {
     const stopWatch = c.watch(noop);
 
     setA(-1);
-    setA(-2); // eventually cleanup?
 
     expect(hasFlag(b, Flag.Stale)).toBeTruthy();
     expect(numOfSourceNodes(b)).toBe(0);
@@ -124,7 +123,6 @@ describe('cell', () => {
     const stopWatch = c.watch(noop);
 
     setA(-1);
-    setA(-2); // eventually cleanup?
 
     expect(hasFlag(b1, Flag.Stale)).toBeTruthy();
     expect(hasFlag(c, Flag.DepsUnstable)).toBeTruthy();
@@ -134,7 +132,6 @@ describe('cell', () => {
     expect(numOfSourceNodes(c)).toBe(2);
 
     setA(1);
-    setA(2); // eventually cleanup?
 
     expect(hasFlag(b1, Flag.Stale)).toBeFalsy();
     expect(numOfSourceNodes(b1)).toBe(1);
