@@ -17,6 +17,7 @@ import {
   VueReactiveBridge,
   SolidBridge,
   Case,
+  VueScheduledBridge,
 } from './common';
 
 declare global {
@@ -44,6 +45,7 @@ function doTest(test: Case) {
 
   addBridge('solid', SolidBridge);
   addBridge('vue', VueReactiveBridge);
+  addBridge('vue (scheduled)', VueScheduledBridge as Bridge);
   addBridge('mobx', MobxBridge);
   addBridge('kairo', KairoBridge);
   addBridge('S.js', SBridge);

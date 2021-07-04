@@ -4,7 +4,12 @@ import {
   Scope,
   transaction,
 } from '../libs/kairo/src';
-import { ref, computed as vComputed, effect as vEffect } from '@vue/reactivity';
+import {
+  ref,
+  computed as vComputed,
+  effect as vEffect,
+  ReactiveEffect,
+} from '@vue/reactivity';
 import S from 's-js';
 
 import {
@@ -129,6 +134,65 @@ export const VueReactiveBridge: Bridge = {
   },
   root: (fn) => {
     // S.root(fn)
+    fn(); // no such way
+  },
+};
+
+export const VueScheduledBridge = {
+  cell: (initial) => {
+    const data = ref(initial);
+    return {
+      read() {
+        return data.value as any;
+      },
+      write(v) {
+        VueScheduledBridge.batch(() => {
+          data.value = v as any;
+        });
+      },
+    };
+  },
+  computed: (fn) => {
+    const c = vComputed(fn);
+    return {
+      read() {
+        return c.value;
+      },
+    };
+  },
+  watch: function (read, effect) {
+    let init = false;
+    return vEffect(
+      () => {
+        read();
+        if (!init) {
+          init = true;
+          return;
+        }
+        effect();
+      },
+      {
+        lazy: false,
+        scheduler: (x) => {
+          this.scheduled.push(x);
+        },
+      }
+    );
+  },
+  scheduled: [] as ReactiveEffect[],
+  isBatching: false,
+  batch: function (fn) {
+    if (this.isBatching) {
+      fn();
+    }
+    this.isBatching = true;
+    fn();
+    while (this.scheduled.length) {
+      this.scheduled.pop()!();
+    }
+    this.isBatching = false;
+  },
+  root: (fn) => {
     fn(); // no such way
   },
 };
@@ -320,18 +384,18 @@ export const KairoStaticBridge: Bridge = {
   },
 };
 
-
 export function assert(exp: any, value: any) {
   if (exp !== value) throw Error('Assertation failed');
 }
 
-export function callAtLeast(time: number = 1,allowMore:boolean = false) {
+export function callAtLeast(time: number = 1, allowMore: boolean = false) {
   let count = 0;
 
   return {
     call: () => {
       count++;
-      if (count > time&&!allowMore) console.log(`More call than expected. Expect ${time} got ${count}`);
+      if (count > time && !allowMore)
+        console.log(`More call than expected. Expect ${time} got ${count}`);
     },
     assert: () => {
       if (count < time) {
@@ -348,4 +412,4 @@ export function busy() {
   }
 }
 
-export type Case = (bridge:Bridge)=>()=>any;
+export type Case = (bridge: Bridge) => () => any;
