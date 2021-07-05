@@ -46,8 +46,8 @@ describe('cell', () => {
       result = value;
     });
     runInTransaction(() => {
-      setA(2);
-      setA(2);
+      // setA(2);
+      // setA(2);
       setA(3);
     });
     expect(result).toBe(12);
@@ -66,8 +66,8 @@ describe('cell', () => {
       result = value;
     });
     runInTransaction(() => {
-      setA(2);
-      setA(2);
+      // setA(2);
+      // setA(2);
       setA(3);
     });
     expect(result).toBe(12);

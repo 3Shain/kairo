@@ -37,6 +37,7 @@ const enum Flag {
   Suspensed = 0x400,
   Suspending = 0x800,
   Lazy = 0x1000,
+  Propagating = 0x2000,
 }
 
 class Suspend {
@@ -116,10 +117,11 @@ function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
   if (equalCheck && data.value === value) {
     return;
   }
-  data.value = value;
   if (data.flags & Flag.Changed) {
+    console.error(`You can't set a Cell twice in a transaction.`);
     return;
   }
+  data.value = value;
   data.flags |= Flag.Changed;
   addDirtyData(data);
 }
@@ -146,29 +148,20 @@ function addDirtyData(data: Data) {
   }
 }
 
-function markObserversForCheck(data: {
-  flags: Flag;
-  last_observer: ObserverLinkNode<Computation> | null;
-}) {
-  const stack: Data[] = [];
-  let p = data.last_observer;
-  while (p !== null) {
-    stack.push(p.observer);
-    p = p.prev_observer;
-  }
+function markObserversForCheck(data: Data) {
+  const stack: Data[] = [data];
   while (stack.length) {
     const node = stack.pop()!;
-    const observer = node;
-    observer.depsCounter++;
-    if (observer.flags & Flag.MarkForCheck) {
-      continue;
-    }
-    observer.flags |= Flag.MarkForCheck;
-    // traveled
     let p = node.last_observer;
     while (p !== null) {
-      stack.push(p.observer);
-      p = p.prev_observer;
+      const observer = p.observer;
+      p = p.prev_observer; // go_next
+      observer.depsCounter++;
+      if (observer.flags & Flag.MarkForCheck) {
+        continue;
+      }
+      observer.flags |= Flag.MarkForCheck;
+      stack.push(observer);
     }
   }
 }
@@ -363,87 +356,90 @@ function cleanupComputation(
   }
 }
 
-function propagate(data: Data): number {
-  if (data.flags & Flag.MarkForCheck) {
-    if (data.flags & Flag.Computation) {
-      if (__TEST__ && (data as Computation).depsCounter !== 0) {
-        panic(2); //should not happen
-      }
-      if (data.flags & Flag.Stale) {
-        if (data.flags & Flag.Lazy) {
-          // lazy comp will keep stale? until re-estimated.
-          data.flags |= Flag.Changed;
-        } else {
-          const currentValue = doComputation(
-            data as Computation,
-            (data as Computation).collect
-          );
-          // compare value , if changed, mark as changed
-          if (currentValue !== data.value) {
-            data.value = currentValue;
-            data.flags |= Flag.Changed;
-          }
-          data.flags &= ~Flag.Stale;
+function propagate(origin: Data): void {
+  const stack: Data[] = [origin];
+  while (stack.length) {
+    const data = stack[stack.length - 1];
+    if (data.flags & Flag.Propagating) {
+      stack.pop();
+      data.flags -= Flag.Propagating;
+      // do cleanup
+      if (data.flags & Flag.Computation) {
+        if (
+          data.last_observer === null /* unlikely */ &&
+          data.last_effect === null
+        ) {
+          cleanupComputation(data as Computation, null);
+          data.flags |= Flag.Stale;
         }
       }
-    } else {
-      data.flags &= ~Flag.Stale; //data can be stale
+      continue;
     }
-    data.flags &= ~Flag.MarkForCheck;
-  } else {
-    panic(1); //should not happen
-  }
-  let state: number = data.last_effect ? 0b000 : 0b111;
-  if (data.flags & Flag.Changed) {
-    let observer = data.first_observer;
-    while (observer !== null) {
-      const current = observer.observer;
-      if ((current.flags & Flag.MarkForCheck) === 0) {
-        observer = observer.next_observer;
-        continue;
-      }
-      current.flags |= Flag.Stale; // bug: data can be stale, too.
-      current.depsCounter--;
-      if (current.depsCounter === 0) {
-        state &= propagate(current);
+    data.flags |= Flag.Propagating;
+    if (data.flags & Flag.MarkForCheck) {
+      if (data.flags & Flag.Computation) {
+        if (__TEST__ && (data as Computation).depsCounter !== 0) {
+          panic(2); //should not happen
+        }
+        if (data.flags & Flag.Stale) {
+          if (data.flags & Flag.Lazy) {
+            // lazy comp will keep stale? until re-estimated.
+            data.flags |= Flag.Changed;
+          } else {
+            const currentValue = doComputation(
+              data as Computation,
+              (data as Computation).collect
+            );
+            // compare value , if changed, mark as changed
+            if (currentValue !== data.value) {
+              data.value = currentValue;
+              data.flags |= Flag.Changed;
+            }
+            data.flags &= ~Flag.Stale;
+          }
+        }
       } else {
-        state &= 0b001;
+        data.flags &= ~Flag.Stale; //data can be stale
       }
-      observer = observer.next_observer;
+      data.flags &= ~Flag.MarkForCheck;
+    } else {
+      panic(1); // should not happen
     }
-    data.flags &= ~Flag.Changed;
-    if (data.last_effect) {
-      // todo?
-      let watcher: WatcherNode | null = data.last_effect;
+    if (data.flags & Flag.Changed) {
+      let observer = data.last_observer;
+      while (observer !== null) {
+        const current = observer.observer;
+        observer = observer.prev_observer;
+        if ((current.flags & Flag.MarkForCheck) === 0) {
+          continue;
+        }
+        current.flags |= Flag.Stale; // bug: data can be stale, too.
+        current.depsCounter--;
+        if (current.depsCounter === 0) {
+          stack.push(current);
+        }
+      }
+      data.flags &= ~Flag.Changed;
+      let watcher = data.last_effect;
       while (watcher !== null) {
         effects.push(watcher.fn);
         watcher = watcher.prev;
       }
-    }
-  } else {
-    let observer = data.first_observer;
-    while (observer !== null) {
-      const current = observer.observer;
-      if ((current.flags & Flag.MarkForCheck) === 0) {
-        observer = observer.next_observer;
-        continue;
+    } else {
+      let observer = data.last_observer;
+      while (observer !== null) {
+        const current = observer.observer;
+        observer = observer.prev_observer;
+        if ((current.flags & Flag.MarkForCheck) === 0) {
+          continue;
+        }
+        current.depsCounter--;
+        if (current.depsCounter === 0) {
+          stack.push(current);
+        }
       }
-      current.depsCounter--;
-      if (current.depsCounter === 0) {
-        state &= propagate(current);
-      } else {
-        state &= 0b001;
-      }
-      observer = observer.next_observer;
     }
   }
-  if (data.flags & Flag.Computation) {
-    if (state === 0b111) {
-      cleanupComputation(data as Computation, null);
-      data.flags |= Flag.Stale;
-    }
-  }
-  return state;
 }
 
 function watch(data: Data, sideEffect: Function) {
@@ -698,6 +694,7 @@ export class Cell<T> {
   ): TeardownLogic {
     let lastDisposer: Cleanable = undefined;
     const watcher = watch(this.internal, () => {
+      doCleanup(lastDisposer);
       lastDisposer = watchFn(this.internal.value!);
     });
     if (options?.immediate) {
@@ -748,13 +745,22 @@ export class Lazy<T> {
     return executeLazy<T>(this.internal, expr);
   }
 
-  watch(watchFn: (value: T) => Cleanable): TeardownLogic {
+  watch(
+    watchFn: (value: T) => Cleanable,
+    options?: WatchOptions
+  ): TeardownLogic {
     let lastDisposer: Cleanable = undefined;
     const watcher = watch(this.internal, () => {
       doCleanup(lastDisposer);
       lastDisposer = watchFn(this.internal.value!);
     });
-    return () => disposeWatcher(watcher!);
+    if (options?.immediate) {
+      lastDisposer = watchFn(this.internal.value!);
+    }
+    return () => {
+      doCleanup(lastDisposer);
+      disposeWatcher(watcher!);
+    };
   }
 }
 
