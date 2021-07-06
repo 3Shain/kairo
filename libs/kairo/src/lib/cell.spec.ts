@@ -54,30 +54,6 @@ describe('cell', () => {
     stopWatch();
   });
 
-  it('should establish a reactive relation (static)', () => {
-    const [a, setA] = mutable(0);
-    const b = computed(() => a.value * 2, { static: true });
-    const c = computed(() => b.value * 2, { static: true });
-    expect(c.value).toBe(0);
-    setA(1);
-    expect(c.value).toBe(4);
-    let result = 0;
-    const stopWatch = c.watch((value) => {
-      result = value;
-    });
-    runInTransaction(() => {
-      // setA(2);
-      // setA(2);
-      setA(3);
-    });
-    expect(result).toBe(12);
-    stopWatch();
-
-    expect(numOfObserverNodes(a)).toBe(1);
-    setA(0);
-    expect(numOfObserverNodes(a)).toBe(0);
-  });
-
   // it('should establish a reactive relation', () => {});
 
   it('unused computation should be cleaned up', () => {
@@ -125,7 +101,7 @@ describe('cell', () => {
     setA(-1);
 
     expect(hasFlag(b1, Flag.Stale)).toBeTruthy();
-    expect(hasFlag(c, Flag.DepsUnstable)).toBeTruthy();
+    // expect(hasFlag(c, Flag.DepsUnstable)).toBeTruthy();
     expect(numOfSourceNodes(b1)).toBe(0);
     expect(numOfObserverNodes(b1)).toBe(0);
     expect(numOfObserverNodes(a)).toBe(2);

@@ -21,23 +21,16 @@ const enum Flag {
    */
   Estimating = 0x10,
   /**
-   * sources are dynamically collected.
-   * exclusive
-   */
-  DepsUnstable = 0x20,
-  DepsNeverChange = 0x40,
-  DepsMaybeStable = 0x80,
-  /**
    * current value is changed (so need to propagate)
    */
-  Changed = 0x100,
+  Changed = 0x20,
   /**
    * dynamic is true when this is true
    */
-  Suspensed = 0x400,
-  Suspending = 0x800,
-  Lazy = 0x1000,
-  Propagating = 0x2000,
+  Suspensed = 0x40,
+  Suspending = 0x80,
+  Lazy = 0x100,
+  Propagating = 0x200,
 }
 
 class Suspend {
@@ -85,6 +78,7 @@ interface Data<T = any> {
 
 interface Computation<T = any> extends Data<T> {
   checkNode: SourceLinkNode<Data> | null;
+  cleanNode: SourceLinkNode<Data> | null;
   first_source: SourceLinkNode<Data> | null;
   last_source: SourceLinkNode<Data> | null;
   collect: Function;
@@ -150,7 +144,7 @@ function addDirtyData(data: Data) {
 
 function markObserversForCheck(data: Data) {
   const stack: Data[] = [data];
-  while (stack.length) {
+  while (stack.length > 0) {
     const node = stack.pop()!;
     let p = node.last_observer;
     while (p !== null) {
@@ -168,11 +162,7 @@ function markObserversForCheck(data: Data) {
 
 function accessData(data: Data) {
   if (currentCollecting !== null) {
-    if (currentCollecting.flags & Flag.DepsUnstable) {
-      insertNewSource(currentCollecting, data);
-    } else if (currentCollecting.flags & Flag.DepsMaybeStable) {
-      logMaybeStable(currentCollecting, data);
-    }
+    logRead(currentCollecting, data);
     if (
       currentCollecting.flags & Flag.Suspensed && // data can be suspensed?
       data.flags & Flag.Suspending
@@ -191,17 +181,8 @@ function accessComputation<T>(data: Computation<T>): T | undefined {
     // self referenced estimation.
     return data.value; // prev_state
   }
-  if (data.flags & Flag.MarkForCheck) {
-    // in propagation
-    // access a computation which depends on current collector
-    return data.value; // prev_state
-  }
   if (currentCollecting !== null) {
-    if (currentCollecting.flags & Flag.DepsMaybeStable) {
-      logMaybeStable(currentCollecting, data);
-    } else if (currentCollecting.flags & Flag.DepsUnstable) {
-      insertNewSource(currentCollecting, data);
-    }
+    logRead(currentCollecting, data);
     if (
       currentCollecting.flags & Flag.Suspensed &&
       data.flags & Flag.Suspending
@@ -232,14 +213,20 @@ function estimateComputation(comp: Computation, expr: Function) {
   comp.flags &= ~Flag.Estimating;
 }
 
-function logMaybeStable(accessor: Computation, data: Data) {
+function logRead(accessor: Computation, data: Data) {
   if (accessor.checkNode === null) {
     insertNewSource(accessor, data);
   } else if (accessor.checkNode.source !== data) {
-    // it is unstable!
-    accessor.flags &= ~Flag.DepsMaybeStable;
-    accessor.flags |= Flag.DepsUnstable;
-    cleanupComputation(accessor, accessor.checkNode.prev_source);
+    // TODO: refactor
+    const checkEnd = accessor.last_source;
+    accessor.last_source = accessor.checkNode.prev_source;
+    accessor.last_source!.next_source = null; // new last_source
+    const checkStart = accessor.checkNode;
+    checkStart.prev_source = null;
+
+    accessor.cleanNode = checkEnd;
+
+    accessor.checkNode = null;
     insertNewSource(accessor, data);
   } else {
     accessor.checkNode = accessor.checkNode.next_source;
@@ -255,10 +242,6 @@ function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
 }
 
 function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
-  if (computation.flags & Flag.DepsUnstable) {
-    cleanupComputation(computation, null);
-  }
-
   const stored = currentCollecting;
   currentCollecting = computation;
   computation.checkNode = computation.first_source;
@@ -291,33 +274,43 @@ function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
     }
   }
 
-  if (computation.flags & Flag.DepsMaybeStable) {
-    // check the real used deps is lesser than assumed.
-    if (computation.checkNode !== null) {
-      // collected source num is less than expected
-      // but it's fine as we remove the extra sources.
-      cleanupComputation(computation, computation.checkNode.prev_source);
+  if (computation.checkNode !== null) {
+    // collected source num is less than expected
+    // but it's fine as we remove the extra sources.
+    cleanupSources(
+      computation.last_source,
+      computation.checkNode.prev_source
+    );
+    computation.last_source = computation.checkNode.prev_source;
+    if (computation.last_source) {
+      computation.last_source.next_source = null;
+    } else {
+      computation.first_source = null;
+      // has no source.
     }
+    computation.checkNode = null;
   }
-  computation.checkNode = null;
+  if (computation.cleanNode) {
+    // these nodes are detached from observer.
+    cleanupSources(computation.cleanNode, null);
+    computation.cleanNode = null;
+  }
   currentCollecting = stored;
-
-  if (computation.flags & Flag.DepsNeverChange) {
-    computation.flags &= ~Flag.DepsMaybeStable; // idempotent action
-  }
   return currentValue;
 }
 
-/**
- * Clean up a computation.
- * @param computation
- * @param until The last source node not cleaned up. If null, all source nodes are cleaned up.
- */
-function cleanupComputation(
-  computation: Computation,
-  until: SourceLinkNode<any> | null
+function cleanupComputation(computation: Computation) {
+  cleanupSources(computation.last_source, null);
+  computation.first_source = null;
+  computation.last_source = null;
+  computation.flags |= Flag.Stale;
+}
+
+function cleanupSources(
+  from: SourceLinkNode<Data> | null,
+  until: SourceLinkNode<Data> | null
 ) {
-  let lastSource = computation.last_source!;
+  let lastSource = from!;
   while (lastSource !== until) {
     const obRef = lastSource.observer_ref;
     if (obRef.next_observer) {
@@ -330,7 +323,7 @@ function cleanupComputation(
     } else {
       lastSource.source.first_observer = obRef.next_observer;
     }
-    if (obRef.observer !== computation) throw panic(200);
+    // if (obRef.observer !== computation) throw panic(200);
     obRef.observer = null;
     // last source
     const source = lastSource.source;
@@ -339,26 +332,18 @@ function cleanupComputation(
       source.last_observer == null &&
       source.last_effect == null
     ) {
-      // TODO: estimate the worst case?
-      cleanupComputation(source as Computation, null);
-      source.flags |= Flag.Stale;
+      cleanupComputation(source as Computation);
     }
-    computation.last_source = lastSource = lastSource.prev_source!; // actually it might be null, but if it's null then until must be null.
+    lastSource = lastSource.prev_source!;
     if (lastSource) {
       lastSource.next_source = null;
-    } else {
-      // full clean
-      computation.first_source = null;
-      if (computation.flags & Flag.DepsNeverChange) {
-        computation.flags |= Flag.DepsMaybeStable;
-      }
     }
   }
 }
 
 function propagate(origin: Data): void {
   const stack: Data[] = [origin];
-  while (stack.length) {
+  while (stack.length > 0) {
     const data = stack[stack.length - 1];
     if (data.flags & Flag.Propagating) {
       stack.pop();
@@ -369,8 +354,7 @@ function propagate(origin: Data): void {
           data.last_observer === null /* unlikely */ &&
           data.last_effect === null
         ) {
-          cleanupComputation(data as Computation, null);
-          data.flags |= Flag.Stale;
+          cleanupComputation(data as Computation);
         }
       }
       continue;
@@ -405,8 +389,8 @@ function propagate(origin: Data): void {
     } else {
       panic(1); // should not happen
     }
+    let observer = data.last_observer;
     if (data.flags & Flag.Changed) {
-      let observer = data.last_observer;
       while (observer !== null) {
         const current = observer.observer;
         observer = observer.prev_observer;
@@ -426,7 +410,6 @@ function propagate(origin: Data): void {
         watcher = watcher.prev;
       }
     } else {
-      let observer = data.last_observer;
       while (observer !== null) {
         const current = observer.observer;
         observer = observer.prev_observer;
@@ -512,7 +495,7 @@ function runInTransaction<T>(fn: () => T) {
   markObserversForCheck(data);
   propagate(data);
 
-  while (effects.length) {
+  while (effects.length > 0) {
     effects.pop()!();
   }
 
@@ -527,7 +510,7 @@ function insertNewSource(accessing: Computation, source: Data): void {
       next_source: null,
       observer_ref: null as any,
     };
-    node.observer_ref = insertNewObserver(source, accessing, node);
+    node.observer_ref = insertNewObserver(source, accessing);
     accessing.last_source.next_source = node;
     accessing.last_source = node;
   } else {
@@ -535,9 +518,8 @@ function insertNewSource(accessing: Computation, source: Data): void {
       source: source,
       prev_source: null,
       next_source: null,
-      observer_ref: null as any,
+      observer_ref: insertNewObserver(source, accessing),
     };
-    node.observer_ref = insertNewObserver(source, accessing, node);
     accessing.first_source = node; // if last is null, first is definitely null.
     accessing.last_source = node;
   }
@@ -545,15 +527,13 @@ function insertNewSource(accessing: Computation, source: Data): void {
 
 function insertNewObserver(
   accesed: Data,
-  observer: Computation,
-  reference: SourceLinkNode<any>
+  observer: Computation
 ): ObserverLinkNode<any> {
   if (accesed.last_observer !== null) {
     const node: ObserverLinkNode<Computation> = {
       observer: observer,
       prev_observer: accesed.last_observer,
       next_observer: null,
-      // source_ref: reference,
     };
     accesed.last_observer.next_observer = node;
     accesed.last_observer = node;
@@ -563,7 +543,6 @@ function insertNewObserver(
       observer: observer,
       prev_observer: null,
       next_observer: null,
-      // source_ref: reference,
     };
     accesed.first_observer = node; // if last is null, first is definitely null.
     accesed.last_observer = node;
@@ -573,12 +552,13 @@ function insertNewObserver(
 
 function createLazy<T>(initial?: T) {
   const ret: Computation<T> = {
-    flags: Flag.Computation | Flag.Lazy | Flag.DepsMaybeStable | Flag.Stale,
+    flags: Flag.Computation | Flag.Lazy | Flag.Stale,
     last_effect: null,
     first_observer: null,
     last_observer: null,
     value: (undefined as any) as T,
     checkNode: null,
+    cleanNode: null,
     first_source: null,
     last_source: null,
     collect: null as any,
@@ -620,20 +600,21 @@ function createComputation<T>(
   }
 ) {
   const ret: Computation<T> = {
-    flags: Flag.Computation | Flag.DepsMaybeStable | Flag.Stale,
+    flags: Flag.Computation | Flag.Stale,
     last_effect: null,
     first_observer: null,
     last_observer: null,
     depsCounter: 0,
     value: undefined,
     checkNode: null,
+    cleanNode: null,
     first_source: null,
     last_source: null,
     collect: fn,
   };
   if (options) {
     if (options.static) {
-      ret.flags |= Flag.DepsNeverChange;
+      // ret.flags |= Flag.DepsNeverChange;
     }
     if (options.initial !== undefined) {
       ret.value = options.initial;
@@ -644,14 +625,14 @@ function createComputation<T>(
 
 function createSuspended<T, F>(fn: (current: T | F) => T, fallback: F) {
   const ret: Suspense<T, F> = {
-    flags:
-      Flag.Computation | Flag.Suspensed | Flag.DepsMaybeStable | Flag.Stale,
+    flags: Flag.Computation | Flag.Suspensed | Flag.Stale,
     last_effect: null,
     first_observer: null,
     last_observer: null,
     depsCounter: 0,
     value: undefined,
     checkNode: null,
+    cleanNode: null,
     first_source: null,
     last_source: null,
     collect: fn,
@@ -867,7 +848,6 @@ export {
   createData,
   createComputation,
   untrack,
-  cleanupComputation,
   createLazy,
   executeLazy,
   createSuspended,
