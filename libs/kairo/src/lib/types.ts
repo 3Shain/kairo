@@ -1,5 +1,3 @@
-import { Cell } from './cell';
-
 export type Action<T> = (payload: T) => void;
 
 export interface Disposable {
@@ -20,8 +18,6 @@ export type Cleanable =
       unsubscribe(): void;
     }
   | void;
-
-export type MaybeBehavior<T> = T extends Cell<infer C> ? C : T;
 
 export const Symbol_observable = (() =>
   (typeof Symbol === 'function' && Symbol.observable) || '@@observable')();

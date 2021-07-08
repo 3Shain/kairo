@@ -1,5 +1,4 @@
-import { Cleanable, Symbol_observable, TeardownLogic } from './types';
-import { doCleanup, noop, panic } from './utils';
+import { noop, panic } from '../utils';
 
 const enum Flag {
   /**
@@ -13,17 +12,17 @@ const enum Flag {
    */
   Stale = 0x4,
   /**
+   * current value is changed (so need to propagate)
+   */
+  Changed = 0x8,
+  /**
    * (computation) current value maybe stale
    */
-  MarkForCheck = 0x8,
+  MarkForCheck = 0x20,
   /**
    *
    */
   Estimating = 0x10,
-  /**
-   * current value is changed (so need to propagate)
-   */
-  Changed = 0x20,
   /**
    * dynamic is true when this is true
    */
@@ -46,54 +45,46 @@ class SuspendWithFallback extends Suspend {
   }
 }
 
-interface WatcherNode {
+interface WatcherLinkedNode {
   fn: Function;
-  prev: WatcherNode | null;
-  next: WatcherNode | null;
+  prev: WatcherLinkedNode | null;
+  next: WatcherLinkedNode | null;
   disposed: boolean;
   data: Data;
 }
 
-interface SourceLinkNode<T> {
-  prev_source: SourceLinkNode<T> | null;
-  next_source: SourceLinkNode<T> | null;
+interface SourceLinkedNode<T> {
+  prev_source: SourceLinkedNode<T> | null;
+  next_source: SourceLinkedNode<T> | null;
   source: T;
-  observer_ref: ObserverLinkNode<any>;
+  observer_ref: ObserverLinkedNode<any>;
 }
 
-interface ObserverLinkNode<T> {
-  prev_observer: ObserverLinkNode<T> | null;
-  next_observer: ObserverLinkNode<T> | null;
+interface ObserverLinkedNode<T> {
+  prev_observer: ObserverLinkedNode<T> | null;
+  next_observer: ObserverLinkedNode<T> | null;
   observer: T;
 }
 
 interface Data<T = any> {
   flags: Flag;
   value: T | undefined;
-  last_effect: WatcherNode | null;
-  first_observer: ObserverLinkNode<Computation> | null;
-  last_observer: ObserverLinkNode<Computation> | null;
+  last_effect: WatcherLinkedNode | null;
+  last_observer: ObserverLinkedNode<Computation> | null;
   depsCounter: number;
 }
 
 interface Computation<T = any> extends Data<T> {
-  checkNode: SourceLinkNode<Data> | null;
-  cleanNode: SourceLinkNode<Data> | null;
-  first_source: SourceLinkNode<Data> | null;
-  last_source: SourceLinkNode<Data> | null;
+  checkNode: SourceLinkedNode<Data> | null;
+  cleanNode: SourceLinkedNode<Data> | null;
+  first_source: SourceLinkedNode<Data> | null;
+  last_source: SourceLinkedNode<Data> | null;
   collect: Function;
 }
 
 interface Suspense<T = any, F = undefined> extends Computation<T> {
   fallback: F;
   currentCancel: (() => void) | undefined;
-}
-
-interface Watcher {
-  data: Data;
-  effectFn: Function;
-  index: number;
-  disposed: boolean;
 }
 
 let currentCollecting: Computation | null = null;
@@ -106,7 +97,7 @@ function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
     return;
   }
   if (!inTransaction) {
-    return runInTransaction(() => setData(data, value, equalCheck));
+    return transaction(() => setData(data, value, equalCheck));
   }
   if (equalCheck && data.value === value) {
     return;
@@ -121,17 +112,15 @@ function setData<T>(data: Data<T>, value: T, equalCheck: boolean): void {
 }
 
 const effects: Function[] = [];
-let last: ObserverLinkNode<any> | null = null;
-let first: ObserverLinkNode<any> | null = null;
+let last: ObserverLinkedNode<any> | null = null;
 
 function addDirtyData(data: Data) {
-  if (first === null) {
-    first = {
+  if (last === null) {
+    last = {
       prev_observer: null,
       next_observer: null,
       observer: data,
     };
-    last = first;
   } else {
     const tmp = last;
     last!.next_observer = last = {
@@ -163,12 +152,6 @@ function markObserversForCheck(data: Data) {
 function accessData(data: Data) {
   if (currentCollecting !== null) {
     logRead(currentCollecting, data);
-    if (
-      currentCollecting.flags & Flag.Suspensed && // data can be suspensed?
-      data.flags & Flag.Suspending
-    ) {
-      throw new Suspend(noop);
-    }
   }
   return data.value;
 }
@@ -190,25 +173,25 @@ function accessComputation<T>(data: Computation<T>): T | undefined {
       throw new Suspend(noop); //TODO: current cancel?
     }
   }
+  if (inTransaction) {
+    data.flags |= Flag.Estimating;
+    const value = data.collect();
+    data.flags &= ~Flag.Estimating;
+    return value;
+  }
   if (data.flags & Flag.Stale) {
     estimateComputation(data, data.collect);
   }
   return data.value; // current value
 }
 
-/**
- * Make computation not stale.
- * Make sure computation is stale
- * @param comp
- * @returns
- */
 function estimateComputation(comp: Computation, expr: Function) {
   if (__DEV__ && (comp.flags & Flag.Stale) === 0) {
-    throw Error('Only stale computation can be estimated.');
+    panic(10);
   }
   comp.flags |= Flag.Estimating;
   comp.flags &= ~Flag.Stale;
-  const value = doComputation(comp, expr);
+  const value = computeAndCollect(comp, expr);
   comp.value = value;
   comp.flags &= ~Flag.Estimating;
 }
@@ -241,7 +224,10 @@ function untrack<T>(fn: (...args: any[]) => T, ...args: any[]) {
   return ret;
 }
 
-function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
+function computeAndCollect<T>(
+  computation: Computation<T>,
+  computeExpr: Function
+) {
   const stored = currentCollecting;
   currentCollecting = computation;
   computation.checkNode = computation.first_source;
@@ -277,10 +263,7 @@ function doComputation<T>(computation: Computation<T>, computeExpr: Function) {
   if (computation.checkNode !== null) {
     // collected source num is less than expected
     // but it's fine as we remove the extra sources.
-    cleanupSources(
-      computation.last_source,
-      computation.checkNode.prev_source
-    );
+    cleanupSources(computation.last_source, computation.checkNode.prev_source);
     computation.last_source = computation.checkNode.prev_source;
     if (computation.last_source) {
       computation.last_source.next_source = null;
@@ -307,8 +290,8 @@ function cleanupComputation(computation: Computation) {
 }
 
 function cleanupSources(
-  from: SourceLinkNode<Data> | null,
-  until: SourceLinkNode<Data> | null
+  from: SourceLinkedNode<Data> | null,
+  until: SourceLinkedNode<Data> | null
 ) {
   let lastSource = from!;
   while (lastSource !== until) {
@@ -320,10 +303,7 @@ function cleanupSources(
     }
     if (obRef.prev_observer) {
       obRef.prev_observer.next_observer = obRef.next_observer;
-    } else {
-      lastSource.source.first_observer = obRef.next_observer;
     }
-    // if (obRef.observer !== computation) throw panic(200);
     obRef.observer = null;
     // last source
     const source = lastSource.source;
@@ -360,66 +340,41 @@ function propagate(origin: Data): void {
       continue;
     }
     data.flags |= Flag.Propagating;
-    if (data.flags & Flag.MarkForCheck) {
-      if (data.flags & Flag.Computation) {
-        if (__TEST__ && (data as Computation).depsCounter !== 0) {
-          panic(2); //should not happen
-        }
-        if (data.flags & Flag.Stale) {
-          if (data.flags & Flag.Lazy) {
+    let observer = data.last_observer;
+    const changes = (data.flags & Flag.Changed) >> 1; // 8>>1 = 4
+    while (observer !== null) {
+      const current = observer.observer;
+      observer = observer.prev_observer;
+      current.flags |= changes; // bug: data can be stale, too.
+      current.depsCounter--;
+      if (current.depsCounter === 0) {
+        stack.push(current);
+        current.flags &= ~Flag.MarkForCheck;
+        if (current.flags & Flag.Stale) {
+          current.flags &= ~Flag.Stale;
+          if (current.flags & Flag.Lazy) {
             // lazy comp will keep stale? until re-estimated.
-            data.flags |= Flag.Changed;
-          } else {
-            const currentValue = doComputation(
-              data as Computation,
-              (data as Computation).collect
+            current.flags |= Flag.Changed | Flag.Stale;
+          } else if (current.flags & Flag.Computation) {
+            const currentValue = computeAndCollect(
+              current as Computation,
+              (current as Computation).collect
             );
             // compare value , if changed, mark as changed
-            if (currentValue !== data.value) {
-              data.value = currentValue;
-              data.flags |= Flag.Changed;
+            if (currentValue !== current.value) {
+              current.value = currentValue;
+              current.flags |= Flag.Changed;
             }
-            data.flags &= ~Flag.Stale;
           }
         }
-      } else {
-        data.flags &= ~Flag.Stale; //data can be stale
       }
-      data.flags &= ~Flag.MarkForCheck;
-    } else {
-      panic(1); // should not happen
     }
-    let observer = data.last_observer;
-    if (data.flags & Flag.Changed) {
-      while (observer !== null) {
-        const current = observer.observer;
-        observer = observer.prev_observer;
-        if ((current.flags & Flag.MarkForCheck) === 0) {
-          continue;
-        }
-        current.flags |= Flag.Stale; // bug: data can be stale, too.
-        current.depsCounter--;
-        if (current.depsCounter === 0) {
-          stack.push(current);
-        }
-      }
+    if (changes) {
       data.flags &= ~Flag.Changed;
       let watcher = data.last_effect;
       while (watcher !== null) {
         effects.push(watcher.fn);
         watcher = watcher.prev;
-      }
-    } else {
-      while (observer !== null) {
-        const current = observer.observer;
-        observer = observer.prev_observer;
-        if ((current.flags & Flag.MarkForCheck) === 0) {
-          continue;
-        }
-        current.depsCounter--;
-        if (current.depsCounter === 0) {
-          stack.push(current);
-        }
       }
     }
   }
@@ -428,10 +383,10 @@ function propagate(origin: Data): void {
 function watch(data: Data, sideEffect: Function) {
   if (__DEV__ && currentCollecting) {
     console.error(`You should not watch inside computation.`);
-    return { disposed: true } as WatcherNode;
+    return { disposed: true } as WatcherLinkedNode;
   }
 
-  const node: WatcherNode = {
+  const node: WatcherLinkedNode = {
     fn: sideEffect,
     prev: data.last_effect,
     next: null,
@@ -451,7 +406,7 @@ function watch(data: Data, sideEffect: Function) {
   return node;
 }
 
-function disposeWatcher(watcher: WatcherNode) {
+function disposeWatcher(watcher: WatcherLinkedNode) {
   if (__TEST__ && currentCollecting) {
     console.error('Violated action.');
     return;
@@ -473,7 +428,7 @@ function disposeWatcher(watcher: WatcherNode) {
 
 let inTransaction = false;
 
-function runInTransaction<T>(fn: () => T) {
+function transaction<T>(fn: () => T) {
   if (inTransaction) {
     // already inside a transaction
     return fn();
@@ -484,13 +439,11 @@ function runInTransaction<T>(fn: () => T) {
 
   const data = {
     flags: Flag.Changed | Flag.MarkForCheck,
-    first_observer: first,
     last_observer: last,
     last_effect: null,
     value: undefined,
     depsCounter: 0,
   };
-  first = null;
   last = null;
   markObserversForCheck(data);
   propagate(data);
@@ -504,17 +457,16 @@ function runInTransaction<T>(fn: () => T) {
 
 function insertNewSource(accessing: Computation, source: Data): void {
   if (accessing.last_source !== null) {
-    const node: SourceLinkNode<Data> = {
+    const node: SourceLinkedNode<Data> = {
       source: source,
       prev_source: accessing.last_source,
       next_source: null,
-      observer_ref: null as any,
+      observer_ref: insertNewObserver(source, accessing),
     };
-    node.observer_ref = insertNewObserver(source, accessing);
     accessing.last_source.next_source = node;
     accessing.last_source = node;
   } else {
-    const node: SourceLinkNode<Data> = {
+    const node: SourceLinkedNode<Data> = {
       source: source,
       prev_source: null,
       next_source: null,
@@ -528,9 +480,9 @@ function insertNewSource(accessing: Computation, source: Data): void {
 function insertNewObserver(
   accesed: Data,
   observer: Computation
-): ObserverLinkNode<any> {
+): ObserverLinkedNode<any> {
   if (accesed.last_observer !== null) {
-    const node: ObserverLinkNode<Computation> = {
+    const node: ObserverLinkedNode<Computation> = {
       observer: observer,
       prev_observer: accesed.last_observer,
       next_observer: null,
@@ -539,12 +491,11 @@ function insertNewObserver(
     accesed.last_observer = node;
     return node;
   } else {
-    const node: ObserverLinkNode<Computation> = {
+    const node: ObserverLinkedNode<Computation> = {
       observer: observer,
       prev_observer: null,
       next_observer: null,
     };
-    accesed.first_observer = node; // if last is null, first is definitely null.
     accesed.last_observer = node;
     return node;
   }
@@ -554,7 +505,6 @@ function createLazy<T>(initial?: T) {
   const ret: Computation<T> = {
     flags: Flag.Computation | Flag.Lazy | Flag.Stale,
     last_effect: null,
-    first_observer: null,
     last_observer: null,
     value: (undefined as any) as T,
     checkNode: null,
@@ -584,7 +534,6 @@ function createData<T>(value: T): Data<T> {
   return {
     flags: Flag.Data,
     last_effect: null,
-    first_observer: null,
     last_observer: null,
     depsCounter: 0,
     value,
@@ -602,7 +551,6 @@ function createComputation<T>(
   const ret: Computation<T> = {
     flags: Flag.Computation | Flag.Stale,
     last_effect: null,
-    first_observer: null,
     last_observer: null,
     depsCounter: 0,
     value: undefined,
@@ -613,9 +561,6 @@ function createComputation<T>(
     collect: fn,
   };
   if (options) {
-    if (options.static) {
-      // ret.flags |= Flag.DepsNeverChange;
-    }
     if (options.initial !== undefined) {
       ret.value = options.initial;
     }
@@ -627,7 +572,6 @@ function createSuspended<T, F>(fn: (current: T | F) => T, fallback: F) {
   const ret: Suspense<T, F> = {
     flags: Flag.Computation | Flag.Suspensed | Flag.Stale,
     last_effect: null,
-    first_observer: null,
     last_observer: null,
     depsCounter: 0,
     value: undefined,
@@ -646,200 +590,11 @@ export function __current_collecting() {
   return currentCollecting;
 }
 
-export function constant<T>(value: T) {
-  return new Cell(createData(value));
-}
-
-export class Cell<T> {
-  constructor(protected internal: Data<T>) {}
-
-  get value(): T {
-    return accessData(this.internal);
-  }
-
-  [Symbol_observable]() {
-    return this;
-  }
-
-  map<R>(mapFn: (value: T) => R): Cell<R> {
-    const internal = createComputation(() => mapFn(this.value), {
-      static: true,
-      sources: [this.internal],
-    });
-    return new ComputationalCell(internal);
-  }
-
-  watch(
-    watchFn: (value: T) => Cleanable,
-    options?: WatchOptions
-  ): TeardownLogic {
-    let lastDisposer: Cleanable = undefined;
-    const watcher = watch(this.internal, () => {
-      doCleanup(lastDisposer);
-      lastDisposer = watchFn(this.internal.value!);
-    });
-    if (options?.immediate) {
-      lastDisposer = watchFn(this.internal.value!);
-    }
-    return () => {
-      doCleanup(lastDisposer);
-      disposeWatcher(watcher!);
-    };
-  }
-
-  /**
-   * @deprecated Use watch.
-   */
-  subscribe(next: (value: T) => void) {
-    const ret = this.watch(
-      (v) => {
-        next(v);
-      },
-      { immediate: true }
-    );
-    (ret as any).unsubscribe = ret;
-    return ret as {
-      (): void;
-      unsubscribe(): void;
-    };
-  }
-}
-
-export interface WatchOptions {
-  immediate?: boolean;
-}
-
-export class ComputationalCell<T> extends Cell<T> {
-  constructor(internal: Computation<T>) {
-    super(internal);
-  }
-
-  get value(): T {
-    return accessComputation(this.internal as Computation);
-  }
-}
-
-export class Lazy<T> {
-  constructor(private internal: Computation<T>) {}
-
-  execute(expr: (current: T) => T) {
-    return executeLazy<T>(this.internal, expr);
-  }
-
-  watch(
-    watchFn: (value: T) => Cleanable,
-    options?: WatchOptions
-  ): TeardownLogic {
-    let lastDisposer: Cleanable = undefined;
-    const watcher = watch(this.internal, () => {
-      doCleanup(lastDisposer);
-      lastDisposer = watchFn(this.internal.value!);
-    });
-    if (options?.immediate) {
-      lastDisposer = watchFn(this.internal.value!);
-    }
-    return () => {
-      doCleanup(lastDisposer);
-      disposeWatcher(watcher!);
-    };
-  }
-}
-
-export function mutable<T>(
-  initialValue: T
-): [
-  Cell<T>,
-  (value: (T extends Function ? never : T) | ((current: T) => T)) => void
-] {
-  const internal = createData(initialValue);
-  return [
-    new Cell(internal),
-    (v) => {
-      if (v instanceof Function) {
-        setData(internal, v(internal.value!), true);
-      } else {
-        setData(internal, v as any, true);
-      }
-    },
-  ];
-}
-
-export function mutValue<T>(initialValue: T): [Cell<T>, (value: T) => void] {
-  const internal = createData(initialValue);
-  return [
-    new Cell(internal),
-    (v) => {
-      setData(internal, v as any, true);
-    },
-  ];
-}
-
-export function lazy<T>(initial?: T) {
-  return new Lazy<T>(createLazy(initial));
-}
-
-export function computed<T>(
-  expr: (current: T) => T,
-  options?: {
-    static?: boolean;
-    initial?: T;
-  }
-): Cell<T> {
-  const internal = createComputation(expr, options);
-  return new ComputationalCell(internal) as Cell<T>;
-}
-
-export function suspended<T, F = T>(
-  expr: (current: T | F) => T,
-  fallback: F
-): Cell<T> {
-  const internal = createSuspended(expr, fallback);
-  return new ComputationalCell(internal);
-}
-
-export type UnwrapProperty<T> = T extends object
-  ? {
-      [P in keyof T]: T[P] extends Cell<infer C> ? C : T[P];
-    }
-  : T;
-
-export function combined<A extends Array<Cell<any>>[]>(
-  array: A
-): Cell<UnwrapProperty<A>>;
-export function combined<
-  C extends {
-    [key: string]: Cell<any>;
-  }
->(obj: C): Cell<UnwrapProperty<C>>;
-export function combined(obj: object): Cell<any> {
-  if (obj instanceof Array) {
-    return computed(
-      () => {
-        return obj.map((x) => {
-          return x.value;
-        });
-      },
-      { static: true }
-    );
-  }
-  return computed(
-    () => {
-      return Object.fromEntries(
-        Object.entries(obj).map(([key, value]) => {
-          return [key, value.value];
-        })
-      );
-    },
-    { static: true }
-  );
-}
-
 export {
   Computation,
   Data,
-  Watcher,
   Flag,
-  runInTransaction,
+  transaction,
   setData,
   watch,
   disposeWatcher,

@@ -1,4 +1,4 @@
-import { runInTransaction } from './cell';
+import { transaction } from './cell';
 import { Cleanable, TeardownLogic } from './types';
 import { doCleanup } from './utils';
 
@@ -107,7 +107,7 @@ export class EventStream<T> {
     });
     return [
       stream,
-      (payload: T) => runInTransaction(() => stream.next(payload)),
+      (payload: T) => transaction(() => stream.next(payload)),
     ];
   }
 }

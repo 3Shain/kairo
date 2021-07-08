@@ -1,6 +1,6 @@
-import { mutArray } from './complex-mutables';
+import { mutArray } from './collections';
 
-describe('complex-mutables', () => {
+describe('cell/collections', () => {
   const noop = () => {};
 
   it('mutableArray', () => {

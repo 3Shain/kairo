@@ -18,6 +18,7 @@ class Scope {
       4,
       parentScope?.injections_bloom.buckets
     );
+    this.rootScope = rootScope ?? parentScope?.rootScope;
   }
 
   beginScope() {

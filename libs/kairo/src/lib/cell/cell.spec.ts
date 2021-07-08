@@ -1,11 +1,10 @@
+import { computed, lazy, mutable, mutValue, suspended } from './cell';
 import {
   Computation,
-  computed,
   Flag,
-  lazy,
-  mutable,
-  runInTransaction,
-} from './cell';
+  transaction as runInTransaction,
+  SuspendWithFallback,
+} from './internal';
 
 describe('cell', () => {
   const noop = () => {};
@@ -36,21 +35,24 @@ describe('cell', () => {
 
   it('should establish a reactive relation', () => {
     const [a, setA] = mutable(0);
-    const b = computed(() => a.value * 2);
-    const c = computed(() => b.value * 2);
+    const [a2, setA2] = mutValue(0);
+    const b = a.map((x) => x * 2);
+    const c = computed(() => b.value * 2 + a2.value);
     expect(c.value).toBe(0);
     setA(1);
     expect(c.value).toBe(4);
+    setA2(1);
+    expect(c.value).toBe(5);
     let result = 0;
     const stopWatch = c.watch((value) => {
       result = value;
     });
     runInTransaction(() => {
-      // setA(2);
-      // setA(2);
       setA(3);
+      setA2(4);
+      expect(c.value).toBe(16); // eager
     });
-    expect(result).toBe(12);
+    expect(result).toBe(16);
     stopWatch();
   });
 
@@ -148,4 +150,21 @@ describe('cell', () => {
     expect(hasFlag(l, Flag.Stale)).toBeFalsy();
   });
 
+  it('suspended', () => {
+    const fn = jest.fn();
+    const [para, setPara] = mutValue(0);
+    const sus = suspended(() => {
+      if (para.value) {
+        throw new SuspendWithFallback(1, fn);
+      }
+      return 2;
+    }, undefined);
+    const stop = sus.watch(noop);
+    setPara(1);
+    expect(sus.value).toBe(1);
+    setPara(0);
+    expect(sus.value).toBe(2);
+    expect(fn).toBeCalledTimes(1);
+    stop();
+  });
 });

@@ -1,13 +1,6 @@
-import {
-  accessData,
-  createData,
-  setData,
-  Suspend,
-  SuspendWithFallback,
-  untrack,
-} from './cell';
-import { Runnable } from './task';
-import { executeRunnable } from './task/task';
+import { accessData, createData, setData } from './cell/internal';
+import { Suspend, SuspendWithFallback, untrack } from './cell';
+import { Runnable, executeRunnable } from './task';
 import { noop } from './utils';
 
 export function read<T>(runnable: Runnable<T>): T {
@@ -67,4 +60,8 @@ export function tryRead<T>(
       throw new SuspendWithFallback(onError(e), noop);
     }
   }
+}
+
+export function resource(){
+  
 }

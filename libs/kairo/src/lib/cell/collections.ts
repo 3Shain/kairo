@@ -1,6 +1,7 @@
-import { createData, setData, Cell } from './cell';
+import { createData, setData } from './internal';
+import { Cell } from './cell';
 
-interface MutableArray<R> {
+export interface MutableArray<R> {
   length: number;
   setAt(index: number, value: R): void;
   push(...items: R[]): number;
