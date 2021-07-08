@@ -1,11 +1,11 @@
 import { InjectFlags, Type, AbstractType, InjectionToken } from '@angular/core';
-import { Behavior, inject, Reference } from 'kairo';
+import { Cell, inject, reference, Reference } from 'kairo';
 import { NG_INJECTOR } from './tokens';
 
 export function ngSetup<Props, Model extends object>(
   setup: (
     props: Props,
-    useProps: <T>(thunk: (props: Props) => T) => Behavior<T>
+    useProps: <T>(thunk: (props: Props) => T) => Cell<T>
   ) => Model | void
 ) {
   return (class {
@@ -20,7 +20,7 @@ type ExcludeReference<T> = {
 }[keyof T];
 
 type ToModel<T> = {
-  [P in keyof T]: T[P] extends Behavior<infer C> ? C : T[P];
+  [P in keyof T]: T[P] extends Cell<infer C> ? C : T[P];
 };
 
 type ProviderToken<T> = Type<T> | AbstractType<T> | InjectionToken<T>;
@@ -31,4 +31,8 @@ export function ngInject<T>(
   flags?: InjectFlags
 ): T {
   return inject(NG_INJECTOR).get(token, notFoundValue, flags);
+}
+
+export function ngElementRef<T>(initial?: T) {
+  return reference(initial, (x) => x.nativeElement);
 }

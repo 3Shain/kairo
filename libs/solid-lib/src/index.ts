@@ -1,2 +1,2 @@
-export { withKairo, KairoApp } from './lib/with-kairo';
-export { useInject } from './lib/use-inject';
+export { withKairo } from './lib/with-kairo';
+export { createKairoApp } from './lib/application';

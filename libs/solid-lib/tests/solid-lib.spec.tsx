@@ -1,8 +1,10 @@
 import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
-import { KairoApp, withKairo } from '../src';
+import { createApp, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import { createSignal } from 'solid-js';
+
+const { App: KairoApp } = createApp();
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {
@@ -13,13 +15,13 @@ describe('@kairo/solid', () => {
     const [signal, setSignal] = createSignal('Hello');
 
     const w = render(() => (
-      <KairoApp globalSetup={()=>{}}>
+      <KairoApp>
         <Case1
-        intialize={initCallback}
-        clean={cleanCallback}
-        viewProp={signal()}
-        viewPropChanged={viewpropChangedCallback}
-      />
+          intialize={initCallback}
+          clean={cleanCallback}
+          viewProp={signal()}
+          viewPropChanged={viewpropChangedCallback}
+        />
       </KairoApp>
     ));
     expect(initCallback).toBeCalledTimes(1);

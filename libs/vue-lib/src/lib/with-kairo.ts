@@ -1,4 +1,4 @@
-import { Behavior } from 'kairo';
+import { Cell } from 'kairo';
 import {
   ComponentPublicInstance,
   defineComponent,
@@ -10,7 +10,7 @@ import { setupKairo } from './setup-kairo';
 export function withKairo<Props = {}>(
   setup: (
     props: Readonly<Props>,
-    useProp: <T>(thunk: (props: Props) => T) => Behavior<T>,
+    useProp: <T>(thunk: (props: Props) => T) => Cell<T>,
     ctx: SetupContext
   ) => (
     this: ComponentPublicInstance,

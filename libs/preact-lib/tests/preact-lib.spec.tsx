@@ -1,8 +1,10 @@
 import { fireEvent, render, cleanup } from '@testing-library/preact';
-import { KairoApp, withKairo } from '../src';
+import { createKairoApp, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 import { h } from 'preact';
+
+const { App: KairoApp } = createKairoApp();
 
 describe('@kairo/preact', () => {
 

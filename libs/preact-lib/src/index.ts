@@ -1,1 +1,2 @@
-export { withKairo, KairoApp, __unstable__runHooks } from './lib/with-kairo';
+export { withKairo, forwardRef, registerHook } from './lib/with-kairo';
+export { createKairoApp } from './lib/application';

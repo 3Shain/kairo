@@ -1,47 +1,21 @@
-import { transaction, Cell, Scope, effect, lazy, mutValue } from 'kairo';
-import { useContext, useEffect, useMemo, useState } from 'preact/hooks';
-import type { FunctionComponent, RenderableProps } from 'preact';
+import { transaction, Cell, Scope, mount, lazy, mutValue } from 'kairo';
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  forwardRef as reactForwardRef,
+} from 'preact/compat';
 import { h } from 'preact';
+import type { FunctionComponent } from 'preact';
+import type { ForwardFn } from 'preact/compat';
 import { KairoContext } from './context';
 
-export const KairoApp: FunctionComponent<{
-  globalSetup?: () => void;
-}> = (props) => {
-  const kairoScope = useMemo(() => {
-    const scope = new Scope();
-    const endScope = scope.beginScope();
+type ForwardRefRenderFunction<R, T> = ForwardFn<T, R>;
 
-    let propsSetter = [];
-    $$CURRENT_HOOKS = [];
-    const renderFn = props.globalSetup?.();
-    Object.freeze(propsSetter);
-    const hooks = $$CURRENT_HOOKS;
-    $$CURRENT_HOOKS = null;
-    endScope();
-    return {
-      renderFn,
-      hooks,
-      scope,
-    };
-  }, []);
-  const { hooks, scope } = kairoScope;
+let $$CURRENT_HOOKS: Function[] | null = null;
 
-  for (const hook of hooks) {
-    hook(props);
-  }
-
-  useEffect(() => {
-    return scope.attach();
-  }, []);
-
-  return (
-    <KairoContext.Provider value={scope}>
-      {props.children}
-    </KairoContext.Provider>
-  );
-};
-
-export function __unstable__runHooks<Props = any>(fn: (prop: Props) => void) {
+export function registerHook<Props = any>(fn: (prop: Props) => void) {
   if ($$CURRENT_HOOKS === null) {
     throw Error(
       'You should only call is function when component initializing.'
@@ -50,25 +24,65 @@ export function __unstable__runHooks<Props = any>(fn: (prop: Props) => void) {
   $$CURRENT_HOOKS.push(fn);
 }
 
-let $$CURRENT_HOOKS: Function[] | null = null;
-
 export function withKairo<Props>(
   setup: (
     props: Props,
     useProp: <P>(selector: (x: Props) => P) => Cell<P>
   ) => FunctionComponent<Props>
-): FunctionComponent<Props> {
-  return function KairoComponent(props: RenderableProps<Props>) {
-    const parentScope = useContext(KairoContext);
-    const [_, setTick] = useState(0);
-    const kairoScope = useMemo(() => {
-      const scope = new Scope(parentScope);
-      const endScope = scope.beginScope();
+) {
+  const component: FunctionComponent<Props> = (props) => {
+    const { render, renderComp, scope } = useKairoComponent(props, setup);
 
-      let tick = 0;
-      const propsSetter = [];
-      $$CURRENT_HOOKS = [];
-      const renderFn = setup(props, (selector) => {
+    return (
+      <KairoContext.Provider value={scope}>
+        {renderComp.execute(() => render(props))}
+      </KairoContext.Provider>
+    );
+  };
+  component.displayName = setup.name;
+  return component;
+}
+
+export function forwardRef<Props, Ref>(
+  setup: (
+    props: Props,
+    useProp: <P>(selector: (x: Props) => P) => Cell<P>
+  ) => ForwardRefRenderFunction<Ref, Props>
+) {
+  const component: ForwardRefRenderFunction<Ref, Props> = (props, ref) => {
+    const { render, renderComp, scope } = useKairoComponent(props, setup);
+
+    return (
+      <KairoContext.Provider value={scope}>
+        {renderComp.execute(() => render(props, ref))}
+      </KairoContext.Provider>
+    );
+  };
+  component.displayName = setup.name;
+  return reactForwardRef(component);
+}
+
+function useKairoComponent<
+  Props,
+  RenderFunction extends (...args: any[]) => any
+>(
+  props: Props,
+  setup: (
+    props: Props,
+    useProp: <P>(selector: (x: Props) => P) => Cell<P>
+  ) => RenderFunction
+) {
+  const parentScope = useContext(KairoContext);
+  const [, forceUpdate] = useReducer((c, _: void) => c + 1, 0);
+  const instance = useMemo(() => {
+    const scope = new Scope(parentScope);
+    const endScope = scope.beginScope();
+
+    let tick = 0;
+    const propsSetter = [];
+    $$CURRENT_HOOKS = [];
+    try {
+      const render = setup(props, (selector) => {
         const [beh, set] = mutValue(selector(props));
         propsSetter.push((p: Props) => set(selector(p)));
         return beh;
@@ -78,49 +92,39 @@ export function withKairo<Props>(
         // the length should be fixed
         if (propsSetter.length) {
           useEffect(() => {
-            // a hook to detect props change
-            transaction(() => {
-              propsSetter.forEach((x) => x(currentProps));
-            });
+            propsSetter.forEach((x) => x(currentProps));
           });
         }
       });
-      const renderComp = lazy<ReturnType<typeof renderFn>>();
-      effect(() => {
-        const stop = renderComp.watch(() => {
-          setTick(++tick);
+      const renderNode = lazy<ReturnType<typeof render>>();
+      mount(() => {
+        const stop = renderNode.watch(() => {
+          forceUpdate();
         });
-        renderComp.execute(() => renderFn(props)); // start
-        return () => {
-          stop();
-        };
+        if (renderNode.stale) {
+          forceUpdate();
+        }
+        return stop;
       });
 
       const hooks = $$CURRENT_HOOKS;
-      $$CURRENT_HOOKS = null;
 
-      endScope();
       return {
-        renderFn,
+        render,
         hooks,
-        renderComp,
+        renderComp: renderNode,
         scope,
       };
-    }, []);
-    const { hooks, renderFn, renderComp, scope } = kairoScope;
-
-    useEffect(() => {
-      return scope.attach();
-    }, []);
-
-    for (const hook of hooks) {
+    } finally {
+      endScope();
+      $$CURRENT_HOOKS = null;
+    }
+  }, []);
+  transaction(() => {
+    for (const hook of instance.hooks) {
       hook(props);
     }
-
-    return (
-      <KairoContext.Provider value={scope}>
-        {renderComp.execute(() => renderFn(props))}
-      </KairoContext.Provider>
-    );
-  };
+  });
+  useEffect(() => instance.scope.attach(), []);
+  return instance;
 }

@@ -1,4 +1,4 @@
-import { isCell, Cell, mutValue, Scope, effect, Reference, lazy } from 'kairo';
+import { isCell, Cell, mutValue, Scope, mount, Reference, lazy } from 'kairo';
 import {
   ref,
   watch,
@@ -6,27 +6,15 @@ import {
   provide as vueProvide,
   onUnmounted,
   SetupContext,
-  App,
   onMounted,
   onActivated,
   onDeactivated,
   Ref,
-  RenderFunction,
   customRef,
   renderSlot,
   ComponentPublicInstance,
 } from 'vue';
 import { SCOPE } from './context';
-
-export function kairoApp(setup?: (app: App) => void) {
-  return (app: App) => {
-    const scope = new Scope();
-    const endScope = scope.beginScope();
-    setup?.(app);
-    endScope();
-    app.provide(SCOPE, scope);
-  };
-}
 
 export function setupKairo<Props, Bindings>(
   setup: (
@@ -74,12 +62,7 @@ export function setupKairo<Props, Bindings>(
       },
       (thunk: (_: Props) => any) => {
         const [prop, setProp] = mutValue(thunk(props));
-        effect(() =>
-          watch(
-            () => thunk(props),
-            setProp
-          )
-        );
+        mount(() => watch(() => thunk(props), setProp));
         return prop;
       },
       setupContext
@@ -88,7 +71,7 @@ export function setupKairo<Props, Bindings>(
       /** render function */
       const renderResult = customRef((track, trigger) => {
         const renderEffect = lazy();
-        effect(() => {
+        mount(() => {
           const stop = renderEffect.watch(() => {
             trigger();
           });
@@ -143,7 +126,7 @@ export function setupKairo<Props, Bindings>(
         }
         if (isCell(value)) {
           const _ref = ref(value.value as object);
-          effect(() =>
+          mount(() =>
             value.watch((s) => {
               _ref.value = s as object;
             })

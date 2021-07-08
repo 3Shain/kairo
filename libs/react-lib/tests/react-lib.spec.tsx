@@ -1,8 +1,10 @@
 import { fireEvent, render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { KairoApp, withKairo } from '../src';
+import { createKairoApp, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
+
+const { App: KairoApp } = createKairoApp();
 
 describe('@kairo/react', () => {
   beforeEach(async () => {});
@@ -13,7 +15,7 @@ describe('@kairo/react', () => {
     const viewpropChangedCallback = jest.fn();
 
     const w = render(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}
@@ -31,7 +33,7 @@ describe('@kairo/react', () => {
     expect(button).toHaveTextContent('0');
 
     w.rerender(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}
@@ -44,7 +46,7 @@ describe('@kairo/react', () => {
     expect(w.container.querySelector('p')).toHaveTextContent('World');
 
     w.rerender(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}

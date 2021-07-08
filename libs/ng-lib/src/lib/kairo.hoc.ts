@@ -18,7 +18,7 @@ import {
   isCell,
   action,
   Scope,
-  effect,
+  mount,
   provide,
   Reference,
 } from 'kairo';
@@ -159,7 +159,7 @@ export function WithKairo(obj?: {
               }
               for (const [key, value] of Object.entries(resolve)) {
                 if (isCell(value)) {
-                  effect(() =>
+                  mount(() =>
                     value.watch((updatedValue) => {
                       this[key] = updatedValue;
                       changeDetector.markForCheck();

@@ -1,8 +1,6 @@
 import {
   ModuleWithProviders,
   NgModule,
-  Optional,
-  SkipSelf,
   InjectionToken,
 } from '@angular/core';
 import { ScopeRef, KairoScopeRefImpl } from './kairo.service';
@@ -11,22 +9,13 @@ import { Scope } from 'kairo';
 const SETUP_FUNCTION = new InjectionToken<() => void>('kairo setup function');
 
 export function setupRootScope(setup: () => void) {
-  const scope = new Scope();
-  const endScope = scope.beginScope();
+  const rootScope = new Scope();
+  const endScope = rootScope.beginScope();
+  // platform inject
   setup();
   endScope();
   const ngService = new KairoScopeRefImpl();
-  ngService.scope = scope;
-  return ngService;
-}
-
-export function setupModuleScope(parent: KairoScopeRefImpl, setup: () => void) {
-  const scope = new Scope(null, parent.scope);
-  const endScope = scope.beginScope();
-  setup();
-  endScope();
-  const ngService = new KairoScopeRefImpl();
-  ngService.scope = scope;
+  ngService.scope = new Scope(undefined, rootScope);
   return ngService;
 }
 
@@ -55,27 +44,6 @@ export class KairoModule {
           provide: KairoScopeRefImpl,
           useFactory: setupRootScope,
           deps: [SETUP_FUNCTION],
-        },
-        {
-          provide: ScopeRef,
-          useExisting: KairoScopeRefImpl,
-        },
-      ],
-    };
-  }
-
-  static forChild(setup?: () => void): ModuleWithProviders<KairoModule> {
-    return {
-      ngModule: KairoModule,
-      providers: [
-        {
-          provide: SETUP_FUNCTION,
-          useValue: setup ?? noop,
-        },
-        {
-          provide: KairoScopeRefImpl,
-          useFactory: setupModuleScope,
-          deps: [[Optional, SkipSelf, KairoScopeRefImpl], SETUP_FUNCTION],
         },
         {
           provide: ScopeRef,
