@@ -17,6 +17,7 @@ module.exports = {
     __TEST__: true,
   },
   coverageDirectory: '../../coverage/libs/ng-lib',
+  coverageReporters: [["lcov", {"projectRoot": "./"}]],
   snapshotSerializers: [
     'jest-preset-angular/build/AngularNoNgAttributesSnapshotSerializer.js',
     'jest-preset-angular/build/AngularSnapshotSerializer.js',

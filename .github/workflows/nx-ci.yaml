@@ -16,14 +16,21 @@ jobs:
           projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib,preact-lib
           targets: test
           affected: true
+          args: --codeCoverage
+      - name: Merge coverage reports
+        run: node ./merge-coverage.js
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - id: get-bench-result
+        name: Do benchmark
         run: |
           body=$(npm run bench)
           body="${body//'%'/'%25'}"
           body="${body//$'\n'/'%0A'}"
           body="${body//$'\r'/'%0D'}" 
           echo ::set-output name=body::$body
-
       - name: Report benchmark result
         uses: peter-evans/commit-comment@v1
         with:

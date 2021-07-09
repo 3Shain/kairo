@@ -9,6 +9,7 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
   coverageDirectory: '../../coverage/libs/vue-lib',
+  coverageReporters: [["lcov", {"projectRoot": "./"}]],
   snapshotSerializers: ['jest-serializer-vue'],
   globals: {
     'ts-jest': {
