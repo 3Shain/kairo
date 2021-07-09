@@ -1,10 +1,10 @@
 import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
-import { createApp, withKairo } from '../src';
+import { createKairoApp, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import { createSignal } from 'solid-js';
 
-const { App: KairoApp } = createApp();
+const { App: KairoApp } = createKairoApp();
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {

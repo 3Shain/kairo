@@ -14,7 +14,7 @@ describe('@kairo/preact', () => {
     const viewpropChangedCallback = jest.fn();
 
     const w = render(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}
@@ -32,7 +32,7 @@ describe('@kairo/preact', () => {
     expect(button).toHaveTextContent('0');
 
     w.rerender(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}
@@ -45,7 +45,7 @@ describe('@kairo/preact', () => {
     expect(w.container.querySelector('p')).toHaveTextContent('World');
 
     w.rerender(
-      <KairoApp globalSetup={() => {}}>
+      <KairoApp>
         <Case1
           intialize={initCallback}
           clean={cleanCallback}

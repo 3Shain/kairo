@@ -25,10 +25,10 @@ import {
   accessData,
   createComputation,
   createData,
-  runInTransaction,
+  transaction as runInTransaction,
   setData,
   watch,
-} from '../libs/kairo/src/lib/cell';
+} from '../libs/kairo/src/lib/cell/internal';
 
 import {
   observable,
