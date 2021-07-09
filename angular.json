@@ -434,7 +434,7 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "preact"],
+            "externals": ["kairo", "preact", "preact/compat"],
             "bundleName": "kairo-preact",
             "copy": []
           }
