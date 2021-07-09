@@ -2,11 +2,14 @@ import {
   ModuleWithProviders,
   NgModule,
   InjectionToken,
+  NgModuleRef,
+  Inject,
 } from '@angular/core';
 import { ScopeRef, KairoScopeRefImpl } from './kairo.service';
-import { Scope } from 'kairo';
+import { mount, Scope } from 'kairo';
 
 const SETUP_FUNCTION = new InjectionToken<() => void>('kairo setup function');
+const ROOT_SCOPE = new InjectionToken<Scope>('kairo root scope');
 
 export function setupRootScope(setup: () => void) {
   const rootScope = new Scope();
@@ -14,22 +17,21 @@ export function setupRootScope(setup: () => void) {
   // platform inject
   setup();
   endScope();
-  const ngService = new KairoScopeRefImpl();
-  ngService.scope = new Scope(undefined, rootScope);
-  return ngService;
+  return rootScope;
 }
 
 const noop = () => {};
 
 @NgModule({})
 export class KairoModule {
-  private detachHandler: () => void;
-  constructor(private scopeRef: KairoScopeRefImpl) {
-    this.detachHandler = this.scopeRef.scope.attach();
-  }
-
-  ngOnDestroy() {
-    this.detachHandler!();
+  constructor(
+    @Inject(ROOT_SCOPE) rootScope: Scope,
+    ngModuleRef: NgModuleRef<KairoModule>,
+    scopeRef: KairoScopeRefImpl
+  ) {
+    // https://github.com/angular/angular/issues/18831
+    ngModuleRef.onDestroy(rootScope.attach());
+    scopeRef.scope = new Scope(undefined, rootScope);
   }
 
   static forRoot(setup?: () => void): ModuleWithProviders<KairoModule> {
@@ -41,10 +43,11 @@ export class KairoModule {
           useValue: setup ?? noop,
         },
         {
-          provide: KairoScopeRefImpl,
+          provide: ROOT_SCOPE,
           useFactory: setupRootScope,
           deps: [SETUP_FUNCTION],
         },
+        KairoScopeRefImpl,
         {
           provide: ScopeRef,
           useExisting: KairoScopeRefImpl,

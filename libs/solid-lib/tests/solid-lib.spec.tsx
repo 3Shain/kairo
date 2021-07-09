@@ -4,7 +4,7 @@ import { createKairoApp, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import { createSignal } from 'solid-js';
 
-const { App: KairoApp } = createKairoApp();
+const { App: KairoApp } = createKairoApp(() => {});
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {

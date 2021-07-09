@@ -14,6 +14,7 @@ type ForwardRefRenderFunction<R, T> = React.ForwardRefRenderFunction<R, T>;
 let $$CURRENT_HOOKS: Function[] | null = null;
 
 export function registerHook<Props = any>(fn: (prop: Props) => void) {
+  /* istanbul ignore if */
   if ($$CURRENT_HOOKS === null) {
     throw Error(
       'You should only call is function when component initializing.'
@@ -76,7 +77,6 @@ function useKairoComponent<
     const scope = new Scope(parentScope);
     const endScope = scope.beginScope();
 
-    let tick = 0;
     const propsSetter = [];
     $$CURRENT_HOOKS = [];
     try {
@@ -99,6 +99,7 @@ function useKairoComponent<
         const stop = renderNode.watch(() => {
           forceUpdate();
         });
+        /* istanbul ignore if */
         if (renderNode.stale) {
           forceUpdate();
         }

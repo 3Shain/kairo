@@ -52,6 +52,7 @@ export function WithKairo(obj?: {
   viewProviders?: Provider[];
 }) {
   return <T>(componentType: Type<T>) => {
+    /* istanbul ignore if  */
     if (!ivyEnabled) {
       throw TypeError(
         '@WithKairo() only works with ivy enabled. Non-ivy enviroment is not supported.'
@@ -108,8 +109,6 @@ export function WithKairo(obj?: {
       }
     })(directiveDefinition);
 
-
-
     const hasInputs = Object.keys(directiveDefinition.inputs).length > 0;
 
     // ensure these method exist in prototype cuz ivy will store them.
@@ -117,7 +116,9 @@ export function WithKairo(obj?: {
       ? componentType.prototype.ngOnChanges
       : componentType.prototype.ngOnInit) as Function;
     const ngOnDestroyOld = componentType.prototype.ngOnDestroy as Function;
-    componentType.prototype.ngOnDestroy = function (this: KairoDirectiveInstance) {
+    componentType.prototype.ngOnDestroy = function (
+      this: KairoDirectiveInstance
+    ) {
       this.ɵɵzone.runOutsideAngular(() => {
         this.ɵɵkairoDetachFn?.(); // issue: it might be undefined (in test)
       });
@@ -129,6 +130,7 @@ export function WithKairo(obj?: {
       changes: SimpleChanges
     ) {
       if (!this.ɵɵinit) {
+        /* istanbul ignore if  */
         if (typeof this.ngSetup !== 'function') {
           console.error(`ngSetup is not declared.`);
           return;
@@ -139,48 +141,52 @@ export function WithKairo(obj?: {
         this.ɵɵzone.runOutsideAngular(() => {
           const endScope = scope.beginScope();
           provide(NG_INJECTOR, this.ɵɵinjector);
-          Object.assign(
-            this,
-            (() => {
-              const resolve = this.ngSetup(this, (thunk: Function) => {
-                const [beh, setbeh] = mutValue(thunk(this));
-                this.ɵɵchangesHook.push((instance: unknown) => {
-                  setbeh(thunk(instance));
-                });
-                return beh;
-              });
-              if (resolve === undefined) {
-                return {};
-              }
-              if (typeof resolve !== 'object') {
-                throw Error(
-                  `ngSetup() is expected to return an object, but it got ${typeof resolve}`
-                );
-              }
-              for (const [key, value] of Object.entries(resolve)) {
-                if (isCell(value)) {
-                  mount(() =>
-                    value.watch((updatedValue) => {
-                      this[key] = updatedValue;
-                      changeDetector.markForCheck();
-                    })
-                  );
-                  resolve[key] = value.value;
-                } else if (value instanceof Reference) {
-                  this.ɵɵreferenceMap.push({
-                    name: key,
-                    reference: value,
+          try {
+            Object.assign(
+              this,
+              (() => {
+                const resolve = this.ngSetup(this, (thunk: Function) => {
+                  const [beh, setbeh] = mutValue(thunk(this));
+                  this.ɵɵchangesHook.push((instance: unknown) => {
+                    setbeh(thunk(instance));
                   });
-                } else if (typeof value === 'function') {
-                  resolve[key] = action(value as any);
-                } else {
-                  resolve[key] = value;
+                  return beh;
+                });
+                if (resolve === undefined) {
+                  return {};
                 }
-              }
-              return resolve;
-            })()
-          );
-          endScope();
+                /* istanbul ignore if  */
+                if (typeof resolve !== 'object') {
+                  throw Error(
+                    `ngSetup() is expected to return an object, but it got ${typeof resolve}`
+                  );
+                }
+                for (const [key, value] of Object.entries(resolve)) {
+                  if (isCell(value)) {
+                    mount(() =>
+                      value.watch((updatedValue) => {
+                        this[key] = updatedValue;
+                        changeDetector.markForCheck();
+                      })
+                    );
+                    resolve[key] = value.value;
+                  } else if (value instanceof Reference) {
+                    this.ɵɵreferenceMap.push({
+                      name: key,
+                      reference: value,
+                    });
+                  } else if (typeof value === 'function') {
+                    resolve[key] = action(value as any);
+                  } else {
+                    resolve[key] = value;
+                  }
+                }
+                return resolve;
+              })()
+            );
+          } finally {
+            endScope();
+          }
         });
         this.ɵɵinit = true;
       } else {
@@ -196,7 +202,8 @@ export function WithKairo(obj?: {
     if (hasInputs) componentType.prototype.ngOnChanges = onChangesOrOnInit;
     else componentType.prototype.ngOnInit = onChangesOrOnInit;
 
-    const ngAfterViewInitOld = componentType.prototype.ngAfterViewInit as Function;
+    const ngAfterViewInitOld = componentType.prototype
+      .ngAfterViewInit as Function;
     const afterViewInit = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
         entry.reference.current = this[entry.name];
@@ -207,13 +214,13 @@ export function WithKairo(obj?: {
     componentType.prototype.ngAfterViewInit = afterViewInit;
 
     const ngAfterViewCheckedOld = componentType.prototype
-      .ngAfterCheckedInit as Function;
+      .ngAfterViewChecked as Function;
     const afterViewChecked = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
         entry.reference.current = this[entry.name];
       }
       ngAfterViewCheckedOld?.call(this);
     };
-    componentType.prototype.ngAfterCheckedInit = afterViewChecked;
+    componentType.prototype.ngAfterViewChecked = afterViewChecked;
   };
 }

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { KairoModule, ngSetup, WithKairo } from '../src';
+import { KairoModule, ngSetup, WithKairo, ngElementRef } from '../src';
 import {
   Component,
   ElementRef,
@@ -7,7 +7,7 @@ import {
   NO_ERRORS_SCHEMA,
   ViewChild,
 } from '@angular/core';
-import { reference, mut, effect } from 'kairo';
+import { mut, effect } from 'kairo';
 import '@testing-library/jest-dom';
 import { fireEvent } from '@testing-library/dom';
 
@@ -118,11 +118,11 @@ export class Case1 extends ngSetup(
     },
     useProp
   ) => {
-    const para = reference<ElementRef<HTMLParagraphElement>>(null);
+    const para = ngElementRef<HTMLParagraphElement>(null);
 
     effect(() => {
       prop.initialize();
-      expect(para.current.nativeElement).toBeInTheDocument();
+      expect(para.current).toBeInTheDocument();
 
       return () => {
         prop.clean();

@@ -34,5 +34,5 @@ export function ngInject<T>(
 }
 
 export function ngElementRef<T>(initial?: T) {
-  return reference(initial, (x) => x.nativeElement);
+  return reference<T>(initial, (x) => x.nativeElement);
 }

@@ -1,4 +1,4 @@
-<script lang="ts" kairo>
+<script lang="ts" kairo="root">
   /// <reference types="jest" />
   import '@testing-library/jest-dom';
   import { reference, mut, effect } from 'kairo';

@@ -8,7 +8,7 @@ import {
   createComputed,
   runWithOwner,
   getOwner,
-  createEffect,
+  onMount,
 } from 'solid-js';
 import {
   Cell,
@@ -27,110 +27,56 @@ let $$READ_AS_PROP = false;
  * side effects
  * patches prototype of Behavior
  */
-const originalGetter = Object.getOwnPropertyDescriptor(Cell.prototype, 'value')
-  .get;
 
 Object.defineProperty(Cell.prototype, 'value', {
-  get(
-    this: Cell<any> & {
-      signal_ref?: WeakMap<ReturnType<typeof getOwner>, [Function, Function]>;
-    }
-  ) {
-    if (__current_collecting()) {
-      return originalGetter.call(this);
-    }
-    if ($$READ_AS_PROP) {
-      throw this;
-    }
-    if (getListener()) {
-      if (!this.signal_ref) {
-        this.signal_ref = new WeakMap();
-      }
-      const ref = this.signal_ref.get(getListener().owner);
-      if (ref === undefined) {
-        const owner = getListener().owner;
-        const disposeWatcher = this.watch((v) => {
-          ref2[1](v);
-        });
-        const ref2 = createSignal(originalGetter.call(this));
-        this.signal_ref.set(owner, ref2);
-        runWithOwner(owner, () => {
-          onCleanup(() => {
-            disposeWatcher();
-            this.signal_ref.delete(owner);
-          });
-        });
-        return ref2[0]();
-      } else {
-        return ref[0]();
-      }
-    }
-    return originalGetter.call(this);
-  },
+  get: createPatch(Object.getOwnPropertyDescriptor(Cell.prototype, 'value').get),
 });
-
-const originalComputationGetter = Object.getOwnPropertyDescriptor(
-  ComputationalCell.prototype,
-  'value'
-).get;
 
 Object.defineProperty(ComputationalCell.prototype, 'value', {
-  get(
+  get: createPatch(
+    Object.getOwnPropertyDescriptor(ComputationalCell.prototype, 'value').get
+  ),
+});
+
+function createPatch(originalGetter: Function) {
+  return function patchedGetter(
     this: Cell<any> & {
       signal_ref?: WeakMap<ReturnType<typeof getOwner>, [Function, Function]>;
     }
   ) {
-    if (__current_collecting()) {
-      return originalComputationGetter.call(this);
-    }
-    if ($$READ_AS_PROP) {
-      throw this;
-    }
-    if (getListener()) {
-      if (!this.signal_ref) {
-        this.signal_ref = new WeakMap();
+    {
+      if (__current_collecting()) {
+        return originalGetter.call(this);
       }
-      const ref = this.signal_ref.get(getListener().owner);
-      if (ref === undefined) {
-        const owner = getListener().owner;
-        const disposeWatcher = this.watch((v) => {
-          ref2[1](v);
-        });
-        const ref2 = createSignal(originalComputationGetter.call(this));
-        this.signal_ref.set(owner, ref2);
-        runWithOwner(owner, () => {
-          onCleanup(() => {
-            disposeWatcher();
-            this.signal_ref.delete(owner);
+      if ($$READ_AS_PROP) {
+        throw this;
+      }
+      if (getListener()) {
+        if (!this.signal_ref) {
+          this.signal_ref = new WeakMap();
+        }
+        const ref = this.signal_ref.get(getListener().owner);
+        if (ref === undefined) {
+          const owner = getListener().owner;
+          const disposeWatcher = this.watch((v) => {
+            ref2[1](v);
           });
-        });
-        return ref2[0]();
-      } else {
-        return ref[0]();
+          const ref2 = createSignal(originalGetter.call(this));
+          this.signal_ref.set(owner, ref2);
+          runWithOwner(owner, () => {
+            onCleanup(() => {
+              disposeWatcher();
+              this.signal_ref.delete(owner);
+            });
+          });
+          return ref2[0]();
+        } else {
+          return ref[0]();
+        }
       }
+      return originalGetter.call(this);
     }
-    return originalComputationGetter.call(this);
-  },
-});
-
-function KairoApp(props: { globalSetup?: () => void; children?: JSX.Element }) {
-  const scope = new Scope(null);
-  {
-    const endScope = scope.beginScope();
-    props.globalSetup?.();
-    endScope();
-  }
-  createEffect(() => {
-    const dispose = scope.attach();
-    onCleanup(dispose);
-  });
-
-  return createComponent(KairoContext.Provider, {
-    value: scope,
-    get children() {
-      return props.children;
-    },
-  });
+  };
 }
 
 function withKairo<Props>(
@@ -162,6 +108,7 @@ function withKairo<Props>(
           });
           return prop;
         } catch (e) {
+          /* istanbul ignore else */
           if (isCell(e)) return e as Cell<any>;
           else throw e;
         } finally {
@@ -171,7 +118,7 @@ function withKairo<Props>(
     );
     endScope();
 
-    createEffect(() => {
+    onMount(() => {
       const dispose = scope.attach();
       onCleanup(dispose);
     });
@@ -185,4 +132,4 @@ function withKairo<Props>(
   };
 }
 
-export { KairoApp, withKairo };
+export { withKairo };

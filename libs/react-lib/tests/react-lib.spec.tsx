@@ -1,6 +1,6 @@
 import { fireEvent, render, cleanup } from '@testing-library/react';
-import React from 'react';
-import { createKairoApp, withKairo } from '../src';
+import React, { useEffect } from 'react';
+import { createKairoApp, forwardRef, registerHook, withKairo } from '../src';
 import { effect, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 
@@ -70,6 +70,40 @@ describe('@kairo/react', () => {
     expect(cleanCallback).toBeCalledTimes(1);
   });
 
+  it('forwardRef', ()=>{
+
+    const ref = {
+      current: null as HTMLDivElement
+    };
+
+    const w = render(
+      <KairoApp>
+        <Case2 ref={ref}/>
+      </KairoApp>
+    );
+
+    expect(ref.current).toHaveTextContent('TARGET');
+
+    w.unmount();
+  });
+
+
+  it('registerHook', ()=>{
+
+    const initCallback = jest.fn();
+    const cleanCallback = jest.fn();
+
+    const w = render(
+      <Case3 onmount={initCallback} onunmount={cleanCallback}/>
+    );
+    expect(initCallback).toBeCalledTimes(1);
+    expect(cleanCallback).toBeCalledTimes(0);
+
+    w.unmount();
+    expect(initCallback).toBeCalledTimes(1);
+    expect(cleanCallback).toBeCalledTimes(1);
+  });
+
   afterAll(() => {
     cleanup();
   });
@@ -124,6 +158,26 @@ const Case1Child = withKairo<{ count: number }>((_, useProp) => {
   return () => <span>{dp.value}</span>;
 });
 
-/**
- * chilren: cascaded dependency injection.
- */
+const Case2 = forwardRef<{},HTMLDivElement>(()=>{
+  return (_,ref) => <div ref={ref}>TARGET</div>
+});
+
+const Case3 = withKairo<{
+  onmount: Function,
+  onunmount: Function
+}>(()=>{
+
+  registerHook(({
+    onmount,
+    onunmount
+  })=>{
+    useEffect(()=>{
+      onmount();
+      return ()=>{
+        onunmount();
+      }
+    });
+  })
+
+  return (_) => null
+});

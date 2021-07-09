@@ -91,7 +91,7 @@ export function setupKairo<Props, Bindings>(
             );
           },
           set() {
-            throw TypeError('Unexpected mutation');
+            // no effect
           },
         };
       });
