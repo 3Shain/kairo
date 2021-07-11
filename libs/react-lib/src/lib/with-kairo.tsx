@@ -1,4 +1,4 @@
-import { transaction, Cell, Scope, mount, lazy, mutValue } from 'kairo';
+import { Cell, Scope, mount, lazy, mutValue } from 'kairo';
 import React, {
   useContext,
   useEffect,
@@ -119,11 +119,9 @@ function useKairoComponent<
       $$CURRENT_HOOKS = null;
     }
   }, []);
-  transaction(() => {
-    for (const hook of instance.hooks) {
-      hook(props);
-    }
-  });
+  for (const hook of instance.hooks) {
+    hook(props);
+  }
   useEffect(() => instance.scope.attach(), []);
   return instance;
 }
