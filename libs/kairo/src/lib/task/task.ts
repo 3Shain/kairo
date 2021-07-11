@@ -1,4 +1,3 @@
-import { EventStream } from '../stream';
 import {
   Action,
   Subscribable,
@@ -24,15 +23,6 @@ export function executeRunnable<T>(
       if (yieldedObject instanceof CancellablePromise) {
         currentDisposer = () => yieldedObject.cancel();
         yieldedObject.then(resumeTask, throwTask);
-      } else if (yieldedObject instanceof EventStream) {
-        const unsub = yieldedObject.listen((value) => {
-          unsub();
-          resumeTask(value);
-        });
-        currentDisposer = () => {
-          unsub();
-          throwTask(new CanceledError());
-        };
       } else if (typeof yieldedObject === 'function') {
         //bind sideEffect
         let synchronous = true; // closure callback
@@ -73,9 +63,7 @@ export function executeRunnable<T>(
         currentDisposer = () => {
           // if (innerSettled) return; // no need this line: currentDisposer
           // is guaranteed to execute only once.
-          if (typeof maybeDisposer === 'function') {
-            doCleanup(maybeDisposer); // maybe raise an error.
-          }
+          doCleanup(maybeDisposer); // maybe raise an error.
           innerSettled || tryReject(new CanceledError());
           // innerSettled = true;
         };
@@ -191,6 +179,7 @@ export function* timeout(time: number): Runnable<void> {
   }) as void;
 }
 
+/* istanbul ignore next */
 export function* nextAnimationFrame(): Runnable<number> {
   return (yield (resume) => {
     const id = requestAnimationFrame(resume as any);

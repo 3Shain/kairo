@@ -4,6 +4,8 @@ export class ObjectDisposedError extends Error {}
 
 export const noop = () => {};
 
+export const identity = <T>(x: T) => x;
+
 export function doCleanup(cleanup: Cleanable) {
   if (typeof cleanup === 'function') {
     cleanup();

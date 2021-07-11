@@ -1,10 +1,12 @@
-import { computed, lazy, mutable, mutValue, suspended } from './cell';
+import { combined, computed, lazy, mutable, mutValue, suspended } from './cell';
 import {
   Computation,
   Flag,
   transaction as runInTransaction,
   SuspendWithFallback,
+  transaction,
 } from './internal';
+import { start, delay } from '../task';
 
 describe('cell', () => {
   const noop = () => {};
@@ -33,6 +35,16 @@ describe('cell', () => {
     return count;
   }
 
+  function numOfWatchers(c: any) {
+    let last = (c['internal'] as Computation).last_effect;
+    let count = 0;
+    while (last !== null) {
+      count++;
+      last = last.prev;
+    }
+    return count;
+  }
+
   it('should establish a reactive relation', () => {
     const [a, setA] = mutable(0);
     const [a2, setA2] = mutValue(0);
@@ -55,8 +67,6 @@ describe('cell', () => {
     expect(result).toBe(16);
     stopWatch();
   });
-
-  // it('should establish a reactive relation', () => {});
 
   it('unused computation should be cleaned up', () => {
     const [a, setA] = mutable(0);
@@ -166,5 +176,65 @@ describe('cell', () => {
     expect(sus.value).toBe(2);
     expect(fn).toBeCalledTimes(1);
     stop();
+  });
+
+  it('combined (array)', () => {
+    const [a, setA] = mutValue(1);
+    const [b, setB] = mutValue(2);
+    const c = combined([a, b], ([_a, _b]) => _a + _b);
+    expect(c.value).toBe(3);
+    const stop = c.watch(noop);
+    transaction(() => {
+      setA(3);
+      setB(4);
+    });
+    expect(c.value).toBe(7);
+    expect(hasFlag(c, Flag.Stale)).toBeFalsy();
+    expect(numOfSourceNodes(c)).toBe(2);
+    stop();
+  });
+
+  it('combined (object)', () => {
+    const [a, setA] = mutValue(1);
+    const [b, setB] = mutValue(2);
+    const c = combined({ a, b }, ({ a: _a, b: _b }) => _a + _b);
+    expect(c.value).toBe(3);
+    const stop = c.watch(noop);
+    transaction(() => {
+      setA(3);
+      setB(4);
+    });
+    expect(c.value).toBe(7);
+    expect(hasFlag(c, Flag.Stale)).toBeFalsy();
+    expect(numOfSourceNodes(c)).toBe(2);
+    stop();
+  });
+
+  it('yield*', async () => {
+    const [a, setA] = mutValue(1);
+    const b = a.map(x=>x*2);
+
+    start(
+      (function* () {
+        yield* delay(1);
+        while (true) {
+          setA(a.value + 1);
+          if (a.value > 10) {
+            break;
+          }
+          yield* delay(1);
+        }
+      })()
+    );
+    await start(
+      (function* () {
+        while (b.value != 10) {
+          yield* b;
+          expect(hasFlag(b,Flag.Stale)).toBeFalsy();
+          expect(numOfSourceNodes(b)).toBe(1);
+          expect(numOfWatchers(b)).toBe(0);
+        }
+      })()
+    );
   });
 });

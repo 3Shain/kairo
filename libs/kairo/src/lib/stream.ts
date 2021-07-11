@@ -1,4 +1,5 @@
 import { transaction } from './cell';
+import { RunnableGenerator } from './task';
 import { Cleanable, TeardownLogic } from './types';
 import { doCleanup } from './utils';
 
@@ -11,8 +12,14 @@ interface SubscriptionNode {
 export class EventStream<T> {
   constructor(private producer: (next: (value: T) => void) => Cleanable) {}
 
-  *[Symbol.iterator]() {
-    return (yield this) as T;
+  *[Symbol.iterator](): RunnableGenerator<T> {
+    return yield (resolve) => {
+      const unsub = this.listen((value) => {
+        resolve(value);
+        unsub(); // 
+      });
+      return unsub;
+    };
   }
 
   private disposeProducer: Cleanable | null = null;
@@ -105,10 +112,7 @@ export class EventStream<T> {
     const stream = new EventStream<T>(() => {
       return () => {};
     });
-    return [
-      stream,
-      (payload: T) => transaction(() => stream.next(payload)),
-    ];
+    return [stream, (payload: T) => transaction(() => stream.next(payload))];
   }
 }
 

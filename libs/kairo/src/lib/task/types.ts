@@ -10,8 +10,10 @@ export type Runnable<T> = {
   /**
    * It could be eager or lazy.
    */
-  [Symbol.iterator](): Generator<TaskYieldable<any>, T, any>;
+  [Symbol.iterator](): RunnableGenerator<T>;
 };
+
+export type RunnableGenerator<T> = Generator<TaskYieldable<any>, T, any>;
 
 export interface ReadableChannel<T> {
   next(): Runnable<T>;

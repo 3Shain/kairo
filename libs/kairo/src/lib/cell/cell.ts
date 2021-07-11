@@ -14,7 +14,8 @@ import {
   watch,
   Flag,
 } from './internal';
-import { doCleanup } from '../utils';
+import { doCleanup, identity } from '../utils';
+import { RunnableGenerator } from '../task/types';
 
 export class Cell<T> {
   constructor(protected internal: Data<T>) {}
@@ -25,6 +26,16 @@ export class Cell<T> {
 
   [Symbol_observable]() {
     return this;
+  }
+
+  *[Symbol.iterator](): RunnableGenerator<T> {
+    return yield (resolve) => {
+      const unsub = this.watch((value) => {
+        resolve(value);
+        unsub();
+      });
+      return unsub;
+    };
   }
 
   map<R>(mapFn: (value: T) => R): Cell<R> {
@@ -83,8 +94,7 @@ export class ComputationalCell<T> extends Cell<T> {
 }
 
 export class Lazy<T> {
-
-  get stale(){
+  get stale() {
     return (this.internal.flags & Flag.Stale) > 0;
   }
 
@@ -172,27 +182,36 @@ export type UnwrapProperty<T> = T extends object
     }
   : T;
 
-export function combined<A extends Array<Cell<any>>[]>(
-  array: A
-): Cell<UnwrapProperty<A>>;
+export function combined<A extends Array<Cell<any>>, R = UnwrapProperty<A>>(
+  array: A,
+  lifeFn?: (a: UnwrapProperty<A>) => R
+): Cell<R>;
 export function combined<
   C extends {
     [key: string]: Cell<any>;
-  }
->(obj: C): Cell<UnwrapProperty<C>>;
-export function combined(obj: object): Cell<any> {
+  },
+  R = UnwrapProperty<C>
+>(obj: C, lifeFn?: (A: UnwrapProperty<C>) => R): Cell<R>;
+export function combined(
+  obj: object,
+  lifeFn: (a: any) => any = identity
+): Cell<any> {
   if (obj instanceof Array) {
     return computed(() => {
-      return obj.map((x) => {
-        return x.value;
-      });
+      return lifeFn(
+        obj.map((x) => {
+          return x.value;
+        })
+      );
     });
   }
   return computed(() => {
-    return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => {
-        return [key, value.value];
-      })
+    return lifeFn(
+      Object.fromEntries(
+        Object.entries(obj).map(([key, value]) => {
+          return [key, value.value];
+        })
+      )
     );
   });
 }

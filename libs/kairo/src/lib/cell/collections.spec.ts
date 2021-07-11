@@ -1,9 +1,9 @@
-import { mutArray } from './collections';
+import { mutArray, mutMap, mutSet } from './collections';
 
 describe('cell/collections', () => {
   const noop = () => {};
 
-  it('mutableArray', () => {
+  it('mutArray', () => {
     const [
       array,
       { push, pop, unshift, shift, reverse, setAt, splice },
@@ -35,5 +35,29 @@ describe('cell/collections', () => {
     dispose();
   });
 
-  // TODO: complete unit tests
+  it('mutSet', () => {
+    const [set, { add, delete: d, clear }] = mutSet([1,2,3]);
+
+    const setSize = set.map(x=>x.size);
+    
+    add(4);
+    expect(setSize.value).toBe(4);
+    d(1);
+    expect(setSize.value).toBe(3);
+    clear();
+    expect(setSize.value).toBe(0);
+  });
+
+  it('mutMap', () => {
+    const [map, { set, delete: d, clear }] = mutMap<string,string>([["test","test"]]);
+
+    const mapSize = map.map(x=>x.size);
+
+    set("test2","test2");
+    expect(mapSize.value).toBe(2);
+    d("test");
+    expect(mapSize.value).toBe(1);
+    clear();
+    expect(mapSize.value).toBe(0);
+  });
 });

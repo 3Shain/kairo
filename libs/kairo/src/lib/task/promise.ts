@@ -1,3 +1,5 @@
+import { Cleanable } from '../types';
+import { doCleanup } from '../utils';
 import { Runnable } from './types';
 
 export class CanceledError extends Error {
@@ -20,7 +22,7 @@ export class CancellablePromise<T> extends Promise<T> implements Runnable<T> {
     executor: (
       resolve: (value: T | PromiseLike<T>) => void,
       reject: (reason?: any) => void
-    ) => (() => void) | undefined
+    ) => Cleanable
   ) {
     super((resolve, reject) => {
       let settled = false;
@@ -42,7 +44,7 @@ export class CancellablePromise<T> extends Promise<T> implements Runnable<T> {
           return;
         }
         if (dispose) {
-          dispose(); // might become settled.
+          doCleanup(dispose); // might become settled.
           settled = true;
           reject(new CanceledError());
         }

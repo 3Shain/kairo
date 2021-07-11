@@ -1,4 +1,5 @@
-const identity = <T>(x: T) => x;
+import { identity } from "./utils";
+
 
 class Reference<T = any> {
   get bind(): any {

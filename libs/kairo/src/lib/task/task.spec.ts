@@ -21,7 +21,7 @@ if (typeof AggregateError === 'undefined') {
   };
 }
 
-describe('task/task', () => {
+describe('concurrency/task', () => {
   it('task can recover from error', (done) => {
     executeRunnable(
       (function* () {
