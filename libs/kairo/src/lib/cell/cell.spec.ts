@@ -6,7 +6,7 @@ import {
   SuspendWithFallback,
   transaction,
 } from './internal';
-import { start, delay } from '../task';
+import { start, delay } from '../concurrency';
 
 describe('cell', () => {
   const noop = () => {};
@@ -232,8 +232,10 @@ describe('cell', () => {
           yield* b;
           expect(hasFlag(b,Flag.Stale)).toBeFalsy();
           expect(numOfSourceNodes(b)).toBe(1);
-          expect(numOfWatchers(b)).toBe(0);
+          expect(numOfWatchers(b)).toBe(1);
         }
+        yield* delay(1);
+        expect(numOfWatchers(b)).toBe(0);
       })()
     );
   });

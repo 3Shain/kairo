@@ -1,5 +1,5 @@
 import { transaction } from './cell';
-import { RunnableGenerator } from './task';
+import { RunnableGenerator } from './concurrency';
 import { Cleanable, TeardownLogic } from './types';
 import { doCleanup } from './utils';
 

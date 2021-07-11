@@ -15,7 +15,7 @@ import {
   Flag,
 } from './internal';
 import { doCleanup, identity } from '../utils';
-import { RunnableGenerator } from '../task/types';
+import { RunnableGenerator } from '../concurrency/types';
 
 export class Cell<T> {
   constructor(protected internal: Data<T>) {}

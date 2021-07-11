@@ -1,6 +1,6 @@
 import { accessData, createData, setData } from './cell/internal';
 import { Suspend, SuspendWithFallback, untrack } from './cell';
-import { Runnable, executeRunnable } from './task';
+import { Runnable, executeRunnable } from './concurrency';
 import { noop } from './utils';
 
 export function read<T>(runnable: Runnable<T>): T {

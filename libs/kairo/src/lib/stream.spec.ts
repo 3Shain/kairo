@@ -1,6 +1,6 @@
 import { noop } from './utils';
 import { EventStream, merged, stream } from './stream';
-import { start, delay } from './task';
+import { start, delay } from './concurrency';
 
 describe('stream', () => {
   it('should be lazy', () => {

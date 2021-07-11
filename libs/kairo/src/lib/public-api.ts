@@ -57,5 +57,5 @@ export type { Provider, Factory } from './scope';
 export { held, reduced } from './derived';
 export * from './read';
 export * from './schedule';
-export * from './task';
+export * from './concurrency';
 export * from './reference';
