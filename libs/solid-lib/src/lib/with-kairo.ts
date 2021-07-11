@@ -29,7 +29,9 @@ let $$READ_AS_PROP = false;
  */
 
 Object.defineProperty(Cell.prototype, 'value', {
-  get: createPatch(Object.getOwnPropertyDescriptor(Cell.prototype, 'value').get),
+  get: createPatch(
+    Object.getOwnPropertyDescriptor(Cell.prototype, 'value').get
+  ),
 });
 
 Object.defineProperty(ComputationalCell.prototype, 'value', {
@@ -95,28 +97,32 @@ function withKairo<Props>(
     const scope = new Scope(parent);
 
     const endScope = scope.beginScope();
-    const Component = setup(
-      {
-        ...props,
-      } as any,
-      (thunk) => {
-        try {
-          $$READ_AS_PROP = true;
-          const [prop, setProp] = mutValue(thunk(props));
-          createComputed(() => {
-            setProp(thunk(props));
-          });
-          return prop;
-        } catch (e) {
-          /* istanbul ignore else */
-          if (isCell(e)) return e as Cell<any>;
-          else throw e;
-        } finally {
-          $$READ_AS_PROP = false;
+    let Component: Component<Props>;
+    try {
+      Component = setup(
+        {
+          ...props,
+        } as any,
+        (thunk) => {
+          try {
+            $$READ_AS_PROP = true;
+            const [prop, setProp] = mutValue(thunk(props));
+            createComputed(() => {
+              setProp(thunk(props));
+            });
+            return prop;
+          } catch (e) {
+            /* istanbul ignore else */
+            if (isCell(e)) return e as Cell<any>;
+            else throw e;
+          } finally {
+            $$READ_AS_PROP = false;
+          }
         }
-      }
-    );
-    endScope();
+      );
+    } finally {
+      endScope();
+    }
 
     onMount(() => {
       const dispose = scope.attach();
