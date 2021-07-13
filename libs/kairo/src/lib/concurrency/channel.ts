@@ -1,4 +1,4 @@
-import { EventStream } from '../public-api';
+import { EventStream } from '../stream';
 import { Runnable } from './types';
 
 const END = {};
@@ -19,10 +19,6 @@ function eventReaderBase<T>(
   const stopUntilListener = until.listen((next) => {
     if (!closed) {
       dispose();
-      if (continuation) {
-        continuation(END);
-        continuation = null;
-      }
     }
   });
   const stopFromListener = from.listen((next) => {
@@ -37,11 +33,16 @@ function eventReaderBase<T>(
     if (!closed) {
       stopUntilListener();
       stopFromListener();
+      if (continuation) {
+        continuation(END);
+        continuation = null;
+      }
       closed = true;
     }
   }
 
   const next = function* (): Runnable<T> {
+    /* istanbul ignore if */
     if (continuation !== null) {
       throw new Error(`There exists a Task waiting for this channel already.`);
     }
@@ -67,6 +68,7 @@ function eventReaderBase<T>(
   };
 
   const hasNext = function* (): Runnable<boolean> {
+    /* istanbul ignore if */
     if (continuation !== null) {
       throw new Error(`There exists a Task waiting for this channel already.`);
     }

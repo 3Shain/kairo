@@ -35,12 +35,15 @@ export function setupKairo<Props, Bindings>(
       detachHandler = scope.attach();
     });
     onUnmounted(() => {
+      if (insideKeepAlive) return;
       detachHandler!();
       detachHandler = null;
     });
 
+    let insideKeepAlive = false;
     let deactivating = false;
     onActivated(() => {
+      insideKeepAlive = true;
       if (deactivating) {
         detachHandler = scope.attach();
         deactivating = false;
@@ -114,7 +117,7 @@ export function setupKairo<Props, Bindings>(
             key,
             customRef(() => {
               return {
-                get: () => {
+                get: /* istanbul ignore next */ () => {
                   return value.current;
                 },
                 set: (v: any) => {

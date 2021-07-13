@@ -16,13 +16,13 @@ export function createKairoApp(setup?: () => void) {
         unmount = app.unmount;
       let detach: () => void = null;
       // dirty patches
-      app.mount = function () {
+      app.mount = function (...args: any[]) {
         detach = rootScope.attach();
-        mount.call(app);
+        return mount.apply(app, args);
       }.bind(app);
       app.unmount = function () {
         detach?.();
-        unmount.call(app);
+        return unmount.apply(app);
       };
       app.provide(SCOPE, topScope);
     },

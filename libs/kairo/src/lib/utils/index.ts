@@ -20,6 +20,7 @@ export function doCleanup(cleanup: Cleanable) {
   }
 }
 
+/* istanbul ignore next */
 export function panic(code: number) {
   throw new Error(
     `Fatal error code (${code}): please file an issue to report this.`

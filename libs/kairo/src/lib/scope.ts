@@ -1,8 +1,14 @@
+import { CancellablePromise } from './concurrency';
 import { Cleanable } from './types';
-import { doCleanup } from './utils';
+import { doCleanup, noop } from './utils';
 import { BloomFilter } from './utils/bloom-filter';
 
 type OnMountLogic = () => Cleanable;
+
+/**
+ * The dirtiest part of kairo (the second is concurrency...)
+ * The bloomfilter process is inspired by Angular.
+ */
 
 class Scope {
   private onmountLogics: OnMountLogic[] = [];
@@ -34,17 +40,20 @@ class Scope {
     if (Scope._currentScope) {
       return Scope._currentScope;
     }
+    /* istanbul ignore next */
     throw new TypeError('Not inside a scope.');
   }
 
   registerOnMountLogic(logic: OnMountLogic) {
+    /* istanbul ignore if */
     if (this !== Scope.current) {
       throw new TypeError('Invalid opearation');
     }
     this.onmountLogics.push(logic);
   }
 
-  registerProvider(arg0: any, arg1?: any): any {
+  registerProvider(arg0: any, arg1?: any, ...args: any[]): any {
+    /* istanbul ignore if */
     if (this !== Scope.current) {
       throw new TypeError('Invalid opearation');
     }
@@ -53,26 +62,10 @@ class Scope {
       this.injections.set(arg0, arg1);
       return arg1;
     } else if (typeof arg0 === 'function' && assertType<Factory<any>>(arg0)) {
-      const exposed = arg1 != undefined ? arg0(...arg1) : arg0(); //TODO: PBP
+      const exposed = arg0(arg1, ...args);
       this.injections_bloom.add(arg0.name);
       this.injections.set(arg0, exposed);
       return exposed;
-    } else if (arg0.provide && assertType<Provider<any>>(arg0)) {
-      if ('useAlias' in arg0) {
-        const aliased = inject(arg0.useAlias);
-
-        this.injections_bloom.add(arg0.provide.name);
-        this.injections.set(arg0.provide, aliased);
-
-        return aliased;
-      } else if ('useValue' in arg0) {
-        this.injections_bloom.add(arg0.provide.name);
-        this.injections.set(arg0.provide, arg0.useValue);
-
-        return arg0.useValue;
-      } else if ('useFactory' in arg0) {
-        throw Error('not implemented');
-      }
     }
   }
 
@@ -84,7 +77,7 @@ class Scope {
   ): any {
     let scope: Scope | undefined = this;
     if (options?.skipSelf) {
-      scope = scope.parentScope;
+      scope = scope.parentScope ?? scope.rootScope; // in case current scope is top
     }
     // get bloom hash
     if (scope?.injections_bloom.test(token.name) === false) {
@@ -107,11 +100,18 @@ class Scope {
 
   private attached = false;
   attach() {
+    /* istanbul ignore if */
     if (this.attached) {
       throw TypeError('Scope has been attached');
     }
     this.attached = true;
-    const cleanups = this.onmountLogics.map((x) => x());
+    const cleanups = this.onmountLogics.map((x) => {
+      const cleanup = x();
+      if (cleanup instanceof CancellablePromise) {
+        cleanup.catch(noop); // to avoid unhandled promise rejection
+      }
+      return cleanup;
+    });
     return () => {
       this.attached = false;
       cleanups.forEach(doCleanup);
@@ -130,6 +130,7 @@ class Token<T> {
     return new Token<T>(name);
   }
 
+  /* istanbul ignore next */
   toString() {
     return this.name;
   }
@@ -140,31 +141,14 @@ interface Factory<T> {
   (...args: any[]): T;
 }
 
-type Provider<T> = (
-  | {
-      useValue: T;
-    }
-  | {
-      useFactory: (...args: []) => T;
-      deps?: any[];
-    }
-  | {
-      useAlias: Factory<T> | Token<T>;
-    }
-) & {
-  provide: Factory<T> | Token<T>;
-  multi?: boolean;
-};
-
 function assertType<T>(value: unknown): value is T {
   return true;
 }
 
-function provide<T>(providers: Provider<T>): T;
-function provide<T>(factory: Factory<T>, args?: any[]): T;
+function provide<T>(factory: Factory<T>, ...args: Parameters<Factory<T>>): T;
 function provide<T>(provide: Token<T>, value: T): T;
-function provide<T>(arg0: any, arg1?: any): any {
-  return Scope.current.registerProvider(arg0, arg1);
+function provide<T>(arg0: any, ...arg1: any[]): any {
+  return Scope.current.registerProvider(arg0, ...arg1);
 }
 
 function inject<T>(
@@ -198,4 +182,4 @@ function inject(
   return Scope.current.inject(token, options);
 }
 
-export { inject, provide, mount, Token, Scope, Factory, Provider };
+export { inject, provide, mount, Token, Scope, Factory };

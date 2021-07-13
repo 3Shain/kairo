@@ -1,9 +1,12 @@
 import { fireEvent, render } from '@testing-library/vue';
-import { withKairo } from '../src';
+import { withKairo, createKairoApp } from '../src';
 import { effect, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 import { nextTick } from 'vue';
 import Case1SFC from './Case1.vue';
+import KeepAlive from './KeepAlive.vue';
+
+const kairoApp = createKairoApp(() => {});
 
 describe('@kairo/vue', () => {
   it('implement Simple Component Model (jsx)', async () => {
@@ -12,6 +15,38 @@ describe('@kairo/vue', () => {
 
   it('implement Simple Component Model (sfc)', async () => {
     await case1(Case1SFC);
+  });
+
+  it('keepalive', async () => {
+    const w = render(KeepAlive, {
+      props: {
+        show: true,
+      },
+      global: {
+        plugins: [kairoApp],
+      },
+    });
+
+    await nextTick();
+    w.rerender({
+      show: false,
+    });
+
+    await nextTick();
+    w.rerender({
+      show: true,
+    });
+
+    await nextTick();
+    w.rerender({
+      show: false,
+    });
+
+    await nextTick();
+    w.rerender({
+      show: true,
+    });
+    w.unmount();
   });
 });
 
@@ -26,6 +61,9 @@ async function case1(Component: any) {
       clean: cleanCallback,
       viewProp: 'Hello',
       viewPropChanged: viewpropChangedCallback,
+    },
+    global: {
+      plugins: [kairoApp],
     },
   });
   expect(initCallback).toBeCalledTimes(1);
@@ -122,7 +160,3 @@ const Case1Child = withKairo<{ count: number }>((_, useProp) => {
 });
 
 Case1Child.props = ['count'];
-
-/**
- * chilren: cascaded dependency injection.
- */
