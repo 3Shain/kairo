@@ -1,0 +1,13 @@
+{
+  "name": "@kairo/vite-plugin-vue",
+  "version": "0.0.1",
+  "description": "",
+  "dependencies": {
+    "@kairo/vue-sfc-transformer": ">=0.0.1"
+  },
+  "peerDependencies": {
+    "@vitejs/plugin-vue": ">=1.0.0",
+    "vite": ">=2.0.0",
+    "@kairo/vue": ">=0.6.0-alpha.0"
+  }
+}

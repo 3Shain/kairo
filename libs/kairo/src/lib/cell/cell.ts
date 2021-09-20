@@ -1,125 +1,118 @@
-import { Symbol_observable, Cleanable, TeardownLogic } from '../types';
+import { PartialObserver, Symbol_observable, Unsubscribable } from '../types';
 import {
-  Data,
-  accessData,
-  createComputation,
-  disposeWatcher,
-  Computation,
-  accessComputation,
-  executeLazy,
+  accessValue,
+  cleanupComputation,
+  createMemo,
+  createReaction,
   createData,
+  Data,
+  executeReaction,
+  Reaction as _Reaction,
   setData,
-  createLazy,
-  createSuspended,
-  watch,
-  Flag,
 } from './internal';
-import { doCleanup, identity } from '../utils';
-import { RunnableGenerator } from '../concurrency/types';
 
 export class Cell<T> {
+  static of<T>(initial: T) {
+    return new Cell(createData(initial));
+  }
+
   constructor(protected internal: Data<T>) {}
 
   get value(): T {
-    return accessData(this.internal);
+    return accessValue(this.internal);
+  }
+
+  get error(): any {
+    try {
+      accessValue(this.internal);
+      return null;
+    } catch (e) {
+      return e;
+    }
   }
 
   [Symbol_observable]() {
     return this;
   }
 
-  *[Symbol.iterator](): RunnableGenerator<T> {
-    return yield (resolve) => {
-      const unsub = this.watch((value) => {
-        resolve(value);
-        unsub();
-      });
-      return unsub;
-    };
-  }
-
-  map<R>(mapFn: (value: T) => R): Cell<R> {
-    const internal = createComputation(() => mapFn(this.value));
-    return new ComputationalCell(internal);
-  }
-
-  watch(
-    watchFn: (value: T) => Cleanable,
-    options?: WatchOptions
-  ): TeardownLogic {
-    let lastDisposer: Cleanable = undefined;
-    const watcher = watch(this.internal, () => {
-      doCleanup(lastDisposer);
-      lastDisposer = watchFn(this.internal.value!);
-    });
-    if (options?.immediate) {
-      lastDisposer = watchFn(this.internal.value!);
-    }
-    return () => {
-      doCleanup(lastDisposer);
-      disposeWatcher(watcher!);
-    };
-  }
-
   /**
-   * @deprecated Use watch.
+   * @deprecated Should be only used for interop.
    */
-  subscribe(next: (value: T) => void) {
-    const ret = this.watch(
-      (v) => {
-        next(v);
-      },
-      { immediate: true }
-    );
-    (ret as any).unsubscribe = ret;
-    return ret as {
-      (): void;
-      unsubscribe(): void;
-    };
-  }
-}
-
-export interface WatchOptions {
-  immediate?: boolean;
-}
-
-export class ComputationalCell<T> extends Cell<T> {
-  constructor(internal: Computation<T>) {
-    super(internal);
-  }
-
-  get value(): T {
-    return accessComputation(this.internal as Computation);
-  }
-}
-
-export class Lazy<T> {
-  get stale() {
-    return (this.internal.flags & Flag.Stale) > 0;
-  }
-
-  constructor(private internal: Computation<T>) {}
-
-  execute(expr: (current: T) => T) {
-    return executeLazy<T>(this.internal, expr);
-  }
-
-  watch(
-    watchFn: (value: T) => Cleanable,
-    options?: WatchOptions
-  ): TeardownLogic {
-    let lastDisposer: Cleanable = undefined;
-    const watcher = watch(this.internal, () => {
-      doCleanup(lastDisposer);
-      lastDisposer = watchFn(this.internal.value!);
-    });
-    if (options?.immediate) {
-      lastDisposer = watchFn(this.internal.value!);
+   subscribe(observer?: PartialObserver<T>): CellSubscription<T>;
+  /**
+   * @deprecated Should be only used for interop.
+   */
+  subscribe(
+    next?: (value: T) => void,
+    error?: (error: any) => void,
+    complete?: () => void
+  ): CellSubscription<T>;
+  /**
+   * @deprecated Should be only used for interop.
+   */
+  subscribe(
+    next?: ((value: T) => void) | PartialObserver<T>,
+    error?: (error: any) => void,
+    complete?: () => void
+  ): CellSubscription<T> {
+    if (typeof next === 'function') {
+      return new CellSubscription(this, {
+        next,
+        error,
+        complete,
+      });
+    } else if (typeof next == 'object') {
+      return new CellSubscription(this, next);
     }
-    return () => {
-      doCleanup(lastDisposer);
-      disposeWatcher(watcher!);
+    throw new TypeError('');
+  }
+}
+
+class CellSubscription<T> implements Unsubscribable {
+  private readonly reaction: Reaction;
+
+  constructor(cell: Cell<T>, observer: PartialObserver<T>) {
+    const callback = () => {
+      let value ,
+        isError = false;
+      try {
+        value = this.reaction.execute(() => cell.value);
+      } catch (e: any) {
+        value = e;
+        isError = true;
+      }
+      if (isError) {
+        observer.closed || observer.next?.(value);
+      } else {
+        observer.closed || observer.error?.(value);
+      }
     };
+    this.reaction = new Reaction(callback);
+    callback();
+  }
+
+  unsubscribe() {
+    this.reaction.dispose();
+  }
+}
+
+export class Reaction {
+  get stale() {
+    return false;
+  }
+
+  private internal: _Reaction;
+
+  constructor(callback: () => any) {
+    this.internal = createReaction(callback);
+  }
+
+  execute<T>(expr: () => T) {
+    return executeReaction<T>(this.internal, expr);
+  }
+
+  dispose() {
+    cleanupComputation(this.internal);
   }
 }
 
@@ -134,9 +127,9 @@ export function mutable<T>(
     new Cell(internal),
     (v) => {
       if (v instanceof Function) {
-        setData(internal, v(internal.value!), true);
+        setData(internal, v(internal.value!));
       } else {
-        setData(internal, v as any, true);
+        setData(internal, v as any);
       }
     },
   ];
@@ -147,71 +140,11 @@ export function mutValue<T>(initialValue: T): [Cell<T>, (value: T) => void] {
   return [
     new Cell(internal),
     (v) => {
-      setData(internal, v as any, true);
+      setData(internal, v as any);
     },
   ];
 }
 
-export function lazy<T>(initial?: T) {
-  return new Lazy<T>(createLazy(initial));
-}
-
-export function computed<T>(
-  expr: () => T,
-  options?: {
-    static?: boolean;
-    initial?: T;
-  }
-): Cell<T> {
-  const internal = createComputation(expr, options);
-  return new ComputationalCell(internal) as Cell<T>;
-}
-
-export function suspended<T, F = T>(expr: () => T, fallback: F): Cell<T> {
-  const internal = createSuspended(expr, fallback);
-  return new ComputationalCell(internal);
-}
-
-export function constant<T>(value: T) {
-  return new Cell(createData(value));
-}
-
-export type UnwrapProperty<T> = T extends object
-  ? {
-      [P in keyof T]: T[P] extends Cell<infer C> ? C : T[P];
-    }
-  : T;
-
-export function combined<A extends Array<Cell<any>>, R = UnwrapProperty<A>>(
-  array: A,
-  lifeFn?: (a: UnwrapProperty<A>) => R
-): Cell<R>;
-export function combined<
-  C extends {
-    [key: string]: Cell<any>;
-  },
-  R = UnwrapProperty<C>
->(obj: C, lifeFn?: (A: UnwrapProperty<C>) => R): Cell<R>;
-export function combined(
-  obj: object,
-  lifeFn: (a: any) => any = identity
-): Cell<any> {
-  if (obj instanceof Array) {
-    return computed(() => {
-      return lifeFn(
-        obj.map((x) => {
-          return x.value;
-        })
-      );
-    });
-  }
-  return computed(() => {
-    return lifeFn(
-      Object.fromEntries(
-        Object.entries(obj).map(([key, value]) => {
-          return [key, value.value];
-        })
-      )
-    );
-  });
+export function computed<T>(expr: () => T): Cell<T> {
+  return new Cell(createMemo(expr));
 }

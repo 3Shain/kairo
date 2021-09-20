@@ -5,6 +5,7 @@ export function broadPropagation(bridge: Bridge) {
   {
     let head = bridge.cell(0);
     let last = head as ReadableCell<number>;
+    let callCounter: Function = null;
     for (let i = 0; i < 50; i++) {
       let current = bridge.computed(() => {
         return head.read() + i;
@@ -21,7 +22,6 @@ export function broadPropagation(bridge: Bridge) {
       last = current2;
     }
 
-    let callCounter: Function = null;
 
     return () => {
       head.write(1);

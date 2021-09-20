@@ -1,4 +1,4 @@
-import { Scope } from 'kairo';
+import { Context } from 'kairo';
 import { InjectionKey } from 'vue';
 
-export const SCOPE = Symbol('kairo scope') as InjectionKey<Scope>;
+export const CONTEXT = Symbol('kairo context') as InjectionKey<Context>;

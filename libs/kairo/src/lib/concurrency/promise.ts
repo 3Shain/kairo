@@ -1,6 +1,6 @@
 import { Cleanable } from '../types';
-import { doCleanup } from '../utils';
-import { Runnable } from './types';
+import { doCleanup } from '../misc';
+import { Runnable, RunnableGenerator } from './types';
 
 export class CanceledError extends Error {
   name = 'CanceledError';
@@ -53,8 +53,11 @@ export class CancellablePromise<T> extends Promise<T> implements Runnable<T> {
     this.cancel = $$CANT_ACCESS_CHILD_PROP_INSIDE_SUPER;
   }
 
-  *[Symbol.iterator]() {
-    return (yield this) as T;
+  *[Symbol.iterator](): RunnableGenerator<T> {
+    return yield (resolve, reject) => {
+      this.then(resolve, reject);
+      return () => this.cancel();
+    };
   }
 
   /**

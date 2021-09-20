@@ -1,4 +1,4 @@
-import { mount } from './scope';
+import { lifecycle } from './lifecycle-scope';
 import { EventStream, stream } from './stream';
 import { TeardownLogic } from './types';
 
@@ -63,7 +63,7 @@ function scheduled<T, R = T>(
   scheduler: Scheduler<T, R>
 ) {
   const [dest, emitDest] = stream<R>();
-  mount(() => source.listen(scheduler(emitDest)));
+  lifecycle(() => source.listen(scheduler(emitDest)));
   return dest;
 }
 

@@ -13,14 +13,6 @@
     "lib": ["esnext", "dom"],
     "types": ["vite/client"]
   },
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
-    }
-  ]
+  "exclude": ["**/*.spec.ts", "**/*.spec.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.vue"]
 }

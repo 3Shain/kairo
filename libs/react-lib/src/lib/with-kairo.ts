@@ -1,10 +1,10 @@
-import { Cell, Scope, mount, lazy, mutValue } from 'kairo';
+import { Cell, lifecycle, Reaction, mutValue, collectScope } from 'kairo';
 import React, {
   useContext,
   useEffect,
   useMemo,
-  useReducer,
   forwardRef as reactForwardRef,
+  useState,
 } from 'react';
 import { KairoContext } from './context';
 
@@ -30,13 +30,9 @@ export function withKairo<Props>(
   ) => FunctionComponent<Props>
 ) {
   const component: FunctionComponent<Props> = (props) => {
-    const { render, renderComp, scope } = useKairoComponent(props, setup);
+    const { render, renderComp } = useKairoComponent(props, setup);
 
-    return (
-      <KairoContext.Provider value={scope}>
-        {renderComp.execute(() => render(props))}
-      </KairoContext.Provider>
-    );
+    return renderComp.execute(() => render(props));
   };
   component.displayName = setup.name;
   return component;
@@ -49,17 +45,15 @@ export function forwardRef<Props, Ref>(
   ) => ForwardRefRenderFunction<Ref, Props>
 ) {
   const component: ForwardRefRenderFunction<Ref, Props> = (props, ref) => {
-    const { render, renderComp, scope } = useKairoComponent(props, setup);
+    const { render, renderComp } = useKairoComponent(props, setup);
 
-    return (
-      <KairoContext.Provider value={scope}>
-        {renderComp.execute(() => render(props, ref))}
-      </KairoContext.Provider>
-    );
+    return renderComp.execute(() => render(props, ref));
   };
   component.displayName = setup.name;
   return reactForwardRef(component);
 }
+
+const inc = (x: number) => x + 1;
 
 function useKairoComponent<
   Props,
@@ -71,12 +65,11 @@ function useKairoComponent<
     useProp: <P>(selector: (x: Props) => P) => Cell<P>
   ) => RenderFunction
 ) {
-  const parentScope = useContext(KairoContext);
-  const [, forceUpdate] = useReducer((c) => c + 1, 0);
+  const parentContext = useContext(KairoContext);
+  const [, forceUpdate] = useState(0);
   const instance = useMemo(() => {
-    const scope = new Scope(parentScope);
-    const endScope = scope.beginScope();
-
+    const exitScope = collectScope();
+    const exitContext = parentContext.runInContext();
     const propsSetter = [];
     $$CURRENT_HOOKS = [];
     try {
@@ -94,16 +87,10 @@ function useKairoComponent<
           });
         }
       });
-      const renderNode = lazy<ReturnType<typeof render>>();
-      mount(() => {
-        const stop = renderNode.watch(() => {
-          forceUpdate();
-        });
-        /* istanbul ignore if */
-        if (renderNode.stale) {
-          forceUpdate();
-        }
-        return stop;
+      // TODO: bug: memory leak in strict-mode: unmanaged subscription.
+      const renderNode = new Reaction(() => {
+        // if not attached: recycle.
+        forceUpdate(inc);
       });
 
       const hooks = $$CURRENT_HOOKS;
@@ -112,10 +99,11 @@ function useKairoComponent<
         render,
         hooks,
         renderComp: renderNode,
-        scope,
+        scope: exitScope(),
       };
     } finally {
-      endScope();
+      exitContext();
+      exitScope();
       $$CURRENT_HOOKS = null;
     }
   }, []);
@@ -123,5 +111,6 @@ function useKairoComponent<
     hook(props);
   }
   useEffect(() => instance.scope.attach(), []);
+  useEffect(() => () => instance.renderComp.dispose(), []);
   return instance;
 }

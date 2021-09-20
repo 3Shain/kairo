@@ -1,16 +1,15 @@
 <script lang="ts" kairo="root">
   /// <reference types="jest" />
   import '@testing-library/jest-dom';
-  import { reference, mut, effect } from 'kairo';
+  import { reference, mut, lifecycle, computed } from 'kairo';
   import Case1Child from './Case1Child.svelte';
   const para = reference<HTMLParagraphElement>(null);
-
   export let initialize: Function;
   export let clean: Function;
   export let viewProp: number;
   export let viewPropChanged: Function;
 
-  effect(() => {
+  lifecycle(() => {
     initialize();
     expect(para.current).toBeInTheDocument();
 
@@ -20,19 +19,13 @@
   });
 
   const [viewProp$, setVp] = mut(viewProp);
-  $:{
-      setVp(viewProp);
+  $: {
+    setVp(viewProp);
   }
-  effect(() =>
-    viewProp$.watch(() => {
-      viewPropChanged();
-    })
-  );
 
   const [count, setCount] = mut(0);
 
-  const doubled = count.map((x) => x * 2);
-
+  const doubled = computed(()=>count.value * 2);
 </script>
 
 <div>

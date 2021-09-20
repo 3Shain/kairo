@@ -3,6 +3,7 @@
   "configurations": [
 
 
+
     {
       "name": "Bench",
       "type": "node",
@@ -32,6 +33,17 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceRoot}/node_modules/.bin/nx",
       "args": ["test", "ng-lib", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (react-lib)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "react-lib", "--runInBand", "-i"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "trace": "all"

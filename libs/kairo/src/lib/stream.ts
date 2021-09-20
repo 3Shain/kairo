@@ -1,7 +1,7 @@
-import { transaction } from './cell';
+import { batch } from './cell';
 import { RunnableGenerator } from './concurrency';
 import { Cleanable, TeardownLogic } from './types';
-import { doCleanup } from './utils';
+import { doCleanup } from './misc';
 
 interface SubscriptionNode {
   next: SubscriptionNode | null;
@@ -112,7 +112,7 @@ export class EventStream<T> {
     const stream = new EventStream<T>(() => {
       return () => {};
     });
-    return [stream, (payload: T) => transaction(() => stream.next(payload))];
+    return [stream, (payload: T) => batch(() => stream.next(payload))];
   }
 }
 

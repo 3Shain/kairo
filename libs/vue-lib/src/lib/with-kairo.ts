@@ -1,23 +1,128 @@
-import { Cell } from 'kairo';
 import {
-  ComponentPublicInstance,
-  defineComponent,
+  Reaction,
+  collectScope,
+  lifecycle,
+  Cell,
+  Context,
+  LifecycleScope,
+} from 'kairo';
+import {
+  customRef,
+  DefineComponent,
+  inject,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  onUnmounted,
   SetupContext,
+  defineComponent,
   VNodeChild,
+  RenderFunction,
+  ref,
 } from 'vue';
-import { setupKairo } from './setup-kairo';
+import { CONTEXT } from './context';
 
-export function withKairo<Props = {}>(
-  setup: (
-    props: Readonly<Props>,
-    useProp: <T>(thunk: (props: Props) => T) => Cell<T>,
-    ctx: SetupContext
-  ) => (
-    this: ComponentPublicInstance,
-    mockProps: { children?: VNodeChild } & Props
-  ) => VNodeChild | object
-) {
-  return defineComponent<Props>({
-    setup: setupKairo(setup),
+Object.defineProperty(Cell.prototype, '__v_isRef', {
+  value: true,
+});
+
+export function useScopeController(scope: LifecycleScope) {
+  let detachHandler: Function | null = null;
+
+  onMounted(() => {
+    detachHandler = scope.attach();
   });
+  onUnmounted(() => {
+    if (insideKeepAlive) return;
+    detachHandler!();
+    detachHandler = null;
+  });
+
+  let insideKeepAlive = false;
+  let deactivating = false;
+  onActivated(() => {
+    insideKeepAlive = true;
+    if (deactivating) {
+      detachHandler = scope.attach();
+      deactivating = false;
+    }
+  });
+  onDeactivated(() => {
+    detachHandler!();
+    detachHandler = null;
+    deactivating = true;
+  });
+}
+
+export function withKairo<Props>(
+  component: (props: Props, ctx: SetupContext) => (props: Props) => VNodeChild
+) {
+  return withKairoComponent(
+    defineComponent<Props>((props, ctx) => {
+      const renderFn = component(props, ctx); // TODO:
+      return (() => {
+        return renderFn({ ...props });
+      }) as RenderFunction;
+    })
+  );
+}
+
+export function withKairoComponent<T extends DefineComponent>(component: T) {
+  const { setup, render } = component;
+  component.setup = function (
+    this: undefined,
+    props: Parameters<T['setup']>[0],
+    setupContext: SetupContext
+  ) {
+    const stopCollecting = collectScope();
+    const context = inject(CONTEXT, Context.EMPTY);
+    const exitContext = context.runInContext();
+    try {
+      const bindings = setup(props, setupContext);
+      if (bindings instanceof Promise) {
+        throw Error('Async component is not supported.');
+      }
+      const tracker = ref(0);
+      const r = new Reaction(() => {
+        tracker.value++;
+      });
+      lifecycle(() => {
+        return () => r.dispose();
+      });
+      if (typeof bindings === 'function') {
+        // @ts-ignore
+        return (...args: unknown[]) => (tracker.value, bindings(...args));
+      }
+      return {
+        ...bindings,
+        tracker,
+        r,
+      };
+    } finally {
+      exitContext();
+      useScopeController(stopCollecting());
+    }
+  };
+  if (component.render) {
+    component.render = patchRender(render);
+  }
+  return component;
+}
+
+function patchRender(originalRender: Function) {
+  return function render(
+    this: any,
+    _ctx: any,
+    _cache: any,
+    $props: any,
+    $setup: any,
+    $data: any,
+    $options: any
+  ) {
+    const ret = _ctx.r.execute(
+      () => originalRender(_ctx, _cache, $props, $setup, $data, $options),
+      _ctx.tracker as void
+    );
+    return ret;
+  };
 }

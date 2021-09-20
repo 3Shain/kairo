@@ -8,8 +8,7 @@
 <script lang="ts">
 /// <reference types="jest" />
 import '@testing-library/jest-dom';
-import { setupKairo } from '../src';
-import { reference, mut, effect } from 'kairo';
+import { reference, mut, lifecycle } from 'kairo';
 import Case1Child from './Case1Child.vue';
 
 export default {
@@ -22,10 +21,10 @@ export default {
   components: {
     Case1Child
   },
-  setup: setupKairo((prop, useProp) => {
+  setup: ((prop, useProp) => {
     const para = reference<HTMLParagraphElement>(null);
 
-    effect(() => {
+    lifecycle(() => {
       prop.initialize();
       expect(para.current).toBeInTheDocument();
 
@@ -34,12 +33,12 @@ export default {
       };
     });
 
-    const viewProp = useProp((x) => x.viewProp);
-    effect(() =>
-      viewProp.watch(() => {
-        prop.viewPropChanged();
-      })
-    );
+    // const viewProp = useProp((x) => x.viewProp);
+    // lifecycle(() =>
+    //   viewProp.watch(() => {
+    //     prop.viewPropChanged();
+    //   })
+    // );
 
     const [count, setCount] = mut(0);
 

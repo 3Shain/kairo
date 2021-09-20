@@ -1,9 +1,9 @@
 import {
   computed,
   mutValue as data,
-  Scope,
-  transaction,
-} from '../libs/kairo/src';
+  batch,
+  reaction as kairoReaction,
+} from '../libs/kairo/src/lib/public-api';
 import {
   ref,
   computed as vComputed,
@@ -15,19 +15,19 @@ import S from 's-js';
 import {
   createRoot,
   createSignal,
-  createMemo,
+  createMemo as createMemoSolid,
   batch as sBatch,
   createComputed,
   // @ts-ignore
 } from '../../../node_modules/solid-js/dist/solid.cjs';
 import {
-  accessComputation,
-  accessData,
-  createComputation,
-  createData,
-  transaction as runInTransaction,
+  accessValue,
+  createMemo,
+  createData as createData,
   setData,
-  watch,
+  createReaction,
+  executeReaction,
+  cleanupComputation,
 } from '../libs/kairo/src/lib/cell/internal';
 
 import {
@@ -75,15 +75,10 @@ export const SBridge: Bridge = {
     };
   },
   watch: (read, effect) => {
-    S.on(
-      read,
-      (x) => {
-        effect();
-        return x;
-      },
-      undefined,
-      true
-    );
+    S(() => {
+      read();
+      effect();
+    });
     return () => {};
     // S.effect
   },
@@ -92,49 +87,6 @@ export const SBridge: Bridge = {
   },
   root: (fn) => {
     S.root(fn);
-  },
-};
-
-export const VueReactiveBridge: Bridge = {
-  cell: (initial) => {
-    const data = ref(initial);
-    return {
-      read() {
-        return data.value as any;
-      },
-      write(v) {
-        data.value = v as any;
-      },
-    };
-  },
-  computed: (fn) => {
-    const c = vComputed(fn);
-    return {
-      read() {
-        return c.value;
-      },
-    };
-  },
-  watch: (read, effect) => {
-    return vEffect(
-      () => {
-        return read();
-      },
-      {
-        lazy: false,
-        scheduler: (x) => {
-          read(); // set _dirty to false, to make it sync.
-          effect();
-        },
-      }
-    );
-  },
-  batch: (fn) => {
-    fn(); // no such way
-  },
-  root: (fn) => {
-    // S.root(fn)
-    fn(); // no such way
   },
 };
 
@@ -161,23 +113,19 @@ export const VueScheduledBridge = {
     };
   },
   watch: function (read, effect) {
-    let init = false;
-    return vEffect(
+    let t = vEffect(
       () => {
         read();
-        if (!init) {
-          init = true;
-          return;
-        }
         effect();
       },
       {
         lazy: false,
         scheduler: (x) => {
-          this.scheduled.push(x);
+          this.scheduled.push(t.effect);
         },
       }
     );
+    return t;
   },
   scheduled: [] as ReactiveEffect[],
   isBatching: false,
@@ -188,7 +136,7 @@ export const VueScheduledBridge = {
     this.isBatching = true;
     fn();
     while (this.scheduled.length) {
-      this.scheduled.pop()!();
+      this.scheduled.pop().run();
     }
     this.isBatching = false;
   },
@@ -208,7 +156,7 @@ export const SolidBridge: Bridge = {
     };
   },
   computed: (fn) => {
-    const read = createMemo(fn);
+    const read = createMemoSolid(fn);
     return {
       read,
     };
@@ -217,10 +165,6 @@ export const SolidBridge: Bridge = {
     let first = false;
     createComputed(() => {
       read();
-      if (!first) {
-        first = true;
-        return;
-      }
       effect();
     });
     return () => {
@@ -252,9 +196,9 @@ export const MobxBridge: Bridge = {
     };
   },
   watch: (read, effect) => {
-    reaction(read, effect, { fireImmediately: false });
+    const disposer = reaction(read, effect, { fireImmediately: true });
     return () => {
-      // no disposor
+      disposer();
     };
   },
   batch: (fn) => {
@@ -281,18 +225,21 @@ export const KairoBridge: Bridge = {
     };
   },
   watch: (read, effect) => {
-    const g = computed(read);
-    g.watch(effect);
-    return () => {};
+    const fn = () => {
+      effect();
+      g.execute(read);
+    };
+    const g = kairoReaction(fn);
+    fn();
+    return () => {
+      g.dispose();
+    };
   },
   batch: (fn) => {
-    transaction(fn);
+    batch(fn);
   },
   root: (fn) => {
-    const scope = new Scope();
-    const end = scope.beginScope();
     fn();
-    end();
   },
 };
 
@@ -300,87 +247,32 @@ export const KairoInternal: Bridge = {
   cell(initial) {
     const data = createData(initial);
     return {
-      read: () => accessData(data),
-      write: (w) => setData(data, w, true),
+      read: () => accessValue(data),
+      write: (w) => setData(data, w),
     };
   },
   computed: (fn) => {
-    const d = createComputation(fn, { static: false });
+    const d = createMemo(fn);
     return {
-      read: () => accessComputation(d),
+      read: () => accessValue(d),
     };
   },
   watch: (read, effect) => {
-    const g = createComputation(read, { static: false });
-    watch(g, effect);
-    return () => {};
+    const fn = () => {
+      effect();
+      executeReaction(g, read);
+    };
+    const g = createReaction(fn);
+    fn();
+    return () => {
+      cleanupComputation(g);
+    };
   },
   batch: (fn) => {
-    runInTransaction(fn);
+    batch(fn);
   },
   root: (fn) => {
     fn();
-  },
-};
-
-export const KairoInternalStatic: Bridge = {
-  cell(initial) {
-    const data = createData(initial);
-    return {
-      read: () => accessData(data),
-      write: (w) => setData(data, w, true),
-    };
-  },
-  computed: (fn) => {
-    const d = createComputation(fn, { static: true });
-    return {
-      read: () => accessComputation(d),
-    };
-  },
-  watch: (read, effect) => {
-    const g = createComputation(read, { static: true });
-    watch(g, effect);
-    return () => {};
-  },
-  batch: (fn) => {
-    runInTransaction(fn);
-  },
-  root: (fn) => {
-    fn();
-  },
-};
-
-export const KairoStaticBridge: Bridge = {
-  cell(initial) {
-    const [b, w] = data(initial);
-    return {
-      read: () => b.value,
-      write: w,
-    };
-  },
-  computed: (fn) => {
-    const d = computed(fn, {
-      static: true,
-    });
-    return {
-      read: () => d.value,
-    };
-  },
-  watch: (read, effect) => {
-    const g = computed(read, {
-      static: true,
-    });
-    g.watch(effect);
-    return () => {};
-  },
-  batch: (fn) => {
-    transaction(fn);
-  },
-  root: (fn) => {
-    const scope = new Scope();
-    const end = scope.beginScope();
-    fn();
-    end();
   },
 };
 

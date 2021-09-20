@@ -1,28 +1,39 @@
-import { Scope } from 'kairo';
-import { Component, createComponent, onCleanup, onMount } from 'solid-js';
+import { Concern, Concerns, reduceConcerns, collectScope } from 'kairo';
+import {
+  Component,
+  createComponent,
+  onCleanup,
+  onMount,
+  useContext,
+} from 'solid-js';
 import { KairoContext } from './context';
 
-export function createKairoApp(setup?: () => void) {
-  const rootScope = new Scope();
-  const endScope = rootScope.beginScope();
-  // platform setup (tokens)
-  setup?.();
-  endScope();
-  const topScope = new Scope(undefined, rootScope);
-  const App: Component = (props) => {
+export function withConcern<Props>(
+  concern: Concern,
+  component: Component<Props>
+): Component<Props> {
+  return (props: Props) => {
+    const currentContext = useContext(KairoContext);
+    const exitScope = collectScope();
+    const context = currentContext.build(concern);
+    const lifecycle = exitScope();
     onMount(() => {
-      onCleanup(rootScope.attach());
+      const detach = lifecycle.attach();
+      onCleanup(detach);
     });
+
     return createComponent(KairoContext.Provider, {
-      value: topScope,
+      value: context,
       get children() {
-        return props.children;
+        return createComponent(component, props);
       },
     });
   };
+}
 
-  return {
-    scope: rootScope,
-    App,
-  };
+export function withConcerns<Props>(
+  concerns: Concerns,
+  component: Component<Props>
+) {
+  return withConcern(reduceConcerns(concerns), component);
 }

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { KairoModule, ngSetup, WithKairo, ngElementRef } from '../src';
+import { ngSetup, WithKairo, ngElementRef, provideConcerns } from '../src';
 import {
   Component,
   ElementRef,
@@ -7,15 +7,16 @@ import {
   NO_ERRORS_SCHEMA,
   ViewChild,
 } from '@angular/core';
-import { mut, effect } from 'kairo';
+import { mut, lifecycle, computed, effect } from 'kairo';
 import '@testing-library/jest-dom';
 import { fireEvent } from '@testing-library/dom';
+import { KairoScopeRefImpl } from '../src/lib/kairo.service';
 
 describe('@kairo/angular', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [Case1Wrapper, Case1, Case1Child],
-      imports: [KairoModule.forRoot()],
+      imports: [],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
   });
@@ -47,12 +48,12 @@ describe('@kairo/angular', () => {
 
     app.viewProp = 'World';
     fixture.detectChanges();
-    expect(viewpropChangedCallback).toBeCalledTimes(1);
+    expect(viewpropChangedCallback).toBeCalledTimes(2);
     expect(compiled.querySelector('p')).toHaveTextContent('World');
 
     app.viewProp = 'Kairo';
     fixture.detectChanges();
-    expect(viewpropChangedCallback).toBeCalledTimes(2);
+    expect(viewpropChangedCallback).toBeCalledTimes(3);
     expect(compiled.querySelector('p')).toHaveTextContent('Kairo');
 
     fireEvent.click(button, {});
@@ -104,6 +105,10 @@ export class Case1Wrapper {
 @WithKairo()
 @Component({
   selector: 'case1',
+  providers: [
+    provideConcerns([()=>{
+    }])
+  ],
   template: `<p #para>{{ viewProp }}</p>
     <button (click)="onClick()">{{ count }}</button>
     <case1-child [count]="doubled"></case1-child>`,
@@ -120,7 +125,7 @@ export class Case1 extends ngSetup(
   ) => {
     const para = ngElementRef<HTMLParagraphElement>(null);
 
-    effect(() => {
+    lifecycle(() => {
       prop.initialize();
       expect(para.current).toBeInTheDocument();
 
@@ -130,15 +135,14 @@ export class Case1 extends ngSetup(
     });
 
     const viewProp = useProp((x) => x.viewProp);
-    effect(() =>
-      viewProp.watch(() => {
-        prop.viewPropChanged();
-      })
-    );
+    effect(()=>{
+      viewProp.value;
+      prop.viewPropChanged();
+    });
 
     const [count, setCount] = mut(0);
 
-    const doubled = count.map((x) => x * 2);
+    const doubled = computed(()=>count.value * 2);
 
     return {
       count,

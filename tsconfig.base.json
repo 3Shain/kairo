@@ -10,7 +10,7 @@
     "importHelpers": true,
     "noImplicitThis": true,
     "module": "esnext",
-    "target": "es2015",
+    "target": "esnext",
     "allowJs": true,
     "lib": ["esnext", "dom"],
     "skipLibCheck": true,

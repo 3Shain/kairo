@@ -17,12 +17,12 @@ export function triangle(bridge: Bridge) {
     return list.map((x) => x.read()).reduce((a, b) => a + b, 0);
   });
 
+  let callCounter: Function = null;
   bridge.watch(
     () => sum.read(),
     () => callCounter?.()
   );
 
-  let callCounter: Function = null;
   return () => {
     const constant = count(width);
     head.write(1);

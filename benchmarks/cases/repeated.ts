@@ -15,11 +15,11 @@ export function repeatedObservers(bridge: Bridge) {
       return result;
     });
 
+    let callCounter: Function = null;
     bridge.watch(
       () => current.read(),
       () => callCounter?.()
     );
-    let callCounter: Function = null;
 
     return () => {
       head.write(1);

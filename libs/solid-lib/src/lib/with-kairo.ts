@@ -9,15 +9,9 @@ import {
   runWithOwner,
   getOwner,
   onMount,
+  untrack,
 } from 'solid-js';
-import {
-  Cell,
-  ComputationalCell,
-  isCell,
-  mutValue,
-  Scope,
-  __current_collecting,
-} from 'kairo';
+import { Cell, collectScope, Context, isCell, mutValue, Reaction } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
 
@@ -25,7 +19,7 @@ let $$READ_AS_PROP = false;
 
 /**
  * side effects
- * patches prototype of Behavior
+ * patches prototype
  */
 
 Object.defineProperty(Cell.prototype, 'value', {
@@ -33,51 +27,49 @@ Object.defineProperty(Cell.prototype, 'value', {
     Object.getOwnPropertyDescriptor(Cell.prototype, 'value').get
   ),
 });
-
-Object.defineProperty(ComputationalCell.prototype, 'value', {
+Object.defineProperty(Cell.prototype, 'error', {
   get: createPatch(
-    Object.getOwnPropertyDescriptor(ComputationalCell.prototype, 'value').get
+    Object.getOwnPropertyDescriptor(Cell.prototype, 'error').get
   ),
 });
 
 function createPatch(originalGetter: Function) {
   return function patchedGetter(
     this: Cell<any> & {
-      signal_ref?: WeakMap<ReturnType<typeof getOwner>, [Function, Function]>;
+      signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
     }
   ) {
-    {
-      if (__current_collecting()) {
-        return originalGetter.call(this);
-      }
-      if ($$READ_AS_PROP) {
-        throw this;
-      }
-      if (getListener()) {
-        if (!this.signal_ref) {
-          this.signal_ref = new WeakMap();
-        }
-        const ref = this.signal_ref.get(getListener().owner);
-        if (ref === undefined) {
-          const owner = getListener().owner;
-          const disposeWatcher = this.watch((v) => {
-            ref2[1](v);
-          });
-          const ref2 = createSignal(originalGetter.call(this));
-          this.signal_ref.set(owner, ref2);
-          runWithOwner(owner, () => {
-            onCleanup(() => {
-              disposeWatcher();
-              this.signal_ref.delete(owner);
-            });
-          });
-          return ref2[0]();
-        } else {
-          return ref[0]();
-        }
-      }
-      return originalGetter.call(this);
+    if ($$READ_AS_PROP) {
+      throw this;
     }
+    if (getListener()) {
+      const { owner } = getListener();
+      if (!this.signal_ref) {
+        this.signal_ref = new WeakMap();
+      }
+      const refRead = this.signal_ref.get(owner);
+      if (refRead === undefined) {
+        const update = () => {
+          reaction.execute(() =>
+            write(untrack(() => originalGetter.call(this)))
+          );
+        };
+        const reaction = new Reaction(update);
+        const [read, write] = createSignal();
+        update();
+        this.signal_ref.set(owner, read);
+        runWithOwner(owner, () => {
+          onCleanup(() => {
+            reaction.dispose();
+            this.signal_ref.delete(owner);
+          });
+        });
+        return read();
+      } else {
+        return refRead();
+      }
+    }
+    return originalGetter.call(this);
   };
 }
 
@@ -92,11 +84,10 @@ function withKairo<Props>(
       children?: JSX.Element;
     }
   ) => {
-    const parent = useContext(KairoContext);
+    const context = useContext(KairoContext);
 
-    const scope = new Scope(parent);
-
-    const endScope = scope.beginScope();
+    const exitScope = collectScope();
+    const exitContext = context.runInContext();
     let Component: Component<Props>;
     try {
       Component = setup(
@@ -121,20 +112,15 @@ function withKairo<Props>(
         }
       );
     } finally {
-      endScope();
+      exitContext();
+      const lifecycle = exitScope();
+      onMount(() => {
+        const dispose = lifecycle.attach();
+        onCleanup(dispose);
+      });
     }
 
-    onMount(() => {
-      const dispose = scope.attach();
-      onCleanup(dispose);
-    });
-
-    return createComponent(KairoContext.Provider, {
-      value: scope,
-      get children() {
-        return createComponent(Component, props);
-      },
-    });
+    return createComponent(Component, props);
   };
 }
 

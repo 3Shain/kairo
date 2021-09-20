@@ -4,9 +4,9 @@ import {
   Symbol_observable,
   TeardownLogic,
 } from '../types';
-import { doCleanup, noop } from '../utils';
+import { doCleanup, noop } from '../misc';
 import { CanceledError, CancellablePromise } from './promise';
-import { Runnable, TaskYieldable } from './types';
+import { AsyncRunnable, Runnable, TaskYieldable } from './types';
 
 export function executeRunnable<T>(
   runnable: Runnable<T>,
@@ -20,10 +20,7 @@ export function executeRunnable<T>(
 
   function takeControl(yieldedObject: TaskYieldable<T>) {
     try {
-      if (yieldedObject instanceof CancellablePromise) {
-        currentDisposer = () => yieldedObject.cancel();
-        yieldedObject.then(resumeTask, throwTask);
-      } else if (typeof yieldedObject === 'function') {
+      if (typeof yieldedObject === 'function') {
         //bind sideEffect
         let synchronous = true; // closure callback
         let innerSettled = false;
@@ -64,8 +61,7 @@ export function executeRunnable<T>(
           // if (innerSettled) return; // no need this line: currentDisposer
           // is guaranteed to execute only once.
           doCleanup(maybeDisposer); // maybe raise an error.
-          innerSettled || tryReject(new CanceledError());
-          // innerSettled = true;
+          tryReject(new CanceledError());
         };
         synchronous = false;
       } else {
@@ -73,7 +69,7 @@ export function executeRunnable<T>(
           'Invalid object yielded. Are you missing an asterisk(*) after `yield`?'
         );
       }
-    } catch (e) {
+    } catch (e: any) {
       if (e.$$RESOLVE === true) {
         return resumeTask(e.$$VALUE);
       } else if (e.$$REJECT === true) {
@@ -106,6 +102,135 @@ export function executeRunnable<T>(
     let result: ReturnType<typeof iter.throw>;
     try {
       result = iter.throw(error);
+    } catch (e) {
+      if (error === e) {
+        settled || ((settled = true), onfailure(e));
+        return;
+      } else {
+        return throwTask(e);
+      }
+    }
+    if (result.done) {
+      settled || ((settled = true), onsuccess(result.value));
+      return;
+    }
+    takeControl(result.value as any);
+  }
+
+  resumeTask(undefined); //start synchronously.
+
+  return () => {
+    if (!settled) {
+      try {
+        currentDisposer?.();
+      } catch (e) {
+        if (!(e instanceof CanceledError)) {
+          throw e;
+        }
+      } finally {
+        settled = true;
+      }
+    }
+  };
+}
+
+type InferPromise<C> = C extends Promise<infer D>? D:unknown;
+
+export function executeAsyncRunnable<T>(
+  runnable: AsyncRunnable<T>,
+  onsuccess: Action<T>,
+  onfailure: Action<any>
+): TeardownLogic {
+  let currentDisposer: Function | null = null;
+
+  const iter = runnable[Symbol.asyncIterator]();
+  let settled = false;
+
+  function takeControl(yielded: TaskYieldable<T>) {
+    try {
+      if (typeof yielded === 'function') {
+        //bind sideEffect
+        let synchronous = true; // closure callback
+        let innerSettled = false;
+        let synchronousResult: {
+          $$RESOLVE?: boolean;
+          $$REJECT?: boolean;
+          $$VALUE: any;
+        } | null = null;
+        function tryResolve(value: any) {
+          if (innerSettled) return;
+          innerSettled = true;
+          if (synchronous) {
+            synchronousResult = {
+              $$RESOLVE: true,
+              $$VALUE: value,
+            };
+          } else {
+            resumeTask(value);
+          }
+        }
+        function tryReject(error: any) {
+          if (innerSettled) return;
+          innerSettled = true;
+          if (synchronous) {
+            synchronousResult = {
+              $$REJECT: true,
+              $$VALUE: error,
+            };
+          } else {
+            throwTask(error);
+          }
+        }
+        const maybeDisposer = yielded(tryResolve, tryReject); //might raise an error.
+        if (synchronousResult !== null) {
+          throw synchronousResult!;
+        }
+        currentDisposer = () => {
+          // if (innerSettled) return; // no need this line: currentDisposer
+          // is guaranteed to execute only once.
+          doCleanup(maybeDisposer); // maybe raise an error.
+          innerSettled || tryReject(new CanceledError());
+          // innerSettled = true;
+        };
+        synchronous = false;
+      } else {
+        throw new TypeError(
+          'Invalid object yielded. Are you missing an asterisk(*) after `yield`?'
+        );
+      }
+    } catch (e: any) {
+      if (e.$$RESOLVE === true) {
+        return resumeTask(e.$$VALUE);
+      } else if (e.$$REJECT === true) {
+        return throwTask(e.$$VALUE);
+      } else {
+        return throwTask(e);
+      }
+    }
+  }
+
+  async function resumeTask(resumeValue: any): Promise<void> {
+    currentDisposer = null;
+    let result: InferPromise<ReturnType<typeof iter.next>>;
+    try {
+      result = await iter.next(resumeValue);
+    } catch (e) {
+      return throwTask(e);
+    }
+
+    if (result.done) {
+      settled || ((settled = true), onsuccess(result.value));
+      return;
+    } else {
+      takeControl(result.value as any);
+    }
+  }
+
+  async function throwTask(error: any): Promise<void> {
+    currentDisposer = null;
+    let result: InferPromise<ReturnType<typeof iter.throw>>;
+    try {
+      result = await iter.throw(error);
     } catch (e) {
       if (error === e) {
         settled || ((settled = true), onfailure(e));
@@ -354,7 +479,7 @@ function* race<T>(tasks: Iterable<T>): Runnable<ResolveAll<T>> {
             }
           )
         );
-      } catch (value) {
+      } catch (value: any) {
         if (value.$$RESOLVE === true) {
           success(value.$$VALUE as T);
         } else if (value.$$REJECT === true) {

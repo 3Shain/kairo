@@ -1,5 +1,4 @@
-import { identity } from "./utils";
-
+import { identity } from './misc';
 
 class Reference<T = any> {
   get bind(): any {
@@ -21,14 +20,6 @@ class Reference<T = any> {
   }
 
   constructor(private _current: T | null = null, private _setter: Function) {}
-}
-
-class DerivedReference<T> implements ReadonlyReference<T>{
-  constructor(private _getter:Function) {}
-
-  get current(){
-    return this._getter();
-  }
 }
 
 interface ReadonlyReference<T> {

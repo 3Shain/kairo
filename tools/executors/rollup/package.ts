@@ -22,6 +22,14 @@ export default async function (
   const projectAbsoluteRoot = resolve(context.root, projectRoot);
   const outDir = resolve('dist', projectRoot);
 
+  const packageJson = require(resolve(projectAbsoluteRoot, 'package.json'));
+
+  const external = [
+    ..._options.externals,
+    ...Object.keys(packageJson.dependencies ?? {}),
+    ...Object.keys(packageJson.peerDependencies ?? {}),
+  ];
+
   const output = await rollup({
     plugins: [
       typescript({
@@ -54,7 +62,7 @@ export default async function (
       }),
       filesize(),
     ],
-    external: [..._options.externals],
+    external,
     input: resolve(projectRoot, _options.entry ?? 'src/index.ts'),
   });
 
@@ -89,7 +97,7 @@ export default async function (
       }),
       filesize(),
     ],
-    external: [..._options.externals],
+    external,
     input: resolve(projectRoot, _options.entry ?? 'src/index.ts'),
   });
 
@@ -120,10 +128,10 @@ export default async function (
   }
 
   const globalPackageJson = require(resolve(context.root, 'package.json'));
-  console.log(globalPackageJson.version);
-
-  const packageJson = require(resolve(projectAbsoluteRoot, 'package.json'));
-  packageJson.version = globalPackageJson.version;
+  if (packageJson.version === '0.0.0') {
+    packageJson.version = globalPackageJson.version;
+  }
+  console.log(packageJson.version);
 
   packageJson.main = `${_options.bundleName}.cjs.js`;
   packageJson.module = `${_options.bundleName}.esm.js`;
@@ -141,7 +149,9 @@ export default async function (
   };
   packageJson.types = `src/index.d.ts`;
 
-  for (const [key, value] of Object.entries(packageJson.peerDependencies)) {
+  for (const [key, value] of Object.entries(
+    packageJson.peerDependencies ?? {}
+  )) {
     if (value === '0.0.0') {
       packageJson.peerDependencies[key] = `^${packageJson.version}`; // TODO: match semver
     }

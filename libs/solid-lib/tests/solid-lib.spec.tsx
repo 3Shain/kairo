@@ -1,7 +1,7 @@
 import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
-import { createKairoApp, withKairo } from '../src';
-import { effect, mut, reference } from 'kairo';
+import { , withKairo } from '../src';
+import { lifecycle, mut, reference } from 'kairo';
 import { createSignal } from 'solid-js';
 
 const { App: KairoApp } = createKairoApp(() => {});
@@ -77,7 +77,7 @@ export const Case1 = withKairo<{
 }>((prop, useProp) => {
   const para = reference<HTMLParagraphElement>(null);
 
-  effect(() => {
+  lifecycle(() => {
     prop.intialize();
     expect(para.current).toBeInTheDocument();
 
@@ -87,7 +87,7 @@ export const Case1 = withKairo<{
   });
 
   const viewProp = useProp((x) => x.viewProp);
-  effect(() =>
+  lifecycle(() =>
     viewProp.watch(() => {
       prop.viewPropChanged();
     })

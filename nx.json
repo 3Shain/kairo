@@ -26,7 +26,10 @@
     "solid-lib": { "tags": [] },
     "svelte-lib": { "tags": [] },
     "svelte-app": { "tags": [] },
+    "svelte-preprocess": { "tags": [] },
     "solid-app": { "tags": [] },
-    "vite-vue-app": { "tags": [] }
+    "vite-vue-app": { "tags": [] },
+    "vue-sfc-transformer": { "tags": [] },
+    "vite-plugin-vue": { "tags": [] }
   }
 }

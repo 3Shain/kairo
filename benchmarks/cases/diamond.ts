@@ -15,12 +15,12 @@ export function diamond(bridge: Bridge) {
   let sum = bridge.computed(() => {
     return current.map((x) => x.read()).reduce((a, b) => a + b, 0);
   });
+  let callCounter: Function = null;
   bridge.watch(
     () => sum.read(),
     () => callCounter?.()
   );
 
-  let callCounter: Function = null;
 
   return () => {
     head.write(1);

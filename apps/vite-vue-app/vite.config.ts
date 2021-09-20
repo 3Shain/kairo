@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import vue from '@vitejs/plugin-vue';
 import vueJsx from '@vitejs/plugin-vue-jsx';
+// import kairoVueSFC from 'vite-plugin-kairo-vue';
+// import kairoVue from '../../libs/vite-plugin-vue/src';
+import kairoVue from '../../dist/libs/vite-plugin-vue';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -9,5 +11,5 @@ export default defineConfig({
     __DEV__: 'true',
     __TEST__: 'true',
   },
-  plugins: [vue(), vueJsx(), tsconfigPaths()],
+  plugins: [kairoVue(), vueJsx(), tsconfigPaths()],
 });

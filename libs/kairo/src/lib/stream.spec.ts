@@ -1,4 +1,4 @@
-import { noop } from './utils';
+import { noop } from './misc';
 import { EventStream, merged, stream } from './stream';
 import { start, delay } from './concurrency';
 

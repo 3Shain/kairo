@@ -1,12 +1,10 @@
 <template>
-  <div>
-  </div>
+  <div></div>
 </template>
 <script lang="ts">
-import { setupKairo } from '../src'
-  export default {
-    setup: setupKairo(()=>{
-      
-    })
-  }
+export default {
+  setup: (() => {
+
+  })
+}
 </script>

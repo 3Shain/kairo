@@ -1,3 +1,2 @@
-export { setupKairo } from './lib/setup-kairo';
-export { withKairo } from './lib/with-kairo';
-export { createKairoApp } from './lib/application';
+export { withConcern } from './lib/application';
+export { withKairoComponent, withKairo } from './lib/with-kairo';

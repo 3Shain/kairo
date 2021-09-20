@@ -1,5 +1,5 @@
 import { InjectFlags, Type, AbstractType, InjectionToken } from '@angular/core';
-import { Cell, inject, reference, Reference } from 'kairo';
+import { Cell, injected, reference, Reference } from 'kairo';
 import { NG_INJECTOR } from './tokens';
 
 export function ngSetup<Props, Model extends object>(
@@ -30,7 +30,7 @@ export function ngInject<T>(
   notFoundValue?: T,
   flags?: InjectFlags
 ): T {
-  return inject(NG_INJECTOR).get(token, notFoundValue, flags);
+  return injected(NG_INJECTOR).get(token, notFoundValue, flags);
 }
 
 export function ngElementRef<T>(initial?: T) {

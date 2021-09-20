@@ -1,12 +1,10 @@
 import { fireEvent, render } from '@testing-library/vue';
-import { withKairo, createKairoApp } from '../src';
-import { effect, mut, reference } from 'kairo';
+import { lifecycle, mut, reference, computed } from 'kairo';
+import { withKairo } from '../src';
 import '@testing-library/jest-dom';
 import { nextTick } from 'vue';
 import Case1SFC from './Case1.vue';
 import KeepAlive from './KeepAlive.vue';
-
-const kairoApp = createKairoApp(() => {});
 
 describe('@kairo/vue', () => {
   it('implement Simple Component Model (jsx)', async () => {
@@ -21,9 +19,6 @@ describe('@kairo/vue', () => {
     const w = render(KeepAlive, {
       props: {
         show: true,
-      },
-      global: {
-        plugins: [kairoApp],
       },
     });
 
@@ -61,9 +56,6 @@ async function case1(Component: any) {
       clean: cleanCallback,
       viewProp: 'Hello',
       viewPropChanged: viewpropChangedCallback,
-    },
-    global: {
-      plugins: [kairoApp],
     },
   });
   expect(initCallback).toBeCalledTimes(1);
@@ -116,7 +108,7 @@ export const Case1 = withKairo<{
 }>((prop, useProp) => {
   const para = reference<HTMLParagraphElement>(null);
 
-  effect(() => {
+  lifecycle(() => {
     prop.initialize();
     expect(para.current).toBeInTheDocument();
 
@@ -125,16 +117,16 @@ export const Case1 = withKairo<{
     };
   });
 
-  const viewProp = useProp((x) => x.viewProp);
-  effect(() =>
-    viewProp.watch(() => {
-      prop.viewPropChanged();
-    })
-  );
+  // const viewProp = useProp((x) => x.viewProp);
+  // lifecycle(() =>
+  //   viewProp.watch(() => {
+  //     prop.viewPropChanged();
+  //   })
+  // );
 
   const [count, setCount] = mut(0);
 
-  const doubled = count.map((x) => x * 2);
+  const doubled = computed(() => count.value * 2);
 
   return (vp) => (
     <div>
@@ -153,10 +145,10 @@ export const Case1 = withKairo<{
 
 Case1.props = ['initialize', 'clean', 'viewProp', 'viewPropChanged'];
 
-const Case1Child = withKairo<{ count: number }>((_, useProp) => {
-  const dp = useProp((x) => x.count);
+const Case1Child = withKairo<{ count: number }>((_) => {
+  // const dp = useProp((x) => x.count);
 
-  return () => <span>{dp.value}</span>;
+  return (props) => <span>{props.count}</span>;
 });
 
 Case1Child.props = ['count'];

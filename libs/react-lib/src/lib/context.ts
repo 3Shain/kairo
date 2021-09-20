@@ -1,4 +1,4 @@
-import { Scope } from 'kairo';
+import { Context } from 'kairo';
 import React from 'react';
 
-export const KairoContext = React.createContext<Scope>(null);
+export const KairoContext = React.createContext<Context>(Context.EMPTY);

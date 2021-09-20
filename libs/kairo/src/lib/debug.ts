@@ -1,29 +1,27 @@
 import { RunnableGenerator, start } from './concurrency';
-import { Scope } from './scope';
+import { Concern, Context } from './context';
+import { collectScope, LifecycleScope } from './lifecycle-scope';
 
-export function testBed<Bindings>(
-  setup: (interact: typeof interactFn) => Promise<void>
+export function testBed(
+  setup: (interact: ReturnType<typeof createInteractionLogic>) => Promise<void>,
+  concern?: Concern
 ) {
-  const testScope = new Scope();
-
-  const endScope = testScope.beginScope();
-
-  const binding = setup(interactFn);
-
-  endScope();
-
+  const exitScope = collectScope();
+  concern && new Context().build(concern);
+  const binding = setup(createInteractionLogic(exitScope()));
   return binding;
 }
 
-function interactFn(interactLogic: () => RunnableGenerator<void>) {
-  return {
-    async expectEffects(runnable: () => RunnableGenerator<void>) {
-      const detach = Scope.current.attach();
+function createInteractionLogic(scope: LifecycleScope) {
+  return function interactFn(interactLogic: () => RunnableGenerator<void>) {
+    return {
+      expectEffects(runnable: () => RunnableGenerator<void>) {
+        const detach = scope.attach();
 
-      const expect = start(runnable()); // do side effects first
-      start(interactLogic()); // start interact
-      await expect;
-      detach();
-    },
+        const expect = start(runnable()); // do side effects first
+        start(interactLogic()); // start interact
+        return expect.finally(detach);
+      },
+    };
   };
 }

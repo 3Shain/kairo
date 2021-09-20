@@ -1,8 +1,7 @@
 import { testBed } from './debug';
-
 import { race, delay, task } from './concurrency';
 import { stream } from './stream';
-import { mount } from './scope';
+import { lifecycle } from './lifecycle-scope';
 
 function useKonami(keys: string[], timeout: number) {
   const [keydownCode, onkeydown] = stream<string>();
@@ -26,7 +25,7 @@ function useKonami(keys: string[], timeout: number) {
       }
     }
   });
-  mount(() => loop());
+  lifecycle(() => loop());
 
   return {
     onkeydown,

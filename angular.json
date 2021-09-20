@@ -48,8 +48,13 @@
             "polyfills": "apps/ng-app/src/polyfills.ts",
             "tsConfig": "apps/ng-app/tsconfig.app.json",
             "aot": true,
-            "assets": ["apps/ng-app/src/favicon.ico", "apps/ng-app/src/assets"],
-            "styles": ["apps/ng-app/src/styles.scss"],
+            "assets": [
+              "apps/ng-app/src/favicon.ico",
+              "apps/ng-app/src/assets"
+            ],
+            "styles": [
+              "apps/ng-app/src/styles.scss"
+            ],
             "scripts": []
           },
           "configurations": {
@@ -110,7 +115,9 @@
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/ng-app"],
+          "outputs": [
+            "coverage/apps/ng-app"
+          ],
           "options": {
             "jestConfig": "apps/ng-app/jest.config.js",
             "passWithNoTests": true
@@ -126,12 +133,16 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/kairo/**/*.ts"]
+            "lintFilePatterns": [
+              "libs/kairo/**/*.ts"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/kairo"],
+          "outputs": [
+            "coverage/libs/kairo"
+          ],
           "options": {
             "jestConfig": "libs/kairo/jest.config.js",
             "passWithNoTests": true
@@ -140,7 +151,9 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["tslib"],
+            "externals": [
+              "tslib"
+            ],
             "bundleName": "kairo",
             "copy": []
           }
@@ -176,7 +189,9 @@
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/ng-lib"],
+          "outputs": [
+            "coverage/libs/ng-lib"
+          ],
           "options": {
             "jestConfig": "libs/ng-lib/jest.config.js",
             "passWithNoTests": true
@@ -206,12 +221,16 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["apps/react-app/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "apps/react-app/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/react-app"],
+          "outputs": [
+            "coverage/apps/react-app"
+          ],
           "options": {
             "jestConfig": "apps/react-app/jest.config.js",
             "passWithNoTests": true
@@ -227,7 +246,10 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "react"],
+            "externals": [
+              "kairo",
+              "react"
+            ],
             "bundleName": "kairo-react",
             "copy": []
           }
@@ -235,12 +257,16 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/react-lib/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "libs/react-lib/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/react-lib"],
+          "outputs": [
+            "coverage/libs/react-lib"
+          ],
           "options": {
             "jestConfig": "libs/react-lib/jest.config.js",
             "passWithNoTests": true
@@ -254,20 +280,28 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/vue-lib/**/*.{ts,tsx,vue}"]
+            "lintFilePatterns": [
+              "libs/vue-lib/**/*.{ts,tsx,vue}"
+            ]
           }
         },
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "vue", "@vue/reactivity"],
+            "externals": [
+              "kairo",
+              "vue",
+              "@vue/reactivity"
+            ],
             "bundleName": "kairo-vue",
             "copy": []
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/vue-lib"],
+          "outputs": [
+            "coverage/libs/vue-lib"
+          ],
           "options": {
             "jestConfig": "libs/vue-lib/jest.config.js",
             "passWithNoTests": true
@@ -283,20 +317,27 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/solid-lib/**/*.{ts,tsx}"]
+            "lintFilePatterns": [
+              "libs/solid-lib/**/*.{ts,tsx}"
+            ]
           }
         },
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "solid-js"],
+            "externals": [
+              "kairo",
+              "solid-js"
+            ],
             "bundleName": "kairo-solid",
             "copy": []
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/solid-lib"],
+          "outputs": [
+            "coverage/libs/solid-lib"
+          ],
           "options": {
             "jestConfig": "libs/solid-lib/jest.config.js",
             "passWithNoTests": true
@@ -312,20 +353,29 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/svelte-lib/**/*.{ts,tsx}"]
+            "lintFilePatterns": [
+              "libs/svelte-lib/**/*.{ts,tsx}"
+            ]
           }
         },
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "svelte"],
+            "externals": [
+              "kairo",
+              "svelte"
+            ],
             "bundleName": "kairo-svelte",
-            "copy": ["transformer.js"]
+            "copy": [
+              "transformer.js"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/svelte-lib"],
+          "outputs": [
+            "coverage/libs/svelte-lib"
+          ],
           "options": {
             "jestConfig": "libs/svelte-lib/jest.config.js",
             "passWithNoTests": true
@@ -347,15 +397,26 @@
             "cwd": "apps/svelte-app"
           }
         },
+        "build": {
+          "builder": "@nrwl/workspace:run-commands",
+          "options": {
+            "command": "npx vite build",
+            "cwd": "apps/svelte-app"
+          }
+        },
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["apps/svelte-app/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "apps/svelte-app/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/svelte-app"],
+          "outputs": [
+            "coverage/apps/svelte-app"
+          ],
           "options": {
             "jestConfig": "apps/svelte-app/jest.config.js",
             "passWithNoTests": true
@@ -371,7 +432,9 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["apps/solid-app/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "apps/solid-app/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "serve": {
@@ -383,7 +446,9 @@
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/solid-app"],
+          "outputs": [
+            "coverage/apps/solid-app"
+          ],
           "options": {
             "jestConfig": "apps/solid-app/jest.config.js",
             "passWithNoTests": true
@@ -399,7 +464,9 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["apps/solid-app/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "apps/solid-app/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "build": {
@@ -418,7 +485,9 @@
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/apps/vite-vue-app"],
+          "outputs": [
+            "coverage/apps/vite-vue-app"
+          ],
           "options": {
             "jestConfig": "apps/vite-vue-app/jest.config.js",
             "passWithNoTests": true
@@ -434,7 +503,11 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "preact", "preact/compat"],
+            "externals": [
+              "kairo",
+              "preact",
+              "preact/compat"
+            ],
             "bundleName": "kairo-preact",
             "copy": []
           }
@@ -442,15 +515,92 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["libs/preact-lib/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "libs/preact-lib/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         },
         "test": {
           "builder": "@nrwl/jest:jest",
-          "outputs": ["coverage/libs/preact-lib"],
+          "outputs": [
+            "coverage/libs/preact-lib"
+          ],
           "options": {
             "jestConfig": "libs/preact-lib/jest.config.js",
             "passWithNoTests": true
+          }
+        }
+      }
+    },
+    "vue-sfc-transformer": {
+      "root": "libs/vue-sfc-transformer",
+      "sourceRoot": "libs/vue-sfc-transformer/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": [],
+            "bundleName": "vue-sfc-transformer",
+            "copy": []
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/vue-sfc-transformer/**/*.{ts,tsx,js,jsx}"
+            ]
+          }
+        }
+      }
+    },
+    "svelte-preprocess": {
+      "root": "libs/svelte-preprocess",
+      "sourceRoot": "libs/svelte-preprocess/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": [
+              ""
+            ],
+            "bundleName": "svelte-preprocess",
+            "copy": []
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/svelte-preprocess/**/*.{ts,tsx,js,jsx}"
+            ]
+          }
+        }
+      }
+    },
+    "vite-plugin-vue": {
+      "root": "libs/vite-plugin-vue",
+      "sourceRoot": "libs/vite-plugin-vue/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": [
+              ""
+            ],
+            "bundleName": "vite-plugin-vue",
+            "copy": []
+          }
+        },
+        "lint": {
+          "builder": "@nrwl/linter:eslint",
+          "options": {
+            "lintFilePatterns": [
+              "libs/vite-plugin-vue/**/*.{ts,tsx,js,jsx}"
+            ]
           }
         }
       }

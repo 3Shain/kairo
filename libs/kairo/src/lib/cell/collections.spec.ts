@@ -1,7 +1,8 @@
 import { mutArray, mutMap, mutSet } from './collections';
+import { cleanup, effect } from './cell.spec';
+import { computed } from './cell';
 
 describe('cell/collections', () => {
-  const noop = () => {};
 
   it('mutArray', () => {
     const [
@@ -9,10 +10,10 @@ describe('cell/collections', () => {
       { push, pop, unshift, shift, reverse, setAt, splice },
     ] = mutArray([]);
 
-    const dispose = array.watch(noop); // watch it to make propagation works
+    effect(() => array.value);
 
-    const arrayLen = array.map((x) => x.length);
-    const arrayMap = array.map((x) => x.map((y) => (y ? y * 2 : y)));
+    const arrayLen = computed(() => array.value.length);
+    const arrayMap = computed(() => array.value.map((y) => (y ? y * 2 : y)));
 
     push(1, 2, 3);
     expect(arrayLen.value).toEqual(3);
@@ -31,15 +32,13 @@ describe('cell/collections', () => {
     expect(array.value).toEqual([1]);
     setAt(10, 3); // make holy array
     expect(arrayLen.value).toBe(11);
-
-    dispose();
   });
 
   it('mutSet', () => {
-    const [set, { add, delete: d, clear }] = mutSet([1,2,3]);
+    const [set, { add, delete: d, clear }] = mutSet([1, 2, 3]);
 
-    const setSize = set.map(x=>x.size);
-    
+    const setSize = computed(() => set.value.size);
+
     add(4);
     expect(setSize.value).toBe(4);
     d(1);
@@ -49,15 +48,19 @@ describe('cell/collections', () => {
   });
 
   it('mutMap', () => {
-    const [map, { set, delete: d, clear }] = mutMap<string,string>([["test","test"]]);
+    const [map, { set, delete: d, clear }] = mutMap<string, string>([
+      ['test', 'test'],
+    ]);
 
-    const mapSize = map.map(x=>x.size);
+    const mapSize = computed(() => map.value.size);
 
-    set("test2","test2");
+    set('test2', 'test2');
     expect(mapSize.value).toBe(2);
-    d("test");
+    d('test');
     expect(mapSize.value).toBe(1);
     clear();
     expect(mapSize.value).toBe(0);
   });
+
+  afterEach(cleanup);
 });

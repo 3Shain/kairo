@@ -1,4 +1,4 @@
-import { Cleanable } from '../types';
+import { Cleanable } from './types';
 
 export class ObjectDisposedError extends Error {}
 
@@ -18,11 +18,4 @@ export function doCleanup(cleanup: Cleanable) {
       cleanup.dispose();
     }
   }
-}
-
-/* istanbul ignore next */
-export function panic(code: number) {
-  throw new Error(
-    `Fatal error code (${code}): please file an issue to report this.`
-  );
 }

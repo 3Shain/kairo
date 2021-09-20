@@ -1,25 +1,13 @@
 export {
   Cell,
-  ComputationalCell,
-  Lazy,
+  Reaction,
   mutable,
   mutValue,
-  lazy,
   computed,
-  suspended,
-  constant,
-  combined,
 } from './cell';
+export { suspended, SuspendedCell } from './suspense';
 
-export type { WatchOptions, UnwrapProperty } from './cell';
-
-export {
-  transaction,
-  untrack,
-  __current_collecting,
-  Suspend,
-  SuspendWithFallback,
-} from './internal';
+export { batch, __current_collecting } from './internal';
 
 export { mutArray, mutMap, mutSet } from './collections';
 

@@ -14,7 +14,6 @@ import {
   MobxBridge,
   ReadableCell,
   SBridge,
-  VueReactiveBridge,
   SolidBridge,
   Case,
   VueScheduledBridge,
@@ -43,12 +42,12 @@ function doTest(test: Case) {
     });
   }
 
-  addBridge('solid', SolidBridge);
-  addBridge('vue', VueReactiveBridge);
-  addBridge('vue (scheduled)', VueScheduledBridge as Bridge);
-  addBridge('mobx', MobxBridge);
   addBridge('kairo', KairoBridge);
-  addBridge('S.js', SBridge);
+  // addBridge('S.js', SBridge);
+  addBridge('kairo internal', KairoInternal);
+  // addBridge('mobx', MobxBridge);
+  // addBridge('solid', SolidBridge);
+  // addBridge('vue (scheduled)', VueScheduledBridge as Bridge);
 
   suite
     .on('error', (e) => {
@@ -56,10 +55,11 @@ function doTest(test: Case) {
     })
     .on('cycle', (s) => {
       console.log(String(s.target));
-      global.gc();
+      // console.log(JSON.stringify(s.target.stats));
+      // global.gc();
     })
     .run({
-      async: false,
+      async: false
     })
     .on('complete', () => {});
 }

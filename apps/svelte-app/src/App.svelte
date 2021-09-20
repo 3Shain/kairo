@@ -1,7 +1,6 @@
-<script kairo="root" lang="ts">
+<script kairo lang="ts">
 </script>
 
 <main />
-
 <style>
 </style>

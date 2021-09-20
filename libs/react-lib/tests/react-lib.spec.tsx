@@ -1,10 +1,14 @@
 import { fireEvent, render, cleanup } from '@testing-library/react';
 import React, { useEffect } from 'react';
-import { createKairoApp, forwardRef, registerHook, withKairo } from '../src';
-import { effect, mut, reference } from 'kairo';
+import { createApp, forwardRef, registerHook, withKairo } from '../src';
+import { computed, effect, lifecycle, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 
-const { App: KairoApp } = createKairoApp();
+const KairoApp = createApp((x) =>
+  x.add(() => {
+    return {};
+  })
+);
 
 describe('@kairo/react', () => {
   beforeEach(async () => {});
@@ -70,15 +74,14 @@ describe('@kairo/react', () => {
     expect(cleanCallback).toBeCalledTimes(1);
   });
 
-  it('forwardRef', ()=>{
-
+  it('forwardRef', () => {
     const ref = {
-      current: null as HTMLDivElement
+      current: null as HTMLDivElement,
     };
 
     const w = render(
       <KairoApp>
-        <Case2 ref={ref}/>
+        <Case2 ref={ref} />
       </KairoApp>
     );
 
@@ -87,14 +90,12 @@ describe('@kairo/react', () => {
     w.unmount();
   });
 
-
-  it('registerHook', ()=>{
-
+  it('registerHook', () => {
     const initCallback = jest.fn();
     const cleanCallback = jest.fn();
 
     const w = render(
-      <Case3 onmount={initCallback} onunmount={cleanCallback}/>
+      <Case3 onmount={initCallback} onunmount={cleanCallback} />
     );
     expect(initCallback).toBeCalledTimes(1);
     expect(cleanCallback).toBeCalledTimes(0);
@@ -117,7 +118,7 @@ export const Case1 = withKairo<{
 }>((prop, useProp) => {
   const para = reference<HTMLParagraphElement>(null);
 
-  effect(() => {
+  lifecycle(() => {
     prop.intialize();
     expect(para.current).toBeInTheDocument();
 
@@ -127,26 +128,21 @@ export const Case1 = withKairo<{
   });
 
   const viewProp = useProp((x) => x.viewProp);
-  effect(() =>
-    viewProp.watch(() => {
-      prop.viewPropChanged();
-    })
-  );
+  effect(() => {
+    viewProp.value, prop.viewPropChanged();
+  });
 
   const [count, setCount] = mut(0);
+  const add = () => {
+    setCount(count.value + 1);
+  };
 
-  const doubled = count.map((x) => x * 2);
+  const doubled = computed(() => count.value * 2);
 
   return (vp) => (
     <div>
       <p ref={para.bind}>{vp.viewProp}</p>
-      <button
-        onClick={() => {
-          setCount(count.value + 1);
-        }}
-      >
-        {count.value}
-      </button>
+      <button onClick={add}>{count.value}</button>
       <Case1Child count={doubled.value} />
     </div>
   );
@@ -158,26 +154,22 @@ const Case1Child = withKairo<{ count: number }>((_, useProp) => {
   return () => <span>{dp.value}</span>;
 });
 
-const Case2 = forwardRef<{},HTMLDivElement>(()=>{
-  return (_,ref) => <div ref={ref}>TARGET</div>
+const Case2 = forwardRef<{}, HTMLDivElement>(() => {
+  return (_, ref) => <div ref={ref}>TARGET</div>;
 });
 
 const Case3 = withKairo<{
-  onmount: Function,
-  onunmount: Function
-}>(()=>{
-
-  registerHook(({
-    onmount,
-    onunmount
-  })=>{
-    useEffect(()=>{
+  onmount: Function;
+  onunmount: Function;
+}>(() => {
+  registerHook(({ onmount, onunmount }) => {
+    useEffect(() => {
       onmount();
-      return ()=>{
+      return () => {
         onunmount();
-      }
+      };
     });
-  })
+  });
 
-  return (_) => null
+  return (_) => null;
 });

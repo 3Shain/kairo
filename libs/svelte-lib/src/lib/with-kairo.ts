@@ -1,30 +1,26 @@
-import { Scope } from 'kairo';
+import { collectScope, Context } from 'kairo';
 import type { getContext, onDestroy, onMount, setContext } from 'svelte';
 import { KairoContext } from './context';
 
 export function beginScope<T>(
-  level: 'root' | 'module' | 'component', // module: reserved
+  level: string, // reserved
   _onDestroy: typeof onDestroy,
   _setContext: typeof setContext,
   _getContext: typeof getContext,
   _onMount: typeof onMount
 ) {
-  const scope =
-    level === 'root' ? new Scope() : new Scope(_getContext(KairoContext));
+  const context = (_getContext(KairoContext) as Context) ?? new Context();
+  const exitScope = collectScope();
+  const exitContext = context.runInContext();
 
-  let detachHandler: () => void;
-  _onMount(() => {
-    detachHandler = scope.attach();
-  });
-  _onDestroy(() => {
-    detachHandler();
-  });
-
-  if (level === 'root') {
-    _setContext(KairoContext, new Scope(undefined, scope));
-  } else {
-    _setContext(KairoContext, scope);
-  }
-
-  return scope.beginScope();
+  return () => {
+    exitContext();
+    const scope = exitScope();
+    _onMount(() => {
+      scope.attach();
+    });
+    _onDestroy(() => {
+      scope.detach();
+    });
+  };
 }
