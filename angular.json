@@ -363,7 +363,8 @@
           "options": {
             "externals": [
               "kairo",
-              "svelte"
+              "svelte",
+              "svelte/internal"
             ],
             "bundleName": "kairo-svelte",
             "copy": [

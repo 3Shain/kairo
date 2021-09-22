@@ -1,23 +1,21 @@
 import { TestBed } from '@angular/core/testing';
-import { ngSetup, WithKairo, ngElementRef, provideConcerns } from '../src';
+import { ngSetup, WithKairo, provideConcerns } from '../src';
 import {
   Component,
   ElementRef,
   Input,
-  NO_ERRORS_SCHEMA,
+  NgModule,
+  SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import { mut, lifecycle, computed, effect } from 'kairo';
+import { mut, lifecycle, computed, reference } from 'kairo';
 import '@testing-library/jest-dom';
 import { fireEvent } from '@testing-library/dom';
-import { KairoScopeRefImpl } from '../src/lib/kairo.service';
 
 describe('@kairo/angular', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [Case1Wrapper, Case1, Case1Child],
-      imports: [],
-      schemas: [NO_ERRORS_SCHEMA],
+      imports: [TestModule],
     }).compileComponents();
   });
 
@@ -75,10 +73,6 @@ describe('@kairo/angular', () => {
   });
 });
 
-/**
- * 3Shain: how could I disable the annoying ngtsc errors?
- */
-
 @Component({
   selector: 'case1-wrapper',
   template: `<case1
@@ -104,50 +98,51 @@ export class Case1Wrapper {
 
 @WithKairo()
 @Component({
+  selector: 'case1-child',
+  template: `<span>{{ count }}</span>`,
+})
+export class Case1Child extends ngSetup(() => {}) {
+  @Input()
+  count: number;
+}
+
+@WithKairo()
+@Component({
   selector: 'case1',
-  providers: [
-    provideConcerns([()=>{
-    }])
-  ],
+  providers: [provideConcerns([() => {}])],
   template: `<p #para>{{ viewProp }}</p>
     <button (click)="onClick()">{{ count }}</button>
-    <case1-child [count]="doubled"></case1-child>`,
+    <case1-child #child [count]="doubled"></case1-child>`,
 })
 export class Case1 extends ngSetup(
-  (
-    prop: {
-      initialize: Function;
-      clean: Function;
-      viewProp: string;
-      viewPropChanged: Function;
-    },
-    useProp
-  ) => {
-    const para = ngElementRef<HTMLParagraphElement>(null);
+  (prop: {
+    initialize: Function;
+    clean: Function;
+    viewProp: string;
+    viewPropChanged: Function;
+  }) => {
+    const para = reference<HTMLParagraphElement>(null);
+    const child = reference<Case1Child>(null);
 
     lifecycle(() => {
       prop.initialize();
       expect(para.current).toBeInTheDocument();
+      expect(child.current).toBeTruthy();
 
       return () => {
         prop.clean();
       };
     });
 
-    const viewProp = useProp((x) => x.viewProp);
-    effect(()=>{
-      viewProp.value;
-      prop.viewPropChanged();
-    });
-
     const [count, setCount] = mut(0);
 
-    const doubled = computed(()=>count.value * 2);
+    const doubled = computed(() => count.value * 2);
 
     return {
       count,
       doubled,
       para,
+      child,
       onClick: () => {
         setCount(count.value + 1);
       },
@@ -168,27 +163,18 @@ export class Case1 extends ngSetup(
 
   @ViewChild('para')
   para: ElementRef;
-}
 
-@WithKairo()
-@Component({
-  selector: 'case1-child',
-  template: `<span>{{ dp }}</span>`,
-})
-export class Case1Child extends ngSetup(
-  (
-    _: {
-      count: number;
-    },
-    useProp
-  ) => {
-    const dp = useProp((x) => x.count);
+  @ViewChild('child')
+  child: Case1Child;
 
-    return {
-      dp,
-    };
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['viewProp']) {
+      this.viewPropChanged();
+    }
   }
-) {
-  @Input()
-  count: number;
 }
+
+@NgModule({
+  declarations: [Case1Wrapper, Case1, Case1Child],
+})
+export class TestModule {}

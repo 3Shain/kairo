@@ -15,19 +15,21 @@ export function withConcern<Props>(
   return (props: Props) => {
     const currentContext = useContext(KairoContext);
     const exitScope = collectScope();
-    const context = currentContext.build(concern);
-    const lifecycle = exitScope();
-    onMount(() => {
-      const detach = lifecycle.attach();
-      onCleanup(detach);
-    });
-
-    return createComponent(KairoContext.Provider, {
-      value: context,
-      get children() {
-        return createComponent(component, props);
-      },
-    });
+    try {
+      const context = currentContext.build(concern);
+      return createComponent(KairoContext.Provider, {
+        value: context,
+        get children() {
+          return createComponent(component, props);
+        },
+      });
+    } finally {
+      const lifecycle = exitScope();
+      onMount(() => {
+        const detach = lifecycle.attach();
+        onCleanup(detach);
+      });
+    }
   };
 }
 

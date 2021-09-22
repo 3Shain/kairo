@@ -57,7 +57,7 @@ export function useScopeController(scope: LifecycleScope) {
 export function withKairo<Props>(
   component: (props: Props, ctx: SetupContext) => (props: Props) => VNodeChild
 ) {
-  return withKairoComponent(
+  return patchComponent(
     defineComponent<Props>((props, ctx) => {
       const renderFn = component(props, ctx); // TODO:
       return (() => {
@@ -67,7 +67,7 @@ export function withKairo<Props>(
   );
 }
 
-export function withKairoComponent<T extends DefineComponent>(component: T) {
+export function patchComponent<T extends DefineComponent>(component: T) {
   const { setup, render } = component;
   component.setup = function (
     this: undefined,

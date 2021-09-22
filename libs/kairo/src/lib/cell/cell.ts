@@ -82,9 +82,9 @@ class CellSubscription<T> implements Unsubscribable {
         isError = true;
       }
       if (isError) {
-        observer.closed || observer.next?.(value);
-      } else {
         observer.closed || observer.error?.(value);
+      } else {
+        observer.closed || observer.next?.(value);
       }
     };
     this.reaction = new Reaction(callback);

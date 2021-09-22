@@ -9,16 +9,15 @@ import {
   SimpleChanges,
   ɵDirectiveDef as DirectiveDef,
   ɵivyEnabled as ivyEnabled,
+  ElementRef,
 } from '@angular/core';
 import {
-  mutValue,
   isCell,
   Reference,
   Context,
   lifecycle,
   LifecycleScope,
   collectScope,
-  batch,
   Cell,
   Reaction,
 } from 'kairo';
@@ -26,12 +25,11 @@ import { KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
 
 interface KairoDirectiveInstance {
-  ɵɵkairoParentScope?: KairoScopeRefImpl;
+  ɵɵkairoScope?: KairoScopeRefImpl;
   ɵɵinjector: Injector;
   ɵɵzone: NgZone;
   ɵɵlifecycleScope: LifecycleScope;
   ɵɵinit: boolean;
-  ɵɵchangesHook: Function[];
   ngSetup: Function;
   // ɵɵeffectQueue: LayoutQueue;
   ɵɵreferenceMap: { name: string; reference: Reference<any> }[];
@@ -54,16 +52,14 @@ export function WithKairo() {
     Object.defineProperty(componentType, 'ɵfac', {
       get: () => (...args: any) => {
         const instance = factoryOld(...args) as KairoDirectiveInstance;
-        instance.ɵɵkairoParentScope = ɵɵdirectiveInject(
+        instance.ɵɵkairoScope = ɵɵdirectiveInject(
           KairoScopeRefImpl,
           InjectFlags.Optional
         );
         instance.ɵɵinjector = ɵɵdirectiveInject(Injector, InjectFlags.Self);
         instance.ɵɵzone = ɵɵdirectiveInject(NgZone);
         instance.ɵɵinit = false;
-        instance.ɵɵchangesHook = [];
         instance.ɵɵreferenceMap = [];
-        // instance.ɵɵeffectQueue = new LayoutQueue();
         return instance;
       },
     });
@@ -110,7 +106,7 @@ export function WithKairo() {
         };
 
         const context =
-          this.ɵɵkairoParentScope?.context.inherit(localProviders) ??
+          this.ɵɵkairoScope?.context.inherit(localProviders) ??
           new Context().build(() => localProviders);
 
         this.ɵɵzone.runOutsideAngular(() => {
@@ -118,13 +114,7 @@ export function WithKairo() {
           const exitContext = context.runInContext();
 
           try {
-            const resolve = this.ngSetup(this, (thunk: Function) => {
-              const [beh, setbeh] = mutValue(thunk(this));
-              this.ɵɵchangesHook.push((instance: unknown) => {
-                setbeh(thunk(instance));
-              });
-              return beh;
-            });
+            const resolve = this.ngSetup(this);
             if (resolve === undefined) {
               return {};
             }
@@ -167,14 +157,8 @@ export function WithKairo() {
           }
         });
         this.ɵɵinit = true;
-      } else {
-        this.ɵɵzone.runOutsideAngular(() => {
-          batch(() => {
-            this.ɵɵchangesHook.forEach((x) => x(this));
-          });
-        });
       }
-      ngOnChangesOld?.apply(this, changes);
+      ngOnChangesOld?.call(this, changes);
     };
 
     if (hasInputs) componentType.prototype.ngOnChanges = onChangesOrOnInit;
@@ -184,7 +168,12 @@ export function WithKairo() {
       .ngAfterViewInit as Function;
     const afterViewInit = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
-        entry.reference.current = this[entry.name];
+        const target = this[entry.name];
+        if(target instanceof ElementRef){
+          entry.reference.current = target.nativeElement;
+        } else {
+          entry.reference.current = target;
+        }
       }
       this.ɵɵlifecycleScope.attach();
       ngAfterViewInitOld?.call(this);
@@ -195,9 +184,13 @@ export function WithKairo() {
       .ngAfterViewChecked as Function;
     const afterViewChecked = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
-        entry.reference.current = this[entry.name];
+        const target = this[entry.name];
+        if(target instanceof ElementRef){
+          entry.reference.current = target.nativeElement;
+        } else {
+          entry.reference.current = target;
+        }
       }
-      // this.ɵɵeffectQueue.flush();
       ngAfterViewCheckedOld?.call(this);
     };
     componentType.prototype.ngAfterViewChecked = afterViewChecked;

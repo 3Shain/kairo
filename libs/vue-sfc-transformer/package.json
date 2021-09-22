@@ -1,12 +1,12 @@
 {
   "name": "@kairo/vue-sfc-transformer",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "",
   "dependencies": {
-    "@babel/traverse": ">=7.0.0",
-    "@babel/generator": ">=7.0.0",
-    "@babel/parser": ">=7.0.0",
-    "@babel/types": ">=7.0.0",
+    "@babel/traverse": "^7.0.0",
+    "@babel/generator": "^7.0.0",
+    "@babel/parser": "^7.0.0",
+    "@babel/types": "^7.0.0",
     "@ampproject/remapping": "^1.0.0"
   }
 }

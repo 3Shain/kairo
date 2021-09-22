@@ -1,14 +1,9 @@
-const sveltePreprocess = require('svelte-preprocess');
-const { kairo } = require('../transformer');
+const preprocess1 = require('../../../dist/libs/svelte-preprocess');
 module.exports = {
   // Consult https://github.com/sveltejs/svelte-preprocess
   // for more information about preprocessors
-  preprocess: [
-    sveltePreprocess({
-      babel: kairo({
-        sourceMaps: 'inline',
-      }),
+  preprocess:
+    preprocess1({
       sourceMap: true,
     }),
-  ],
 };

@@ -69,6 +69,17 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "trace": "all"
+    },
+    {
+      "name": "Jest Tests (svelte-lib)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["test", "svelte-lib", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
     }
   ]
 }

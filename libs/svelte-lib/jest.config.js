@@ -1,12 +1,12 @@
 module.exports = {
   transform: {
+    '^.+\\.tsx?$': 'ts-jest',
     '^.+\\.svelte$': [
       'svelte-jester',
       {
         preprocess: 'libs/svelte-lib/tests/svelte.config.js',
       },
     ],
-    '^.+\\.tsx?$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'svelte'],
   coverageDirectory: '../../coverage/libs/svelte-lib',

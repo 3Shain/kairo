@@ -1,4 +1,4 @@
-<script lang="ts" kairo="root">
+<script lang="ts" kairo>
   /// <reference types="jest" />
   import '@testing-library/jest-dom';
   import { reference, mut, lifecycle, computed } from 'kairo';
@@ -18,21 +18,20 @@
     };
   });
 
-  const [viewProp$, setVp] = mut(viewProp);
   $: {
-    setVp(viewProp);
+    viewPropChanged(viewProp);
   }
 
   const [count, setCount] = mut(0);
 
-  const doubled = computed(()=>count.value * 2);
+  const doubled = computed(() => count.value * 2);
 </script>
 
 <div>
   <p bind:this={para.bind}>{viewProp}</p>
   <button
     on:click={() => {
-      setCount(count.value + 1);
+      setCount(c => c + 1);
     }}>{$count}</button
   >
   <Case1Child count={$doubled} />

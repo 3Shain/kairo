@@ -54,9 +54,10 @@ class LifecycleScope {
   detach: () => void = noop;
 }
 
-function lifecycle(onInit: LifecycleLogic) {
+function lifecycle(onInit: LifecycleLogic): void {
   if (currentCollecting) {
-    return currentCollecting.push(onInit);
+    currentCollecting.push(onInit);
+    return;
   }
   throw new TypeError('Not inside a scope');
 }

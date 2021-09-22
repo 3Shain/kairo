@@ -8,14 +8,15 @@ export function testBed(
 ) {
   const exitScope = collectScope();
   concern && new Context().build(concern);
-  const binding = setup(createInteractionLogic(exitScope()));
+  const binding = setup(createInteractionLogic(exitScope));
   return binding;
 }
 
-function createInteractionLogic(scope: LifecycleScope) {
+function createInteractionLogic(exitScope: ()=>LifecycleScope) {
   return function interactFn(interactLogic: () => RunnableGenerator<void>) {
     return {
       expectEffects(runnable: () => RunnableGenerator<void>) {
+        const scope = exitScope();
         const detach = scope.attach();
 
         const expect = start(runnable()); // do side effects first

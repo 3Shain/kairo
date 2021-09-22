@@ -46,7 +46,7 @@ describe('@kairo/svelte', () => {
     });
     await tick();
     expect(w.container.querySelector('p')).toHaveTextContent('World');
-    expect(viewpropChangedCallback).toBeCalledTimes(1);
+    expect(viewpropChangedCallback).toBeCalledTimes(2);
 
     w.component.$set({
       initialize: initCallback,
@@ -55,7 +55,7 @@ describe('@kairo/svelte', () => {
       viewPropChanged: viewpropChangedCallback,
     });
     await tick();
-    expect(viewpropChangedCallback).toBeCalledTimes(2);
+    expect(viewpropChangedCallback).toBeCalledTimes(3);
     expect(w.container.querySelector('p')).toHaveTextContent('Kairo');
 
     await fireEvent.click(button, {});

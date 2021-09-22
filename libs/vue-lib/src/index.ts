@@ -1,2 +1,2 @@
 export { withConcern } from './lib/application';
-export { withKairoComponent, withKairo } from './lib/with-kairo';
+export { patchComponent, withKairo } from './lib/with-kairo';

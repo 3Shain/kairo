@@ -1,10 +1,8 @@
 import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
-import { , withKairo } from '../src';
-import { lifecycle, mut, reference } from 'kairo';
-import { createSignal } from 'solid-js';
-
-const { App: KairoApp } = createKairoApp(() => {});
+import { withConcern, withKairo } from '../src';
+import { computed, lifecycle, mut, reference } from 'kairo';
+import { createComputed, createSignal } from 'solid-js';
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {
@@ -14,15 +12,15 @@ describe('@kairo/solid', () => {
 
     const [signal, setSignal] = createSignal('Hello');
 
+    const WithConcern = withConcern(() => {}, Case1);
+
     const w = render(() => (
-      <KairoApp>
-        <Case1
-          intialize={initCallback}
-          clean={cleanCallback}
-          viewProp={signal()}
-          viewPropChanged={viewpropChangedCallback}
-        />
-      </KairoApp>
+      <WithConcern
+        intialize={initCallback}
+        clean={cleanCallback}
+        viewProp={signal()}
+        viewPropChanged={viewpropChangedCallback}
+      />
     ));
     expect(initCallback).toBeCalledTimes(1);
     expect(cleanCallback).toBeCalledTimes(0);
@@ -33,11 +31,11 @@ describe('@kairo/solid', () => {
     expect(button).toHaveTextContent('0');
 
     setSignal('World');
-    expect(viewpropChangedCallback).toBeCalledTimes(1);
+    expect(viewpropChangedCallback).toBeCalledTimes(2);
     expect(w.container.querySelector('p')).toHaveTextContent('World');
 
     setSignal('Kairo');
-    expect(viewpropChangedCallback).toBeCalledTimes(2);
+    expect(viewpropChangedCallback).toBeCalledTimes(3);
     expect(w.container.querySelector('p')).toHaveTextContent('Kairo');
 
     fireEvent.click(button, {});
@@ -57,24 +55,12 @@ describe('@kairo/solid', () => {
   });
 });
 
-/**
- * 1. model view separation
- *
- * 2. simplified lifecycle
- *
- * 3. declarative model
- *
- * 4. static prop vs dynamic prop
- *
- * 5. reference
- */
-
 export const Case1 = withKairo<{
   intialize: Function;
   clean: Function;
   viewProp: string;
   viewPropChanged: Function;
-}>((prop, useProp) => {
+}>((prop) => {
   const para = reference<HTMLParagraphElement>(null);
 
   lifecycle(() => {
@@ -86,38 +72,31 @@ export const Case1 = withKairo<{
     };
   });
 
-  const viewProp = useProp((x) => x.viewProp);
-  lifecycle(() =>
-    viewProp.watch(() => {
-      prop.viewPropChanged();
-    })
-  );
-
   const [count, setCount] = mut(0);
 
-  const doubled = count.map((x) => x * 2);
+  const doubled = computed(() => count.value * 2);
 
-  return (vp) => (
-    <div>
-      <p ref={para.bind}>{vp.viewProp}</p>
-      <button
-        onClick={() => {
-          setCount(count.value + 1);
-        }}
-      >
-        {count.value}
-      </button>
-      <Case1Child count={doubled.value} />
-    </div>
-  );
+  return (vp) => {
+    createComputed(() => {
+      vp.viewProp;
+      vp.viewPropChanged();
+    });
+    return (
+      <div>
+        <p ref={para.bind}>{vp.viewProp}</p>
+        <button
+          onClick={() => {
+            setCount(count.value + 1);
+          }}
+        >
+          {count.value}
+        </button>
+        <Case1Child count={doubled.value} />
+      </div>
+    );
+  };
 });
 
-const Case1Child = withKairo<{ count: number }>((_, useProp) => {
-  const dp = useProp((x) => x.count);
-
-  return () => <span>{dp.value}</span>;
+const Case1Child = withKairo<{ count: number }>(() => {
+  return (props) => <span>{props.count}</span>;
 });
-
-/**
- * chilren: cascaded dependency injection.
- */

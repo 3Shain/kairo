@@ -20,7 +20,12 @@ export default function preprocess(
       if (options.attributes['kairo']) {
         return {
           ...result,
-          ...transform(result.code, result.map as any),
+          ...transform(
+            result.code,
+            typeof result.map === 'string'
+              ? JSON.parse(result.map)
+              : (result.map as any)
+          ),
         };
       }
 
@@ -38,39 +43,41 @@ function transform(code: string, map?: RawSourceMap) {
   traverse(ast, {
     Program: (path) => {
       const args = [
-        path.scope.generateUidIdentifier('onDestroy'),
-        path.scope.generateUidIdentifier('setContext'),
-        path.scope.generateUidIdentifier('getContext'),
-        path.scope.generateUidIdentifier('onMount'),
+        path.scope.generateUid('onDestroy'),
+        path.scope.generateUid('setContext'),
+        path.scope.generateUid('getContext'),
+        path.scope.generateUid('onMount'),
       ];
+      const beginScopeUid = path.scope.generateUid('beginScope');
+      const endScopeUid = path.scope.generateUid('endScope');
       path.unshiftContainer('body', [
         createImportDeclaration({
           from: '@kairo/svelte',
-          imports: [['beginScope', path.scope.generateUid('beginScope')]],
+          imports: [['beginScope', beginScopeUid]],
         }),
         createImportDeclaration({
           from: 'svelte',
           imports: [
-            ['onDestroy', '__onDestroy'],
-            ['setContext', '__setContext'],
-            ['getContext', '__getContext'],
-            ['onMount', '__onMount'],
+            ['onDestroy', args[0]],
+            ['setContext', args[1]],
+            ['getContext', args[2]],
+            ['onMount', args[3]],
           ],
         }),
         t.variableDeclaration('const', [
           t.variableDeclarator(
-            t.identifier('__endScope'),
-            t.callExpression(t.identifier('__beginScope'), [
-              t.identifier('__onDestroy'),
-              t.identifier('__setContext'),
-              t.identifier('__getContext'),
-              t.identifier('__onMount'),
+            t.identifier(endScopeUid),
+            t.callExpression(t.identifier(beginScopeUid), [
+              t.identifier(args[0]),
+              t.identifier(args[1]),
+              t.identifier(args[2]),
+              t.identifier(args[3]),
             ])
           ),
         ]),
       ]);
       path.pushContainer('body', [
-        t.callExpression(t.identifier('__endScope'), []),
+        t.callExpression(t.identifier(endScopeUid), []),
       ]);
       path.skip();
     },
@@ -87,7 +94,11 @@ function transform(code: string, map?: RawSourceMap) {
   });
   return {
     code: generated.code,
-    map: remapped as RawSourceMap,
+    map: {
+      ...map,
+      names: remapped.names,
+      mappings: remapped.mappings
+    },
   };
 }
 

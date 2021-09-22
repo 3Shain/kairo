@@ -15,7 +15,6 @@ import { Cell, collectScope, Context, isCell, mutValue, Reaction } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
 
-let $$READ_AS_PROP = false;
 
 /**
  * side effects
@@ -39,9 +38,6 @@ function createPatch(originalGetter: Function) {
       signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
     }
   ) {
-    if ($$READ_AS_PROP) {
-      throw this;
-    }
     if (getListener()) {
       const { owner } = getListener();
       if (!this.signal_ref) {
@@ -75,8 +71,7 @@ function createPatch(originalGetter: Function) {
 
 function withKairo<Props>(
   setup: (
-    props: Props,
-    useProp: <P>(selector: (x: Props) => P) => Cell<P>
+    props: Props
   ) => Component<Props>
 ): Component<Props> {
   return (
@@ -93,23 +88,7 @@ function withKairo<Props>(
       Component = setup(
         {
           ...props,
-        } as any,
-        (thunk) => {
-          try {
-            $$READ_AS_PROP = true;
-            const [prop, setProp] = mutValue(thunk(props));
-            createComputed(() => {
-              setProp(thunk(props));
-            });
-            return prop;
-          } catch (e) {
-            /* istanbul ignore else */
-            if (isCell(e)) return e as Cell<any>;
-            else throw e;
-          } finally {
-            $$READ_AS_PROP = false;
-          }
-        }
+        } as any
       );
     } finally {
       exitContext();

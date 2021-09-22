@@ -1,7 +1,6 @@
 module.exports = {
   extends: [
     '../../.eslintrc.json',
-    'plugin:vue/vue3-essential',
     '@vue/typescript/recommended',
     'prettier',
     'prettier/@typescript-eslint',
