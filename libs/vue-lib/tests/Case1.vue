@@ -1,14 +1,17 @@
 <template>
   <div>
-    <p ref="para">{{viewProp}}</p>
-    <button @click="onClick">{{count}}</button>
-    <case-1-child :count="doubled"/>
+    <p ref="para">{{ viewProp }}</p>
+    <button @click="onClick">{{ count }}</button>
+    <case-1-child :count="doubled" />
   </div>
 </template>
-<script lang="ts">
+<script lang="ts" kairo>
 /// <reference types="jest" />
 import '@testing-library/jest-dom';
-import { reference, mut, lifecycle } from 'kairo';
+
+import { watchEffect } from 'vue';
+import { reference, mut, lifecycle, computed } from 'kairo';
+
 import Case1Child from './Case1Child.vue';
 
 export default {
@@ -21,7 +24,7 @@ export default {
   components: {
     Case1Child
   },
-  setup: ((prop, useProp) => {
+  setup: ((prop) => {
     const para = reference<HTMLParagraphElement>(null);
 
     lifecycle(() => {
@@ -33,22 +36,20 @@ export default {
       };
     });
 
-    // const viewProp = useProp((x) => x.viewProp);
-    // lifecycle(() =>
-    //   viewProp.watch(() => {
-    //     prop.viewPropChanged();
-    //   })
-    // );
+    watchEffect(()=>{
+      prop.viewProp;
+      prop.viewPropChanged();
+    });
 
     const [count, setCount] = mut(0);
 
-    const doubled = count.map((x) => x * 2);
+    const doubled = computed(() => count.value * 2);
 
     return {
       count,
       doubled,
       para,
-      onClick:()=>{
+      onClick: () => {
         setCount(count.value + 1);
       }
     };

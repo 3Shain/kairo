@@ -6,5 +6,5 @@
   },
   "files": [],
   "exclude": ["**/*.spec.ts", "**/*.spec.tsx"],
-  "include": ["**/*.ts", "**/*.tsx", "**/*.vue"]
+  "include": ["**/*.ts", "**/*.tsx"]
 }

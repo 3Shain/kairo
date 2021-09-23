@@ -7,7 +7,7 @@
     "allowSyntheticDefaultImports": true
   },
   "files": [],
-  "include": [],
+  "include": ["**/*.vue"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

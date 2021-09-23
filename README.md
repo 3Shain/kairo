@@ -6,5 +6,3 @@
 [![Coverage Status](https://coveralls.io/repos/github/3Shain/kairo/badge.svg?branch=master)](https://coveralls.io/github/3Shain/kairo?branch=master)
 
 ## Documentation will be ready soon
-
-[See at a glance](https://kairojs.org)

@@ -2,8 +2,9 @@ import { fireEvent, render } from '@testing-library/vue';
 import { lifecycle, mut, reference, computed } from 'kairo';
 import { withKairo } from '../src';
 import '@testing-library/jest-dom';
-import { nextTick } from 'vue';
+import { nextTick, watchEffect } from 'vue';
 import Case1SFC from './Case1.vue';
+import Case1SetupSFC from './Case1Setup.vue';
 import KeepAlive from './KeepAlive.vue';
 
 describe('@kairo/vue', () => {
@@ -13,6 +14,10 @@ describe('@kairo/vue', () => {
 
   it('implement Simple Component Model (sfc)', async () => {
     await case1(Case1SFC);
+  });
+
+  it('implement Simple Component Model (sfc-setup)', async () => {
+    await case1(Case1SetupSFC);
   });
 
   it('keepalive', async () => {
@@ -73,7 +78,7 @@ async function case1(Component: any) {
     viewPropChanged: viewpropChangedCallback,
   });
   await nextTick();
-  expect(viewpropChangedCallback).toBeCalledTimes(1);
+  expect(viewpropChangedCallback).toBeCalledTimes(2);
   expect(w.container.querySelector('p')).toHaveTextContent('World');
 
   w.rerender({
@@ -83,7 +88,7 @@ async function case1(Component: any) {
     viewPropChanged: viewpropChangedCallback,
   });
   await nextTick();
-  expect(viewpropChangedCallback).toBeCalledTimes(2);
+  expect(viewpropChangedCallback).toBeCalledTimes(3);
   expect(w.container.querySelector('p')).toHaveTextContent('Kairo');
 
   fireEvent.click(button, {});
@@ -105,7 +110,7 @@ export const Case1 = withKairo<{
   clean: Function;
   viewProp: string;
   viewPropChanged: Function;
-}>((prop, useProp) => {
+}>((prop) => {
   const para = reference<HTMLParagraphElement>(null);
 
   lifecycle(() => {
@@ -117,12 +122,10 @@ export const Case1 = withKairo<{
     };
   });
 
-  // const viewProp = useProp((x) => x.viewProp);
-  // lifecycle(() =>
-  //   viewProp.watch(() => {
-  //     prop.viewPropChanged();
-  //   })
-  // );
+  watchEffect(()=>{
+    prop.viewProp;
+    prop.viewPropChanged();
+  });
 
   const [count, setCount] = mut(0);
 

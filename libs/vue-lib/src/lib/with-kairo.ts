@@ -5,6 +5,7 @@ import {
   Cell,
   Context,
   LifecycleScope,
+  Reference,
 } from 'kairo';
 import {
   customRef,
@@ -69,42 +70,67 @@ export function withKairo<Props>(
 
 export function patchComponent<T extends DefineComponent>(component: T) {
   const { setup, render } = component;
-  component.setup = function (
-    this: undefined,
-    props: Parameters<T['setup']>[0],
-    setupContext: SetupContext
-  ) {
-    const stopCollecting = collectScope();
-    const context = inject(CONTEXT, Context.EMPTY);
-    const exitContext = context.runInContext();
-    try {
-      const bindings = setup(props, setupContext);
-      if (bindings instanceof Promise) {
-        throw Error('Async component is not supported.');
+
+  if (setup) {
+    component.setup = function (
+      this: undefined,
+      props: Parameters<T['setup']>[0],
+      setupContext: SetupContext
+    ) {
+      const stopCollecting = collectScope();
+      const context = inject(CONTEXT, Context.EMPTY);
+      const exitContext = context.runInContext();
+      try {
+        const bindings = setup(props, setupContext);
+        if (bindings instanceof Promise) {
+          throw Error('Async component is not supported.');
+        }
+        const tracker = ref(0);
+        const r = new Reaction(() => {
+          tracker.value++;
+        });
+        lifecycle(() => {
+          return () => r.dispose();
+        });
+        if (typeof bindings === 'function') {
+          return (...args: unknown[]) => (
+            // @ts-ignore
+            tracker.value, r.execute(() => bindings(...args))
+          );
+        }
+        const mappedBindings = Object.fromEntries(
+          Object.entries((bindings as object) ?? {}).map(([key, value]) => {
+            if (value instanceof Reference) {
+              return [
+                key,
+                customRef(() => {
+                  return {
+                    get() {
+                      return value.current;
+                    },
+                    set(v: any) {
+                      value.current = v;
+                    },
+                  };
+                }),
+              ];
+            }
+            return [key, value];
+          })
+        );
+        return {
+          ...mappedBindings,
+          tracker,
+          r,
+        };
+      } finally {
+        exitContext();
+        useScopeController(stopCollecting());
       }
-      const tracker = ref(0);
-      const r = new Reaction(() => {
-        tracker.value++;
-      });
-      lifecycle(() => {
-        return () => r.dispose();
-      });
-      if (typeof bindings === 'function') {
-        // @ts-ignore
-        return (...args: unknown[]) => (tracker.value, bindings(...args));
-      }
-      return {
-        ...bindings,
-        tracker,
-        r,
-      };
-    } finally {
-      exitContext();
-      useScopeController(stopCollecting());
+    };
+    if (render) {
+      component.render = patchRender(render);
     }
-  };
-  if (component.render) {
-    component.render = patchRender(render);
   }
   return component;
 }

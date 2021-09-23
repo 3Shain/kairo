@@ -2,7 +2,7 @@ module.exports = {
   displayName: 'vue-lib',
   preset: '../../jest.preset.js',
   transform: {
-    '^.+\\.vue$': '@vue/vue3-jest',
+    '^.+\\.vue$': '@kairo/vue3-jest',
     '.+\\.(css|styl|less|sass|scss|svg|png|jpg|ttf|woff|woff2)$':
       'jest-transform-stub',
     '^.+\\.tsx?$': 'ts-jest',

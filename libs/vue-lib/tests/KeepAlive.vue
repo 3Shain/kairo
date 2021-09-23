@@ -5,7 +5,7 @@
     </keep-alive>
   </div>
 </template>
-<script lang="ts">
+<script lang="ts" kairo>
 import KeepAliveChild from './KeepAliveChild.vue';
 export default {
   components: { KeepAliveChild },
