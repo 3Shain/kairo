@@ -1,35 +1,80 @@
 {
   "implicitDependencies": {
     "angular.json": "*",
-    "package.json": { "dependencies": "*", "devDependencies": "*" },
+    "package.json": {
+      "dependencies": "*",
+      "devDependencies": "*"
+    },
     "tsconfig.base.json": "*",
     "tslint.json": "*",
     ".eslintrc.json": "*",
     "nx.json": "*"
   },
-  "affected": { "defaultBase": "master" },
+  "affected": {
+    "defaultBase": "master"
+  },
   "npmScope": "kairo",
   "tasksRunnerOptions": {
     "default": {
       "runner": "@nrwl/workspace/tasks-runners/default",
-      "options": { "cacheableOperations": ["build", "lint", "test", "e2e"] }
+      "options": {
+        "cacheableOperations": ["build", "lint", "test", "e2e"]
+      }
     }
   },
   "projects": {
-    "ng-app": { "tags": [] },
-    "kairo": { "tags": [] },
-    "ng-lib": { "tags": [] },
-    "react-app": { "tags": [] },
-    "react-lib": { "tags": [] },
-    "preact-lib": { "tags": [] },
-    "vue-lib": { "tags": [] },
-    "solid-lib": { "tags": [] },
-    "svelte-lib": { "tags": [] },
-    "svelte-app": { "tags": [] },
-    "svelte-preprocess": { "tags": [] },
-    "solid-app": { "tags": [] },
-    "vite-vue-app": { "tags": [] },
-    "vue-sfc-transformer": { "tags": [] },
-    "vite-plugin-vue": { "tags": [] }
+    "kairo": {
+      "tags": []
+    },
+    "ng-app": {
+      "tags": []
+    },
+    "ng-lib": {
+      "tags": []
+    },
+    "preact-lib": {
+      "tags": []
+    },
+    "react-app": {
+      "tags": []
+    },
+    "react-lib": {
+      "tags": []
+    },
+    "solid-app": {
+      "tags": []
+    },
+    "solid-lib": {
+      "tags": []
+    },
+    "svelte-app": {
+      "tags": []
+    },
+    "svelte-lib": {
+      "tags": []
+    },
+    "svelte-preprocess": {
+      "tags": []
+    },
+    "vite-plugin-vue": {
+      "tags": []
+    },
+    "vite-vue-app": {
+      "tags": []
+    },
+    "vue-lib": {
+      "tags": []
+    },
+    "vue-sfc-transformer": {
+      "tags": []
+    }
+  },
+  "targetDependencies": {
+    "build": [
+      {
+        "target": "build",
+        "projects": "dependencies"
+      }
+    ]
   }
 }

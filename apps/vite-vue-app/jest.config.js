@@ -9,13 +9,12 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
   coverageDirectory: '../../coverage/apps/vue-app',
-  snapshotSerializers: ['jest-serializer-vue'],
+
   globals: {
-    'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json',
-    },
+    'ts-jest': { tsconfig: '<rootDir>/tsconfig.spec.json' },
     'vue-jest': {
       tsConfig: '<rootDir>/tsconfig.spec.json',
     },
   },
+  snapshotSerializers: ['jest-serializer-vue'],
 };

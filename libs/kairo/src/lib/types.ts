@@ -19,6 +19,12 @@ export type Cleanable =
     }
   | void;
 
+declare global {
+  interface SymbolConstructor {
+    readonly observable: unique symbol;
+  }
+}
+
 export const Symbol_observable = (() =>
   (typeof Symbol === 'function' && Symbol.observable) || '@@observable')();
 

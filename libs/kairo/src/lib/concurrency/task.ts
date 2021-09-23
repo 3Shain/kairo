@@ -304,7 +304,7 @@ export function* timeout(time: number): Runnable<void> {
   }) as void;
 }
 
-/* istanbul ignore next */
+/* c8 ignore next 6 */
 export function* nextAnimationFrame(): Runnable<number> {
   return (yield (resume) => {
     const id = requestAnimationFrame(resume as any);

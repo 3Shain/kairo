@@ -4,23 +4,20 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/test-setup.js'],
   globals: {
     'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json',
       stringifyContentPathRegex: '\\.(html|svg)$',
-      astTransformers: {
-        before: [
-          'jest-preset-angular/build/InlineFilesTransformer',
-          'jest-preset-angular/build/StripStylesTransformer',
-        ],
-      },
+
+      tsconfig: '<rootDir>/tsconfig.spec.json',
     },
     __DEV__: true,
     __TEST__: true,
   },
+  coverageProvider: 'v8',
   coverageDirectory: '../../coverage/libs/ng-lib',
-  coverageReporters: [["lcov", {"projectRoot": "./"}]],
+  coverageReporters: [['lcov', { projectRoot: './' }]],
   snapshotSerializers: [
-    'jest-preset-angular/build/AngularNoNgAttributesSnapshotSerializer.js',
-    'jest-preset-angular/build/AngularSnapshotSerializer.js',
-    'jest-preset-angular/build/HTMLCommentSerializer.js',
+    'jest-preset-angular/build/serializers/no-ng-attributes',
+    'jest-preset-angular/build/serializers/ng-snapshot',
+    'jest-preset-angular/build/serializers/html-comment',
   ],
+  transform: { '^.+\\.(ts|js|html)$': 'jest-preset-angular' },
 };

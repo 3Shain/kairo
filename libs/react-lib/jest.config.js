@@ -6,11 +6,9 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/react-lib',
-  coverageReporters: [["lcov", {"projectRoot": "./"}]],
+  coverageReporters: [['lcov', { projectRoot: './' }]],
   globals: {
-    'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json',
-    },
+    'ts-jest': { tsconfig: '<rootDir>/tsconfig.spec.json' },
     __DEV__: true,
     __TEST__: true,
   },

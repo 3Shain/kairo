@@ -6,11 +6,12 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/solid-lib',
-  coverageReporters: [["lcov", {"projectRoot": "./"}]],
+  coverageReporters: [['lcov', { projectRoot: './' }]],
+  coverageProvider: 'v8',
   globals: {
     'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.spec.json',
       babelConfig: '<rootDir>/babel.config.js',
+      tsconfig: '<rootDir>/tsconfig.spec.json',
     },
     __DEV__: true,
     __TEST__: true,
