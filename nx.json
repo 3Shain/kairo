@@ -70,11 +70,5 @@
     }
   },
   "targetDependencies": {
-    "build": [
-      {
-        "target": "build",
-        "projects": "dependencies"
-      }
-    ]
   }
 }

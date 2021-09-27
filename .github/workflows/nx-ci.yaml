@@ -11,7 +11,15 @@ jobs:
       - uses: c-hive/gha-yarn-cache@v1
       - name: Install deps
         run: yarn install
-      - uses: mansagroup/nrwl-nx-action@v2.0.4
+      - name: Build prequisite tools
+        run: yarn run build-tools
+      - name: Build prequisite dependencies
+        uses: mansagroup/nrwl-nx-action@v2.0.4
+        with:
+          projects: svelte-preprocess
+          targets: build
+      - name: Unit test
+        uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
           projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib,preact-lib
           targets: test

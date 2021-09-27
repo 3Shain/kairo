@@ -47,7 +47,7 @@ export default async function (
             src: [
               resolve(projectRoot, 'README.md'),
               resolve(projectRoot, 'package.json'),
-              ..._options.copy?.map((x) => resolve(projectRoot, x)),
+              ..._options.copy?.map((x) => resolve(projectRoot, x)) ?? [],
             ],
             dest: outDir,
           },
