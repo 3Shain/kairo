@@ -10,7 +10,6 @@ module.exports = {
     '^.+\\.[tj]sx?$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  coverageProvider: 'v8',
   coverageDirectory: '../../coverage/libs/kairo',
   coverageReporters: [['lcov', { projectRoot: './' }]],
 };

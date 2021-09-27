@@ -9,7 +9,6 @@ module.exports = {
     ],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'svelte'],
-  coverageProvider: 'v8',
   coverageDirectory: '../../coverage/libs/svelte-lib',
   testEnvironment: 'jsdom',
   globals: {

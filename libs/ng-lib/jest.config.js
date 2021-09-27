@@ -11,7 +11,6 @@ module.exports = {
     __DEV__: true,
     __TEST__: true,
   },
-  coverageProvider: 'v8',
   coverageDirectory: '../../coverage/libs/ng-lib',
   coverageReporters: [['lcov', { projectRoot: './' }]],
   snapshotSerializers: [

@@ -10,7 +10,6 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
   coverageDirectory: '../../coverage/libs/vue-lib',
   coverageReporters: [['lcov', { projectRoot: './' }]],
-  coverageProvider: 'v8',
   globals: {
     'ts-jest': {
       babelConfig: '<rootDir>/babel.config.js',

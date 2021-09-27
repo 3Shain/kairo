@@ -7,7 +7,6 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/solid-lib',
   coverageReporters: [['lcov', { projectRoot: './' }]],
-  coverageProvider: 'v8',
   globals: {
     'ts-jest': {
       babelConfig: '<rootDir>/babel.config.js',

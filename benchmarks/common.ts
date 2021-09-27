@@ -2,7 +2,7 @@ import {
   computed,
   mutValue as data,
   batch,
-  reaction as kairoReaction,
+  Reaction,
 } from '../libs/kairo/src/lib/public-api';
 import {
   ref,
@@ -229,7 +229,7 @@ export const KairoBridge: Bridge = {
       effect();
       g.execute(read);
     };
-    const g = kairoReaction(fn);
+    const g = new Reaction(fn);
     fn();
     return () => {
       g.dispose();
