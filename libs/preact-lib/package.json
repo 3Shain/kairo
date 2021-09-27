@@ -1,6 +1,6 @@
 {
   "name": "@kairo/preact",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "Preact integration for kairo",
   "peerDependencies": {
     "preact": ">=10.2.0",

@@ -1,2 +1,2 @@
-export { withKairo, forwardRef, registerHook } from './lib/with-kairo';
-export { createKairoApp } from './lib/application';
+export { withKairo, forwardRef } from './lib/with-kairo';
+export * from './lib/application';

@@ -6,8 +6,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "files": [],
-  "include": ["**/*.vue"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

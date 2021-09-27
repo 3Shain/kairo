@@ -1,11 +1,9 @@
-import { collectScope, Concern } from 'kairo';
+import { Concern, collectScope } from 'kairo';
 import { KairoContext } from './context';
-import React, { useContext, useEffect, useMemo } from 'react';
+import { h, ComponentType } from 'preact';
+import { useEffect, useContext, useMemo } from 'preact/compat';
 
-export function withConcern<P>(
-  concern: Concern,
-  Component: React.ComponentType<P>
-) {
+export function withConcern<P>(concern: Concern, Component: ComponentType<P>) {
   const Module: React.FunctionComponent<P> = (props) => {
     const parentContext = useContext(KairoContext);
     const [context, scope] = useMemo(() => {
@@ -18,11 +16,10 @@ export function withConcern<P>(
       }
     }, []);
     useEffect(() => scope.attach(), []);
-    return React.createElement(
-      KairoContext.Provider,
-      { value: context },
-      React.createElement(Component, props)
-    );
+    return h(KairoContext.Provider, {
+      value: context,
+      children: h(Component, props),
+    });
   };
 
   return Module;

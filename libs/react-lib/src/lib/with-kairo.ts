@@ -1,53 +1,43 @@
-import { Cell, lifecycle, Reaction, mutValue, collectScope } from 'kairo';
+import {
+  Cell,
+  lifecycle,
+  Reaction,
+  mutValue,
+  collectScope,
+  LifecycleScope,
+} from 'kairo';
 import React, {
   useContext,
   useEffect,
   useMemo,
   forwardRef as reactForwardRef,
   useState,
+  useRef,
 } from 'react';
 import { KairoContext } from './context';
 
 type FunctionComponent<T> = React.FunctionComponent<T>;
 type ForwardRefRenderFunction<R, T> = React.ForwardRefRenderFunction<R, T>;
 
-let $$CURRENT_HOOKS: Function[] | null = null;
-
-export function registerHook<Props = any>(fn: (prop: Props) => void) {
-  /* istanbul ignore if */
-  if ($$CURRENT_HOOKS === null) {
-    throw Error(
-      'You should only call is function when component initializing.'
-    );
-  }
-  $$CURRENT_HOOKS.push(fn);
-}
-
 export function withKairo<Props>(
-  setup: (
-    props: Props,
-    useProp: <P>(selector: (x: Props) => P) => Cell<P>
-  ) => FunctionComponent<Props>
+  setup: (props: Props) => FunctionComponent<Props>
 ) {
   const component: FunctionComponent<Props> = (props) => {
-    const { render, renderComp } = useKairoComponent(props, setup);
+    const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderComp.execute(() => render(props));
+    return renderReaction.execute(() => renderFunction(props));
   };
   component.displayName = setup.name;
   return component;
 }
 
 export function forwardRef<Props, Ref>(
-  setup: (
-    props: Props,
-    useProp: <P>(selector: (x: Props) => P) => Cell<P>
-  ) => ForwardRefRenderFunction<Ref, Props>
+  setup: (props: Props) => ForwardRefRenderFunction<Ref, Props>
 ) {
   const component: ForwardRefRenderFunction<Ref, Props> = (props, ref) => {
-    const { render, renderComp } = useKairoComponent(props, setup);
+    const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderComp.execute(() => render(props, ref));
+    return renderReaction.execute(() => renderFunction(props, ref));
   };
   component.displayName = setup.name;
   return reactForwardRef(component);
@@ -55,62 +45,52 @@ export function forwardRef<Props, Ref>(
 
 const inc = (x: number) => x + 1;
 
-function useKairoComponent<
-  Props,
-  RenderFunction extends (...args: any[]) => any
->(
+function useKairoComponent<Props>(
   props: Props,
-  setup: (
-    props: Props,
-    useProp: <P>(selector: (x: Props) => P) => Cell<P>
-  ) => RenderFunction
+  setup: (props: Props) => FunctionComponent<Props>
 ) {
   const parentContext = useContext(KairoContext);
   const [, forceUpdate] = useState(0);
   const instance = useMemo(() => {
     const exitScope = collectScope();
     const exitContext = parentContext.runInContext();
-    const propsSetter = [];
-    $$CURRENT_HOOKS = [];
-    try {
-      const render = setup(props, (selector) => {
-        const [beh, set] = mutValue(selector(props));
-        propsSetter.push((p: Props) => set(selector(p)));
-        return beh;
-      });
-      Object.freeze(propsSetter);
-      $$CURRENT_HOOKS.push((currentProps: Props) => {
-        // the length should be fixed
-        if (propsSetter.length) {
-          useEffect(() => {
-            propsSetter.forEach((x) => x(currentProps));
-          });
-        }
-      });
-      // TODO: bug: memory leak in strict-mode: unmanaged subscription.
-      const renderNode = new Reaction(() => {
-        // if not attached: recycle.
-        forceUpdate(inc);
-      });
-
-      const hooks = $$CURRENT_HOOKS;
-
-      return {
-        render,
-        hooks,
-        renderComp: renderNode,
-        scope: exitScope(),
+    let renderFunction: FunctionComponent<Props>;
+    let scope: LifecycleScope;
+    let didMounted = false,
+      didUpdateBeforeMounted = false;
+    lifecycle(() => {
+      didMounted = true;
+      if (didUpdateBeforeMounted) {
+        forceUpdate(inc); // schedule an update
+        didUpdateBeforeMounted = false;
+      }
+      return () => {
+        didMounted = false;
+        renderReaction.dispose();
       };
+    });
+    try {
+      renderFunction = setup(props);
     } finally {
       exitContext();
-      exitScope();
-      $$CURRENT_HOOKS = null;
+      scope = exitScope();
     }
+    const renderReaction = new Reaction(() => {
+      if (!didMounted) {
+        renderReaction.dispose();
+        didUpdateBeforeMounted = true;
+        // if it's the first render of strict mode,
+      } else {
+        forceUpdate(inc);
+      }
+    });
+
+    return {
+      renderFunction,
+      renderReaction,
+      scope,
+    };
   }, []);
-  for (const hook of instance.hooks) {
-    hook(props);
-  }
   useEffect(() => instance.scope.attach(), []);
-  useEffect(() => () => instance.renderComp.dispose(), []);
   return instance;
 }

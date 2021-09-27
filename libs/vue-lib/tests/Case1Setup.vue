@@ -1,6 +1,6 @@
 <template>
   <div>
-    <p ref="para">{{ viewProp }}</p>
+    <p :ref="para.bind">{{ viewProp }}</p>
     <button @click="onClick">{{ count }}</button>
     <case-1-child :count="doubled" />
   </div>

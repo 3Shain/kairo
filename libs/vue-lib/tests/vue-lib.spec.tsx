@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/vue';
 import { lifecycle, mut, reference, computed } from 'kairo';
-import { withKairo } from '../src';
+import { withConcern, withKairo } from '../src';
 import '@testing-library/jest-dom';
 import { nextTick, watchEffect } from 'vue';
 import Case1SFC from './Case1.vue';
@@ -50,7 +50,9 @@ describe('@kairo/vue', () => {
   });
 });
 
-async function case1(Component: any) {
+async function case1(cComponent: any) {
+  const Component = withConcern(() => {}, cComponent);
+
   const initCallback = jest.fn();
   const cleanCallback = jest.fn();
   const viewpropChangedCallback = jest.fn();
@@ -61,6 +63,8 @@ async function case1(Component: any) {
       clean: cleanCallback,
       viewProp: 'Hello',
       viewPropChanged: viewpropChangedCallback,
+      onEvent: (vtt)=>{
+      }
     },
   });
   expect(initCallback).toBeCalledTimes(1);
@@ -71,32 +75,29 @@ async function case1(Component: any) {
   expect(w.container.querySelector('p')).toHaveTextContent('Hello');
   expect(button).toHaveTextContent('0');
 
-  w.rerender({
+  await w.rerender({
     initialize: initCallback,
     clean: cleanCallback,
     viewProp: 'World',
     viewPropChanged: viewpropChangedCallback,
   });
-  await nextTick();
   expect(viewpropChangedCallback).toBeCalledTimes(2);
   expect(w.container.querySelector('p')).toHaveTextContent('World');
 
-  w.rerender({
+  await w.rerender({
     initialize: initCallback,
     clean: cleanCallback,
     viewProp: 'Kairo',
     viewPropChanged: viewpropChangedCallback,
   });
-  await nextTick();
   expect(viewpropChangedCallback).toBeCalledTimes(3);
   expect(w.container.querySelector('p')).toHaveTextContent('Kairo');
 
-  fireEvent.click(button, {});
-  await nextTick();
+  await fireEvent.click(button, {});
+  // await nextTick();
   expect(button).toHaveTextContent('1');
   expect(span).toHaveTextContent('2');
-  fireEvent.click(button, {});
-  await nextTick();
+  await fireEvent.click(button, {});
   expect(button).toHaveTextContent('2');
   expect(span).toHaveTextContent('4');
 
@@ -122,7 +123,7 @@ export const Case1 = withKairo<{
     };
   });
 
-  watchEffect(()=>{
+  watchEffect(() => {
     prop.viewProp;
     prop.viewPropChanged();
   });
@@ -149,7 +150,6 @@ export const Case1 = withKairo<{
 Case1.props = ['initialize', 'clean', 'viewProp', 'viewPropChanged'];
 
 const Case1Child = withKairo<{ count: number }>((_) => {
-  // const dp = useProp((x) => x.count);
 
   return (props) => <span>{props.count}</span>;
 });

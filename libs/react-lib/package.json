@@ -1,6 +1,6 @@
 {
   "name": "@kairo/react",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "React integration for kairo",
   "peerDependencies": {
     "react": ">=16.8.0",

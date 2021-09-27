@@ -1,18 +1,19 @@
 <template>
   <div>
-    <p ref="para">{{ viewProp }}</p>
     <button @click="onClick">{{ count }}</button>
-    <case-1-child :count="doubled" />
+    <case-1-child :count="doubled">
+      <p :ref="para.bind">{{ viewProp }}</p>
+    </case-1-child>
   </div>
 </template>
 <script lang="ts" kairo>
-/// <reference types="jest" />
 import '@testing-library/jest-dom';
 
 import { watchEffect } from 'vue';
 import { reference, mut, lifecycle, computed } from 'kairo';
 
 import Case1Child from './Case1Child.vue';
+import { withConcern } from '../src';
 
 export default {
   props: {
@@ -22,11 +23,11 @@ export default {
     viewPropChanged: Function,
   },
   components: {
-    Case1Child
+    Case1Child: withConcern(()=>{},Case1Child as any )
   },
   setup: ((prop) => {
     const para = reference<HTMLParagraphElement>(null);
-
+    
     lifecycle(() => {
       prop.initialize();
       expect(para.current).toBeInTheDocument();

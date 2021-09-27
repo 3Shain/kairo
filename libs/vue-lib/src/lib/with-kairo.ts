@@ -5,10 +5,8 @@ import {
   Cell,
   Context,
   LifecycleScope,
-  Reference,
 } from 'kairo';
 import {
-  customRef,
   DefineComponent,
   inject,
   onActivated,
@@ -60,7 +58,7 @@ export function withKairo<Props>(
 ) {
   return patchComponent(
     defineComponent<Props>((props, ctx) => {
-      const renderFn = component(props, ctx); // TODO:
+      const renderFn = component(props, ctx);
       return (() => {
         return renderFn({ ...props });
       }) as RenderFunction;
@@ -98,28 +96,8 @@ export function patchComponent<T extends DefineComponent>(component: T) {
             tracker.value, r.execute(() => bindings(...args))
           );
         }
-        const mappedBindings = Object.fromEntries(
-          Object.entries((bindings as object) ?? {}).map(([key, value]) => {
-            if (value instanceof Reference) {
-              return [
-                key,
-                customRef(() => {
-                  return {
-                    get() {
-                      return value.current;
-                    },
-                    set(v: any) {
-                      value.current = v;
-                    },
-                  };
-                }),
-              ];
-            }
-            return [key, value];
-          })
-        );
         return {
-          ...mappedBindings,
+          ...bindings,
           tracker,
           r,
         };
