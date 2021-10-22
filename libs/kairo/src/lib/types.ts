@@ -17,6 +17,9 @@ export type Cleanable =
   | {
       unsubscribe(): void;
     }
+  | {
+      abort(): void;
+    }
   | void;
 
 declare global {
@@ -36,35 +39,39 @@ export declare type InteropObservable<T> = {
 };
 
 export interface Subscribable<T> {
-  subscribe(observer?: PartialObserver<T>): Unsubscribable;
+  subscribe(observer?: PartialObserver<T>): Subscription;
   subscribe(
     next?: (value: T) => void,
     error?: (error: any) => void,
     complete?: () => void
-  ): Unsubscribable;
+  ): Subscription;
 }
 export interface Unsubscribable {
   unsubscribe(): void;
 }
-export interface NextObserver<T> {
-  closed?: boolean;
+export interface Subscription extends Unsubscribable {
+  get closed(): boolean;
+}
+
+interface NextObserver<T> {
+  start?: (subscription: Subscription) => void;
   next: (value: T) => void;
   error?: (err: any) => void;
   complete?: () => void;
 }
-export interface ErrorObserver<T> {
-  closed?: boolean;
+interface ErrorObserver<T> {
+  start?: (subscription: Subscription) => void;
   next?: (value: T) => void;
   error: (err: any) => void;
   complete?: () => void;
 }
-export interface CompletionObserver<T> {
-  closed?: boolean;
+interface CompletionObserver<T> {
+  start?: (subscription: Subscription) => void;
   next?: (value: T) => void;
   error?: (err: any) => void;
   complete: () => void;
 }
-export declare type PartialObserver<T> =
+export type PartialObserver<T> =
   | NextObserver<T>
   | ErrorObserver<T>
   | CompletionObserver<T>;

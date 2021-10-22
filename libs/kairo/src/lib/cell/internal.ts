@@ -63,7 +63,7 @@ function setData<T>(data: Data<T>, value: T): void {
   /* istanbul ignore if */
   if (__DEV__ && ctx_cc) {
     console.error(
-      `Violated action: You can't mutate any behavior inside a computation.`
+      `Violated action: You can't mutate any behavior inside a computation or reaction.`
     );
     return;
   }
@@ -95,9 +95,6 @@ function accessValue<T>(data: Data<T>): T {
   }
   if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
     ct.flush();
-    // if (__DEV__ && data.flags & BitFlags.MarkForCheck) {
-    //   panic(8);
-    // }
   }
   if (ctx_cc !== null) {
     logDependency(data);
@@ -210,7 +207,6 @@ function evaluate<T>(
   expr: () => T,
   restore_ctx_cc: typeof ctx_cc
 ) {
-  // assert(ctx_cln,null), assert(ctx_lr,null)
   ctx_cn = (ctx_cc = observer).fs;
 
   let calculatedValue: T | null,
@@ -246,7 +242,7 @@ function evaluate<T>(
   if (error !== NO_ERROR) {
     throw error;
   }
-  return calculatedValue!;
+  return calculatedValue! as T;
 }
 
 function cleanupMemo(memo: Memo) {
@@ -271,11 +267,7 @@ function cleanupSources(
     (next ? (next.prev = prev) : (source.lo = prev))
       ? (prev!.next = next)
       : null;
-    if (
-      source.flags & BitFlags.Memo &&
-      source.lo === null
-      // && ~source.flags & BitFlags.Propagating
-    ) {
+    if (source.flags & BitFlags.Memo && source.lo === null) {
       // it's last observer // but propagation might tackle this.
       cleanupMemo(source as Memo);
       source.flags |= BitFlags.StaleMemo;
@@ -317,7 +309,6 @@ function propagate(stack: Data[]): void {
             observer.flags &= ~BitFlags.Dirty;
             // if propagate receives array of data then the if is not necessary
             try {
-              // assert(ctx_cc,null)
               const currentValue = evaluate(observer, observer.c, null);
               // compare value , if changed, mark as changed
               if (
@@ -464,7 +455,7 @@ function createReaction(onCommit: () => void): Reaction {
 function executeReaction<T>(reaction: Reaction, fn: () => T) {
   /* istanbul ignore if */
   if (__TEST__ && ctx_cc) {
-    throw Error('should be not in computation');
+    throw Error('should be not in computation or reaction');
   }
   return evaluate(reaction, fn, null);
 }
@@ -515,5 +506,5 @@ export {
   untrack,
   createReaction,
   executeReaction,
-  cleanupMemo as cleanupComputation,
+  cleanupMemo,
 };

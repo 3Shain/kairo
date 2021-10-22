@@ -1,9 +1,19 @@
-import { computed, mutable, mutValue, Cell, Reaction } from './cell';
+import { from, Observable } from 'rxjs';
+import { computed, mutable, Cell, Reaction, combined } from './cell';
 import { batch, BitFlags, Memo, untrack } from './internal';
 
 describe('cell', () => {
-  it('', () => {
-    const [a, ma] = mutValue(0);
+
+  beforeAll(()=>{
+    globalThis.Observable = Observable;
+  });
+
+  afterAll(()=>{
+    globalThis.Observable = undefined;
+  })
+
+  it('normal', () => {
+    const [a, ma] = mutable(0);
     const b = computed(() => a.value);
     let g = 0;
     effect(() => (g = b.value));
@@ -15,7 +25,7 @@ describe('cell', () => {
   });
 
   it('eager evaluate', () => {
-    const [a, ma] = mutValue(0);
+    const [a, ma] = mutable(0);
     const b = computed(() => a.value);
     b.value;
     expect(countObservers(a)).toBe(1);
@@ -48,9 +58,9 @@ describe('cell', () => {
   });
 
   it('unstable 1', () => {
-    const [a, ma] = mutValue(0);
-    const [b, mb] = mutValue(0);
-    const [c, mc] = mutValue(0);
+    const [a, ma] = mutable(0);
+    const [b, mb] = mutable(0);
+    const [c, mc] = mutable(0);
     const d = computed(() => {
       if (a.value) {
         b.value, c.value;
@@ -75,9 +85,9 @@ describe('cell', () => {
   });
 
   it('unstable 2', () => {
-    const [a, ma] = mutValue(0);
-    const [b, mb] = mutValue(0);
-    const [c, mc] = mutValue(0);
+    const [a, ma] = mutable(0);
+    const [b, mb] = mutable(0);
+    const [c, mc] = mutable(0);
     const d = computed(() => {
       if ((a.value, a.value)) {
         b.value, c.value;
@@ -104,7 +114,7 @@ describe('cell', () => {
   });
 
   it('unstable 3', () => {
-    const [a, ma] = mutValue(0);
+    const [a, ma] = mutable(0);
     const b = Cell.of(0);
     const c = computed(() => a.value + b.value);
     const e = computed(() => c.value);
@@ -135,7 +145,7 @@ describe('cell', () => {
   });
 
   it('', () => {
-    const [a, ma] = mutValue(0);
+    const [a, ma] = mutable(0);
     const b = Cell.of(0);
     const c = computed(() => {
       a.value, b.value;
@@ -167,9 +177,9 @@ describe('cell', () => {
   });
 
   it('untrack', () => {
-    const [a, ma] = mutValue(0);
-    const [b, mb] = mutValue(0);
-    const [c, mc] = mutValue(0);
+    const [a, ma] = mutable(0);
+    const [b, mb] = mutable(0);
+    const [c, mc] = mutable(0);
     const d = computed(() => {
       if (a.value) {
         b.value, untrack(() => c.value);
@@ -195,12 +205,63 @@ describe('cell', () => {
 
   it('batch', () => {});
 
-  it('interop observable', () => {});
+  it('interop observable', () => {
+    const [a, ma] = mutable(0);
+    const interopObservable = from(a);
+
+    let o = 0;
+    const subscription = interopObservable.subscribe({
+      next: (v) => {
+        o = v;
+      },
+    });
+    const num = Math.random();
+    ma(num);
+    subscription.unsubscribe();
+    expect(o).toBe(num);
+  });
+
+  it('interop observable (function)', () => {
+    const [a, ma] = mutable(0);
+
+    let o = 0;
+    const subscription = a.subscribe((v) => {
+      o = v;
+    });
+    const num = Math.random();
+    ma(num);
+    subscription.unsubscribe();
+    expect(o).toBe(num);
+  });
+
+  it('combined object', () => {
+    const [a] = mutable(0);
+
+    const combinedCell = combined({
+      prop1: 0,
+      prop2: a,
+      prop3: {
+        prop4: a,
+      },
+    });
+    expect(combinedCell.value).toStrictEqual({
+      prop1: 0,
+      prop2: 0,
+      prop3: {
+        prop4: a,
+      },
+    });
+  });
+
+  it('combined array', () => {
+    const [a] = mutable(0);
+
+    const combinedCell = combined([0, a, { prop: a }]);
+    expect(combinedCell.value).toStrictEqual([0, 0, { prop: a }]);
+  });
 
   afterEach(cleanup);
 });
-
-const noop = () => {};
 
 const toCleanup: Function[] = [];
 
@@ -211,7 +272,7 @@ export function cleanup() {
 
 export function effect(fn: () => any) {
   const callback = () => {
-    r.execute(fn);
+    r.track(fn);
   };
   const r = new Reaction(callback);
   callback();
@@ -220,7 +281,7 @@ export function effect(fn: () => any) {
 
 export function controlledEffect(fn: () => any) {
   const callback = () => {
-    r.execute(fn);
+    r.track(fn);
   };
   const r = new Reaction(callback);
   callback();

@@ -1,4 +1,4 @@
-import { RunnableGenerator, start } from './concurrency';
+import { RunnableGenerator, task } from './concurrency';
 import { Concern, Context } from './context';
 import { collectScope, LifecycleScope } from './lifecycle-scope';
 
@@ -19,8 +19,8 @@ function createInteractionLogic(exitScope: ()=>LifecycleScope) {
         const scope = exitScope();
         const detach = scope.attach();
 
-        const expect = start(runnable()); // do side effects first
-        start(interactLogic()); // start interact
+        const expect = task(runnable)(); // do side effects first
+        task(interactLogic)(); // start interact
         return expect.finally(detach);
       },
     };

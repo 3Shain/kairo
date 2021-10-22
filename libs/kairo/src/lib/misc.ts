@@ -10,7 +10,9 @@ export function doCleanup(cleanup: Cleanable) {
   if (typeof cleanup === 'function') {
     cleanup();
   } else if (typeof cleanup === 'object') {
-    if ('cancel' in cleanup) {
+    if('abort' in cleanup){
+      cleanup.abort();
+    } else if ('cancel' in cleanup) {
       cleanup.cancel();
     } else if ('unsubscribe' in cleanup) {
       cleanup.unsubscribe();
@@ -18,4 +20,10 @@ export function doCleanup(cleanup: Cleanable) {
       cleanup.dispose();
     }
   }
+}
+
+export function hostReportErrors(error: any) {
+  setTimeout(()=>{
+    throw error;
+  });
 }

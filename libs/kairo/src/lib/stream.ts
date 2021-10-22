@@ -1,7 +1,7 @@
-import { batch } from './cell';
-import { RunnableGenerator } from './concurrency';
+import type { RunnableGenerator } from './concurrency/types';
 import { Cleanable, TeardownLogic } from './types';
 import { doCleanup } from './misc';
+import { __fulfill, TaskSuspended } from './concurrency/task';
 
 interface SubscriptionNode {
   next: SubscriptionNode | null;
@@ -13,12 +13,12 @@ export class EventStream<T> {
   constructor(private producer: (next: (value: T) => void) => Cleanable) {}
 
   *[Symbol.iterator](): RunnableGenerator<T> {
-    return yield (resolve) => {
+    return yield (next) => {
       const unsub = this.listen((value) => {
-        resolve(value);
-        unsub(); // 
+        next(__fulfill(value));
+        unsub(); //
       });
-      return unsub;
+      throw new TaskSuspended(unsub);
     };
   }
 
@@ -112,7 +112,7 @@ export class EventStream<T> {
     const stream = new EventStream<T>(() => {
       return () => {};
     });
-    return [stream, (payload: T) => batch(() => stream.next(payload))];
+    return [stream, (payload: T) => stream.next(payload)];
   }
 }
 

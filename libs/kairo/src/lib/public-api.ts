@@ -14,7 +14,6 @@ export { mutable as mut } from './cell';
 export { EventStream, stream, never, merged } from './stream';
 export * from './lifecycle-scope';
 export * from './context';
-export { held, reduced } from './derived';
 export * from './schedule';
 export * from './concurrency';
 export * from './reference';

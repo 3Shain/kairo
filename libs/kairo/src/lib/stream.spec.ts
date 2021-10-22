@@ -1,6 +1,6 @@
 import { noop } from './misc';
 import { EventStream, merged, stream } from './stream';
-import { start, delay } from './concurrency';
+import { delay } from './concurrency';
 
 describe('stream', () => {
   it('should be lazy', () => {
@@ -76,21 +76,5 @@ describe('stream', () => {
     emitSource2(2);
     expect(EXE_COUNTER).toBe(2);
     unsub();
-  });
-
-  it('yiled*', async () => {
-    const [source, emitSource] = stream<number>();
-    start((function* () {
-      yield* delay(1);
-      emitSource(1);
-      yield* delay(1);
-      emitSource(0);
-    })(
-    ));
-    await start((function* () {
-      while(yield* source) {
-        // expect(source)
-      }
-    })());
   });
 });

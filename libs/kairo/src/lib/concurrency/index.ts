@@ -1,4 +1,16 @@
-export { readEvents } from './channel';
-export * from './task';
+/* istanbul ignore file */
+
+export {
+  task,
+  delay,
+  timeout,
+  nextAnimationFrame,
+  resolve,
+  TaskSuspended,
+  Task,
+  AbortablePromise,
+  AbortedError
+} from './task';
+export { all, any, race, allSettled } from './combinators';
+export { ControlStatements } from './control-statements';
 export * from './types';
-export * from './promise';

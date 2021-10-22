@@ -1,11 +1,11 @@
-import { CanceledError, CancellablePromise } from './concurrency';
+import { AbortedError, AbortablePromise } from './concurrency';
 import { Cleanable } from './types';
 import { doCleanup, noop } from './misc';
 
 type LifecycleLogic = () => Cleanable;
 
-function filterCanceledError(x: unknown) {
-  if (!(x instanceof CanceledError)) {
+function filterAbortedError(x: unknown) {
+  if (!(x instanceof AbortedError)) {
     throw x;
   }
 }
@@ -37,9 +37,8 @@ class LifecycleScope {
     this.attached = true;
     const cleanups = this.onmountLogics.map((x) => {
       const cleanup = x();
-      if (cleanup instanceof CancellablePromise) {
-        // TODO: ignore specific error: CancelledError
-        cleanup.catch(filterCanceledError);
+      if (cleanup instanceof AbortablePromise) {
+        cleanup.catch(filterAbortedError);
       }
       return cleanup;
     });

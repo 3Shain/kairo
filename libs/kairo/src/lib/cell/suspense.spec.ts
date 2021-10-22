@@ -21,7 +21,7 @@ describe('cell/suspense', () => {
     expect(() => c.value).toThrow(`failed_${a.value}`);
   });
 
-  it('should cascade', async () => {
+  it('should be able to cascade', async () => {
     const [a, ma] = mut(0);
     const s = mockFetch();
     const c = suspended(() => {
@@ -46,7 +46,7 @@ describe('cell/suspense', () => {
     expect(e.value).toBe(a.value);
   });
 
-  it('should cascade error', async () => {
+  it('should be able to propagate error', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
     const c = suspended(() => {

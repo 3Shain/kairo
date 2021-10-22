@@ -10,10 +10,10 @@ export function effect(sideEffect: () => void) {
     }
   };
   const reaction = new Reaction(() => {
-    reaction.execute(doEffect);
+    reaction.track(doEffect);
   });
   lifecycle(() => {
-    reaction.execute(doEffect);
+    reaction.track(doEffect);
     return () => reaction.dispose();
   });
 }

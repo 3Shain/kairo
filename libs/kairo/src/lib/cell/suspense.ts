@@ -12,6 +12,8 @@ import {
 export class SuspendedCell<T, F> extends Cell<T | F> {
   private isSuspending = false;
 
+  [Symbol.toStringTag] = 'SuspendedCell';
+
   constructor(expr: () => T, fallback: F) {
     super(
       createMemo(() => {
@@ -75,7 +77,7 @@ export function suspended<T, F = undefined>(expr: () => T, fallback?: F) {
 }
 
 const DEFER_SUSPENSION = {
-  toString: /* istanbul ignore next */  () => '[Cell SUSPENDING]',
+  [Symbol.toStringTag]: 'DeferSuspension'
 };
 
 const queue: (() => void)[] = [];
@@ -93,16 +95,18 @@ function enqueueJob(job: () => void) {
   queue.push(job);
 }
 
-const enqueueTask = ((() => {
-  if (typeof setImmediate === 'function') {
-    return setImmediate;
-  } /* istanbul ignore next */
-  if (typeof MessageChannel !== 'undefined') {
-    const channel = new MessageChannel();
-    return (callback) => {
-      channel.port1.onmessage = callback;
-      channel.port2.postMessage(undefined);
-    };
-  } /* istanbul ignore next */
-  return (callback) => setTimeout(callback, 0);
-}) as () => (callback: () => void) => void)();
+const enqueueTask = (
+  /* istanbul ignore next */ (() => {
+    if (typeof setImmediate === 'function') {
+      return setImmediate;
+    }
+    if (typeof MessageChannel !== 'undefined') {
+      const channel = new MessageChannel();
+      return (callback) => {
+        channel.port1.onmessage = callback;
+        channel.port2.postMessage(undefined);
+      };
+    } /* istanbul ignore next */
+    return (callback) => setTimeout(callback, 0);
+  }) as () => (callback: () => void) => void
+)();

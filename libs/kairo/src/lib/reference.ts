@@ -1,33 +1,23 @@
-import { identity } from './misc';
-
 class Reference<T = any> {
   get bind(): any {
     return (x: any) => {
-      this._current = this._setter(x);
+      this.current = x;
     };
   }
 
   set bind(x: any) {
-    this._current = this._setter(x);
+    this.current = x;
   }
 
-  get current(): T | null {
-    return this._current;
-  }
-
-  set current(value: T | null) {
-    this._current = this._setter(value);
-  }
-
-  constructor(private _current: T | null = null, private _setter: Function) {}
+  constructor(public current: T | null = null) {}
 }
 
 interface ReadonlyReference<T> {
   readonly current: T;
 }
 
-function reference<T>(initialValue?: T, setter: (s: any) => T = identity) {
-  return new Reference(initialValue, setter);
+function reference<T>(initialValue?: T) {
+  return new Reference(initialValue);
 }
 
 export { Reference, ReadonlyReference, reference };

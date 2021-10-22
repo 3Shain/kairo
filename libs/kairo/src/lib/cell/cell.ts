@@ -1,7 +1,13 @@
-import { PartialObserver, Symbol_observable, Unsubscribable } from '../types';
+import { identity } from '../misc';
+import {
+  Subscribable,
+  Symbol_observable,
+  Subscription,
+  PartialObserver,
+} from '../types';
 import {
   accessValue,
-  cleanupComputation,
+  cleanupMemo,
   createMemo,
   createReaction,
   createData,
@@ -35,10 +41,12 @@ export class Cell<T> {
     return this;
   }
 
+  [Symbol.toStringTag] = 'Cell';
+
   /**
    * @deprecated Should be only used for interop.
    */
-   subscribe(observer?: PartialObserver<T>): CellSubscription<T>;
+  subscribe(observer?: PartialObserver<T>): Subscription;
   /**
    * @deprecated Should be only used for interop.
    */
@@ -46,73 +54,65 @@ export class Cell<T> {
     next?: (value: T) => void,
     error?: (error: any) => void,
     complete?: () => void
-  ): CellSubscription<T>;
+  ): Subscription;
   /**
    * @deprecated Should be only used for interop.
    */
-  subscribe(
-    next?: ((value: T) => void) | PartialObserver<T>,
-    error?: (error: any) => void,
-    complete?: () => void
-  ): CellSubscription<T> {
-    if (typeof next === 'function') {
-      return new CellSubscription(this, {
-        next,
-        error,
-        complete,
+  subscribe(...params: any[]): Subscription {
+    return new Observable<T>((observer) => {
+      const reaction = new Reaction(() => {
+        try {
+          observer.next(this.value);
+        } catch (e) {
+          observer.error(e);
+        }
       });
-    } else if (typeof next == 'object') {
-      return new CellSubscription(this, next);
-    }
-    throw new TypeError('');
+      observer.next(this.value);
+      reaction.track(() => this.value);
+      return () => reaction.dispose();
+    }).subscribe(...params);
   }
 }
 
-class CellSubscription<T> implements Unsubscribable {
-  private readonly reaction: Reaction;
+interface Observable<T> extends Subscribable<T> {}
 
-  constructor(cell: Cell<T>, observer: PartialObserver<T>) {
-    const callback = () => {
-      let value ,
-        isError = false;
-      try {
-        value = this.reaction.execute(() => cell.value);
-      } catch (e: any) {
-        value = e;
-        isError = true;
-      }
-      if (isError) {
-        observer.closed || observer.error?.(value);
-      } else {
-        observer.closed || observer.next?.(value);
-      }
-    };
-    this.reaction = new Reaction(callback);
-    callback();
-  }
-
-  unsubscribe() {
-    this.reaction.dispose();
-  }
+interface ObservableConstructor {
+  new <T>(
+    subscriber: (observer: SubscriptionObserver<T>) => () => void
+  ): Observable<T>;
 }
+
+interface SubscriptionObserver<T> {
+  next: (value: T) => void;
+
+  error: (errorValue: any) => void;
+
+  complete: () => void;
+
+  get closed(): Boolean;
+}
+
+declare var Observable: ObservableConstructor;
 
 export class Reaction {
-  get stale() {
-    return false;
-  }
-
   private internal: _Reaction;
 
-  constructor(callback: () => any) {
+  constructor(callback: () => void) {
     this.internal = createReaction(callback);
   }
 
-  execute<T>(expr: () => T) {
-    return executeReaction<T>(this.internal, expr);
+  /**
+   *
+   * @param program
+   * @returns return value of `program`
+   * @throws User-land errors in program()
+   */
+  track<T>(program: () => T) {
+    return executeReaction<T>(this.internal, program);
   }
 
   dispose() {
-    cleanupComputation(this.internal);
+    cleanupMemo(this.internal);
   }
 }
 
@@ -129,22 +129,55 @@ export function mutable<T>(
       if (v instanceof Function) {
         setData(internal, v(internal.value!));
       } else {
-        setData(internal, v as any);
+        setData(internal, v);
       }
-    },
-  ];
-}
-
-export function mutValue<T>(initialValue: T): [Cell<T>, (value: T) => void] {
-  const internal = createData(initialValue);
-  return [
-    new Cell(internal),
-    (v) => {
-      setData(internal, v as any);
     },
   ];
 }
 
 export function computed<T>(expr: () => T): Cell<T> {
   return new Cell(createMemo(expr));
+}
+
+const getCellValue = <T>(x: Cell<T>) => x.value;
+
+type Unwrap<T> = {
+  [Key in keyof T]: T[Key] extends Cell<infer CellType> ? CellType : T[Key];
+};
+
+export function combined<TArray extends any[]>(
+  array: TArray
+): Cell<Unwrap<TArray>>;
+export function combined<TObject extends object>(
+  object: TObject
+): Cell<Unwrap<TObject>>;
+export function combined(obj: any) {
+  if (obj instanceof Array) {
+    const elementMap = obj.map((item) =>
+      item instanceof Cell ? getCellValue : identity
+    );
+    return computed(() => elementMap.map((x, i) => x(obj[i])));
+  } else if (typeof obj === 'object' && obj !== null) {
+    const entryMap = Object.entries(obj).map(
+      ([key, value]) =>
+        (value instanceof Cell
+          ? [key, getCellValue, value]
+          : [key, identity, value]) as [string, Function, any]
+    );
+    return computed(() =>
+      Object.fromEntries(
+        entryMap.map(([key, map, value]) => {
+          return [key, map(value)];
+        })
+      )
+    );
+  }
+  // istanbul ignore next
+  throw new TypeError(
+    __DEV__
+      ? `\`combined\` excepts an array or non-null object but ${
+          obj === null ? typeof obj : 'null'
+        } is provided.`
+      : undefined
+  );
 }

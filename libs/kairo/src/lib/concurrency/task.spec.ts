@@ -1,16 +1,19 @@
 import {
-  task,
-  executeRunnable,
-  delay,
-  any,
-  all,
-  allSettled,
-  race,
   timeout,
+  delay,
+  executeRunnableTask,
+  TaskSuspended,
+  task,
   resolve,
-  Semaphore,
+  __return,
+  executeRunnableBlock,
+  __continue,
+  __break,
+  AbortedError,
+  AbortablePromise
 } from './task';
-import { Observable } from 'rxjs';
+import { race } from './combinators';
+import { asapScheduler, of, scheduled, throwError } from 'rxjs';
 
 // polyfill
 if (typeof AggregateError === 'undefined') {
@@ -21,716 +24,357 @@ if (typeof AggregateError === 'undefined') {
   };
 }
 
-describe('concurrency/task', () => {
-  it('task can recover from error', (done) => {
-    executeRunnable(
-      (function* () {
-        let count = 0;
-        while (true) {
-          try {
-            yield* timeout(5);
-          } catch (e) {
-            count++;
-            if (count > 5) return 0;
-          }
+describe('concurrency/task.new', () => {
+  it('sync return', () => {
+    const value = Math.random();
+
+    function* task() {
+      const ret = yield () => {
+        return { type: 'fulfill', value: value * 2 } as const;
+      };
+      expect(ret).toBe(value * 2);
+      return value;
+    }
+    const ret = executeRunnableTask(task());
+    // @ts-ignore
+    expect(ret.value).toBe(value);
+  });
+
+  it('sync throw', () => {
+    const error = new Error('custom error');
+
+    function* task() {
+      yield () => {
+        return { type: 'fulfill', value: 0 } as const;
+      };
+      throw error;
+    }
+
+    const ret = executeRunnableTask(task());
+    expect(ret.type).toBe('error');
+    // @ts-ignore
+    expect(ret.error).toBe(error);
+  });
+
+  it('sync throw uncaptured', () => {
+    const error = new Error('custom error');
+
+    function* task() {
+      yield () => {
+        return { type: 'error', error } as const;
+      };
+    }
+
+    const ret = executeRunnableTask(task());
+    expect(ret.type).toBe('error');
+    // @ts-ignore
+    expect(ret.error).toBe(error);
+  });
+
+  it('sync throw captured', () => {
+    const error = new Error('custom error');
+
+    function* task() {
+      try {
+        yield () => {
+          return { type: 'error', error } as const;
+        };
+      } catch (e) {
+        return e;
+      }
+    }
+
+    const ret = executeRunnableTask(task());
+    expect(ret.type).toBe('fulfill');
+    // @ts-ignore
+    expect(ret.value).toBe(error);
+  });
+
+  it('invalid operation', () => {
+    const error = new Error('custom error');
+
+    function* task() {
+      yield (next) => {
+        expect(() => next({ type: 'fulfill', value: 0 })).toThrow();
+        throw error;
+      };
+    }
+
+    const ret = executeRunnableTask(task());
+    expect(ret.type).toBe('error');
+    // @ts-ignore
+    expect(ret.error).toBe(error);
+  });
+
+  it('sync throw in yield', () => {
+    const error = new Error('custom error');
+
+    function* task() {
+      yield () => {
+        throw error;
+      };
+    }
+
+    const ret = executeRunnableTask(task());
+    expect(ret.type).toBe('error');
+    // @ts-ignore
+    expect(ret.error).toBe(error);
+  });
+
+  it('sync return imm', () => {
+    const value = Math.random();
+
+    function* task() {
+      yield () => {
+        return __return(value * 2);
+      };
+      // will never execute
+      return value;
+    }
+    const ret = executeRunnableBlock(task());
+    expect(ret.type).toBe('complete');
+    // @ts-ignore
+    expect(ret.value).toBe(value * 2);
+  });
+
+  it('async return', (done) => {
+    const value = Math.random();
+
+    function* task() {
+      yield* delay(1);
+      yield* delay(1);
+      return value;
+    }
+    expect(() =>
+      executeRunnableTask(task(), (ret) => {
+        expect(ret.type).toBe('fulfill');
+        // @ts-ignore
+        expect(ret.value).toBe(value);
+        done();
+      })
+    ).toThrow();
+  });
+
+  it('async throw', (done) => {
+    const value = Math.random();
+
+    function* task() {
+      yield* delay();
+      yield* timeout();
+      return value;
+    }
+    expect(() =>
+      executeRunnableTask(task(), (ret) => {
+        expect(ret.type).toBe('error');
+        // @ts-ignore
+        expect(ret.error.message).toBe('Timeout');
+        done();
+      })
+    ).toThrow();
+  });
+
+  it('async complete', (done) => {
+    const value = Math.random();
+
+    function* task() {
+      yield* delay();
+      yield () => {
+        return __return(value * 2);
+      };
+      // never
+      return value;
+    }
+    expect(() =>
+      executeRunnableBlock(task(), (ret) => {
+        expect(ret.type).toBe('complete');
+        // @ts-ignore
+        expect(ret.value).toBe(value * 2);
+        done();
+      })
+    ).toThrow();
+  });
+
+  it('async throw in yield', (done) => {
+    const error = new Error('custom error');
+
+    function* task() {
+      yield* delay();
+      yield () => {
+        throw error;
+      };
+    }
+
+    expect(() =>
+      executeRunnableTask(task(), (ret) => {
+        expect(ret.type).toBe('error');
+        // @ts-ignore
+        expect(ret.error).toBe(error);
+        done();
+      })
+    ).toThrow();
+  });
+
+  it('async abort', (done) => {
+    const value = Math.random();
+
+    function* task() {
+      yield* delay(1);
+      return value;
+    }
+    try {
+      executeRunnableTask(task(), (ret) => {
+        expect(ret.type).toBe('error');
+        // @ts-ignore
+        expect(ret.error).toBeInstanceOf(AbortedError);
+        done();
+      });
+    } catch (e) {
+      const ts = e as TaskSuspended;
+      ts.abort();
+    }
+  });
+
+  describe('AbortablePromise',()=>{
+    it('is a promise', async () => {
+      const promise = new AbortablePromise((resolve) => {
+        setTimeout(() => {
+          resolve(16);
+        }, 10);
+      });
+      await expect(promise).resolves.toBe(16);
+      const thrown = {};
+      const promise2 = new AbortablePromise((_, reject) => {
+        setTimeout(() => {
+          reject(thrown);
+        }, 10);
+      });
+      await expect(promise2).rejects.toBe(thrown);
+    });
+  
+    it('can be aborted', async () => {
+      const promise = new AbortablePromise<number>((resolve) => {
+        const id = setTimeout(() => {
+          resolve(16);
+        }, 10);
+        return () => clearTimeout(id);
+      });
+      const g = Promise.all([
+        expect(promise).rejects.toBeInstanceOf(AbortedError),
+        expect(promise.then((x) => x * 2)).rejects.toBeInstanceOf(AbortedError),
+      ]);
+      promise.abort();
+      promise.abort();// idempotent
+      await g;
+    });
+  
+    it('is a runnable', async ()=> {
+      return await task(function*() { 
+        const p = Math.random();
+        expect(yield* new AbortablePromise((res)=>{
+          res(p)
+        })).toBe(p);
+        try {
+          yield* new AbortablePromise((_,rej)=>{
+            rej(p);
+          });
+        } catch(e){
+          expect(e).toBe(p);
         }
-      })(),
-      () => {
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
+        const fn = jest.fn();
+        yield* race([new AbortablePromise(()=>fn), 0 ])
+        expect(fn).toBeCalledTimes(1);
+      })();
+    })
+  })
+
+  describe('task()', ()=>{
+    it('should fulfill when complete.return', async ()=>{
+      await expect(task(function*(){
+        yield ()=>__return(0);
+        throw 'never';
+      })()).resolves.toBe(0);
+    });
+
+    it('should reject when complete.break', async ()=>{
+      await expect(task(function*(){
+        yield ()=>__break();
+      })()).rejects.toBeInstanceOf(TypeError);
+    });
+
+    it('should reject when complete.continue', async ()=>{
+      await expect(task(function*(){
+        yield ()=>__continue();
+      })()).rejects.toBeInstanceOf(TypeError);
+    });
   });
 
-  it('new error is still captured', (done) => {
-    executeRunnable(
-      (function* () {
-        while (true) {
-          try {
-            yield* timeout(5);
-          } catch (e) {
-            throw new Error('New error');
-          }
+  describe('resolve()', () => {
+    it('resolves a Runnable', async () => {
+      return await task(function* () {
+        expect(
+          yield* resolve(
+            (function* () {
+              return 0;
+            })()
+          )
+        ).toBe(0);
+      })();
+    });
+
+    it('resolves a fulfilled Promise', async () => {
+      return await task(function* () {
+        expect(yield* resolve(Promise.resolve(0))).toBe(0);
+      })();
+    });
+
+    it('resolves a rejected Promise', async () => {
+      return await task(function* () {
+        try {
+          yield* resolve(Promise.reject(0));
+        } catch (e) {
+          expect(e).toBe(0);
         }
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
+      })();
+    });
 
-  it('PromiseLike is resolvable', (done) => {
-    executeRunnable(
-      (function* () {
-        yield* resolve(
-          new Promise((resolve) => {
-            setTimeout(resolve, 0);
-          })
-        );
-      })(),
-      () => {
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
+    it('resolves an Observable', async () => {
+      return await task(function* () {
+        expect(yield* resolve(of(0))).toBe(0);
+      })();
+    });
 
-  it('Subscrible is resolvable', (done) => {
-    executeRunnable(
-      (function* () {
-        yield* resolve(
-          new Observable<number>((observer) => {
-            setTimeout(() => {
-              observer.next(0);
-              observer.complete();
-            }, 0);
-          })
-        );
-      })(),
-      () => {
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
+    it('resolves an Observable with error', async () => {
+      return await task(function* () {
+        const p = Math.random();
+        try {
+          yield* resolve(throwError(p));
+        } catch (e) {
+          expect(e).toBe(p);
+        }
+      })();
+    });
 
-  it('Subscrible is resolvable (error)', (done) => {
-    executeRunnable(
-      (function* () {
-        yield* resolve(
-          new Observable<number>((observer) => {
-            setTimeout(() => {
-              observer.error(new Error('USER_ERROR'));
-            }, 0);
-          })
-        );
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        expect(error.message).toBe('USER_ERROR');
-        done();
-      }
-    );
-  });
+    it('resolves an async Observable', async () => {
+      return await task(function* () {
+        expect(yield* resolve(scheduled([0], asapScheduler))).toBe(0);
+      })();
+    });
 
-  it('Subscrible is resolvable (cancel)', (done) => {
-    const cancel = executeRunnable(
-      (function* () {
-        yield* resolve(
-          new Observable<number>((observer) => {
-            const id = setTimeout(() => {
-              observer.error(new Error('USER_ERROR'));
-            }, 1000);
-            return () => clearTimeout(id);
-          })
-        );
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    setTimeout(cancel, 0);
-  });
+    it('resolves an async Observable with error', async () => {
+      return await task(function* () {
+        const p = Math.random();
+        try {
+          yield* resolve(throwError(p, asapScheduler));
+        } catch (e) {
+          expect(e).toBe(p);
+        }
+      })();
+    });
 
-  it('Unresolvable object causes an error', (done) => {
-    executeRunnable(
-      (function* () {
-        yield* resolve({});
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('Unyieldable object causes an error', (done) => {
-    executeRunnable(
-      (function* () {
-        yield {} as any;
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('race should return the first settled task: when success', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* race([
-          delay(5),
-          task(function* () {
-            yield* delay(10);
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('race should return the first settled task: when success (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* race([
-          delay(5),
-          task(function* () {
-            yield* timeout(10);
-          })(),
-          0, //const
-        ]);
-      })(),
-      () => {
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('race should return the first settled task: when failed', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* race([
-          delay(10),
-          task(function* () {
-            yield* delay(5);
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('race should return the first settled task: when failed (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* race([
-          delay(10),
-          task(function* () {
-            yield* delay(5);
-            throw Error();
-          })(),
-          (function* () {
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('any should return the first fulfilled task: when any success', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* any([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw Error();
-          })(),
-        ]);
-      })(),
-      (success) => {
-        expect(success).toBe(1);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('any should return the first fulfilled task: when any success (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* any([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw Error();
-          })(),
-          0,
-        ]);
-      })(),
-      (success) => {
-        expect(success).toBe(0);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('any should fail when all failed', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* any([timeout(1), timeout(2), timeout(3)]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('any should fail when all failed (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* any([
-          (function* () {
-            throw Error();
-          })(),
-          (function* () {
-            throw Error();
-          })(),
-          (function* () {
-            throw Error();
-          })(),
-          (function* () {
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('all should return all fulfilled task', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* all([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            return 3;
-          })(),
-        ]);
-      })(),
-      (success: number[]) => {
-        expect(success).toStrictEqual([1, 2, 3]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('all should return all fulfilled task (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* all([1, 2, 3]);
-      })(),
-      (success: number[]) => {
-        expect(success).toStrictEqual([1, 2, 3]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('all should fail when any task fail', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* all([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('all should fail when any task fail (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* all([
-          (function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw Error();
-          })(),
-          (function* () {
-            throw Error();
-          })(),
-        ]);
-      })(),
-      () => {
-        done(Error('Not expected callback.'));
-      },
-      (error) => {
-        done();
-      }
-    );
-  });
-
-  it('allSettled should return all fulfilled task', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* allSettled([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            return 3;
-          })(),
-        ]);
-      })(),
-      (success: any[]) => {
-        expect(success).toStrictEqual([
-          {
-            success: true,
-            value: 1,
-          },
-          {
-            success: true,
-            value: 2,
-          },
-          {
-            success: true,
-            value: 3,
-          },
-        ]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('allSettled should return all settled task', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* allSettled([
-          task(function* () {
-            yield* delay(5);
-            return 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            return 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw 3;
-          })(),
-        ]);
-      })(),
-      (success: any[]) => {
-        expect(success).toStrictEqual([
-          {
-            success: true,
-            value: 1,
-          },
-          {
-            success: true,
-            value: 2,
-          },
-          {
-            success: false,
-            value: 3,
-          },
-        ]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('allSettled should never fail even if all runnable fail', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* allSettled([
-          task(function* () {
-            yield* delay(5);
-            throw 1;
-          })(),
-          task(function* () {
-            yield* delay(10);
-            throw 2;
-          })(),
-          task(function* () {
-            yield* delay(2);
-            throw 3;
-          })(),
-        ]);
-      })(),
-      (result) => {
-        expect(result).toStrictEqual([
-          {
-            success: false,
-            value: 1,
-          },
-          {
-            success: false,
-            value: 2,
-          },
-          {
-            success: false,
-            value: 3,
-          },
-        ]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('allSettled should never fail even if all runnable fail (sync)', (done) => {
-    executeRunnable(
-      (function* () {
-        return yield* allSettled([
-          (function* () {
-            throw 1;
-          })(),
-          (function* () {
-            throw 2;
-          })(),
-          (function* () {
-            throw 3;
-          })(),
-        ]);
-      })(),
-      (result) => {
-        expect(result).toStrictEqual([
-          {
-            success: false,
-            value: 1,
-          },
-          {
-            success: false,
-            value: 2,
-          },
-          {
-            success: false,
-            value: 3,
-          },
-        ]);
-        done();
-      },
-      (error) => {
-        done(error);
-      }
-    );
-  });
-
-  it('any is cancelable (sync)', (done) => {
-    const cancel = executeRunnable(
-      any([timeout(500), timeout(500), timeout(500)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    cancel();
-  });
-
-  it('race is cancelable (sync)', (done) => {
-    const cancel = executeRunnable(
-      race([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    cancel();
-  });
-
-  it('all is cancelable (sync)', (done) => {
-    const cancel = executeRunnable(
-      all([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    cancel();
-  });
-
-  it('allSettled is cancelable (sync)', (done) => {
-    const cancel = executeRunnable(
-      allSettled([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    cancel();
-  });
-
-  it('any is cancelable', (done) => {
-    const cancel = executeRunnable(
-      any([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    setTimeout(cancel, 0);
-  });
-
-  it('race is cancelable', (done) => {
-    const cancel = executeRunnable(
-      race([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    setTimeout(cancel, 0);
-  });
-
-  it('all is cancelable', (done) => {
-    const cancel = executeRunnable(
-      all([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    setTimeout(cancel, 0);
-  });
-
-  it('allSettled is cancelable', (done) => {
-    const cancel = executeRunnable(
-      allSettled([timeout(5), timeout(5), timeout(5)]),
-      () => {},
-      (error) => {
-        expect(error.name).toBe('CanceledError');
-        done();
-      }
-    );
-    setTimeout(cancel, 0);
-  });
-
-  it('semaphore', async () => {
-    const sph = new Semaphore(3);
-
-    task(function* () {
-      yield* sph.waitOne();
-      yield* sph.waitOne();
-      expect(sph.free).toBe(true);
-      yield* delay(10);
-      sph.release();
-      sph.release();
-    })();
-
-    await task(function* () {
-      yield* sph.waitOne();
-      expect(sph.free).toBe(false);
-      yield* sph.waitOne();
-      expect(sph.free).toBe(true);
-      sph.release();
-    })();
+    it('resolves any value', async () => {
+      return await task(function* () {
+        expect(yield* resolve(0)).toBe(0);
+      })();
+    });
   });
 });
