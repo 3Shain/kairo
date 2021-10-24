@@ -9,7 +9,8 @@ export {
   TaskSuspended,
   Task,
   AbortablePromise,
-  AbortedError
+  AbortedError,
+  TaskKilledError
 } from './task';
 export { all, any, race, allSettled } from './combinators';
 export { ControlStatements } from './control-statements';

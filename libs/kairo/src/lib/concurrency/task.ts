@@ -1,19 +1,27 @@
-import { Symbol_observable, Subscribable } from '../types';
-import { noop } from '../misc';
+import { Symbol_observable, Subscribable, Cleanable } from '../types';
+import { noop, doCleanup } from '../misc';
 import type {
   Runnable,
   TaskYieldable,
   TaskResult,
   RunnableGenerator,
+  TaskCompleteResult,
+  TaskErrorResult,
+  TaskFulfillResult,
 } from './types';
 import { CompletionType } from './types';
-import { Cleanable } from '../types';
-import { doCleanup } from '../misc';
 
 export class AbortedError extends Error {
   name = 'AbortedError';
   constructor(message?: string) {
-    super(message ?? 'Operation has been aborted');
+    super(/* istanbul ignore next: simple */message ?? 'Operation has been aborted');
+  }
+}
+
+export class TaskKilledError extends Error {
+  name = 'TaskKilledError';
+  constructor() {
+    super('Task has been killed since it can\'t be aborted gracefully.')
   }
 }
 
@@ -44,14 +52,10 @@ export class AbortablePromise<T> extends Promise<T> implements Runnable<T> {
         }
       );
       $$CANT_ACCESS_CHILD_PROP_INSIDE_SUPER = () => {
-        if (settled) {
-          return;
-        }
-        if (dispose) {
-          doCleanup(dispose); // might become settled.
-          settled = true;
-          reject(new AbortedError());
-        }
+        if (settled) return;
+        /* istanbul ignore else: no-op */if (dispose) doCleanup(dispose); // might become settled.
+        settled = true;
+        reject(new AbortedError());
       };
     });
     this.abort = $$CANT_ACCESS_CHILD_PROP_INSIDE_SUPER;
@@ -99,7 +103,7 @@ export class TaskSuspended {
   constructor(private readonly onAbort: () => void) {}
 
   abort() {
-    if (this.aborted) return;
+    /* istanbul ignore if: idempotent no-op */if (this.aborted) return;
     this.aborted = true;
     this.onAbort();
   }
@@ -107,7 +111,7 @@ export class TaskSuspended {
 
 export function executeRunnableBlock<T>(
   block: Runnable<T>,
-  asyncControlPoint: (result: TaskResult) => void = noop
+  asyncContinuation: (result: TaskResult) => void = noop
 ): TaskResult {
   const tasks = block[Symbol.iterator]();
 
@@ -142,10 +146,7 @@ export function executeRunnableBlock<T>(
         yieldValue = yieldResult.value;
       } catch (error) {
         // userland error
-        return {
-          type: 'error',
-          error,
-        };
+        return __error(error);
       }
       let stillSync = true;
       try {
@@ -160,7 +161,7 @@ export function executeRunnableBlock<T>(
           } catch (taskSuspended) {
             return;
           }
-          asyncControlPoint(result);
+          asyncContinuation(result);
         });
         stillSync = false;
       } catch (e) {
@@ -183,28 +184,26 @@ export function executeRunnableBlock<T>(
       try {
         result = resumeTask(__error(new AbortedError()));
       } catch (taskSuspended) {
-        // forced to exit
-        // hostErrorReport
-        result = resumeTask({
-          type: 'complete',
-          value: undefined,
-          completionType: 1,
-        });
+        resumeTask(__return(undefined)); // kill
+        (taskSuspended as TaskSuspended).abort();
+        result = __error(new TaskKilledError());
       }
       // after resumeTask so any action inside is ignored.
       taskCurrentDisposer.abort();
-      asyncControlPoint(result);
+      asyncContinuation(result);
     });
   }
 }
 
 export function executeRunnableTask<T>(
   runnable: Runnable<T>,
-  asyncControlPoint: (result: TaskResult) => void = noop
-): TaskResult {
+  asyncContinuation: (
+    result: TaskFulfillResult | TaskErrorResult
+  ) => void = noop
+): TaskFulfillResult | TaskErrorResult {
   return __handle_task_complete(
     executeRunnableBlock(runnable, (result) =>
-      asyncControlPoint(__handle_task_complete(result))
+      asyncContinuation(__handle_task_complete(result))
     )
   );
 }
@@ -219,10 +218,10 @@ export function task<TaskFn extends (...args: any[]) => Runnable<any>>(
 ) {
   return function (...params: any[]) {
     return new AbortablePromise((resolve, reject) => {
-      function handleResult(result: TaskResult) {
+      function handleResult(result: TaskFulfillResult | TaskErrorResult) {
         if (result.type === 'fulfill') {
           resolve(result.value);
-        } else if (result.type === 'error') {
+        } else {
           reject(result.error);
         }
       }
@@ -241,11 +240,9 @@ export function* delay(ms?: number): Runnable<void> {
     const id = setTimeout(() => {
       next(__fulfill(undefined));
     }, ms);
-    throw new TaskSuspended(
-      /* istanbul ignore next*/ () => {
-        clearTimeout(id);
-      }
-    );
+    throw new TaskSuspended(() => {
+      clearTimeout(id);
+    });
   };
 }
 
@@ -254,15 +251,13 @@ export function* timeout(ms?: number): Runnable<void> {
     const id = setTimeout(() => {
       next(__error(new Error('Timeout')));
     }, ms);
-    throw new TaskSuspended(
-      /* istanbul ignore next*/ () => {
-        clearTimeout(id);
-      }
-    );
+    throw new TaskSuspended(() => {
+      clearTimeout(id);
+    });
   };
 }
 
-/* istanbul ignore next */
+/* istanbul ignore next: simple but hard to test */
 export function* nextAnimationFrame(): Runnable<number> {
   return yield (next) => {
     const id = requestAnimationFrame((time) => {
@@ -291,7 +286,7 @@ export function* resolve(obj: any): Runnable<any> {
             next(__error(error));
           }
         );
-        throw new TaskSuspended(() => {});
+        throw new TaskSuspended(noop);
       };
     } else if (Symbol_observable in obj) {
       return yield (next) => {
@@ -316,7 +311,7 @@ export function* resolve(obj: any): Runnable<any> {
           return syncResult;
         }
         syncResult = __fulfill(undefined);
-        throw new TaskSuspended(() => subscription.unsubscribe());
+        throw new TaskSuspended(/* istanbul ignore next: simple */() => subscription.unsubscribe());
       };
     }
   }
@@ -324,27 +319,37 @@ export function* resolve(obj: any): Runnable<any> {
     return __fulfill(obj);
   };
 }
-export function __error(error: any): TaskResult {
+export function __error(error: any): TaskErrorResult {
   return { type: 'error', error };
 }
 
-export function __fulfill(value: any): TaskResult {
+export function __fulfill(value: any): TaskFulfillResult {
   return { type: 'fulfill', value };
 }
 
-export function __return(value: any): TaskResult {
+export function __return(value: any): TaskCompleteResult {
   return { type: 'complete', value, completionType: CompletionType.Return };
 }
 
-export function __break(): TaskResult {
-  return { type: 'complete', completionType: CompletionType.Break };
+export function __break(label?: string): TaskCompleteResult {
+  return {
+    type: 'complete',
+    value: label,
+    completionType: CompletionType.Break,
+  };
 }
 
-export function __continue(): TaskResult {
-  return { type: 'complete', completionType: CompletionType.Continue };
+export function __continue(label?: string): TaskCompleteResult {
+  return {
+    type: 'complete',
+    value: label,
+    completionType: CompletionType.Continue,
+  };
 }
 
-export function __handle_task_complete(result: TaskResult) {
+export function __handle_task_complete(
+  result: TaskResult
+): TaskFulfillResult | TaskErrorResult {
   if (result.type === 'complete') {
     switch (result.completionType) {
       case CompletionType.Return:
@@ -355,4 +360,22 @@ export function __handle_task_complete(result: TaskResult) {
     }
   }
   return result;
+}
+
+// istanbul ignore next: simple
+export function __abort_all(disposers: TaskSuspended[]) {
+  const errors = disposers.reduce((collect, d) => {
+    try {
+      d.abort();
+    } catch (e) {
+      collect.push(e);
+    }
+    return collect;
+  }, [] as any[]);
+  if (errors.length > 0) {
+    if (errors.length === 1) {
+      throw errors[0];
+    }
+    throw new AggregateError(errors);
+  }
 }

@@ -10,10 +10,12 @@ import {
   __continue,
   __break,
   AbortedError,
-  AbortablePromise
+  AbortablePromise,
+  TaskKilledError
 } from './task';
 import { race } from './combinators';
 import { asapScheduler, of, scheduled, throwError } from 'rxjs';
+import { neverFulfill } from './spec-shared';
 
 // polyfill
 if (typeof AggregateError === 'undefined') {
@@ -24,7 +26,7 @@ if (typeof AggregateError === 'undefined') {
   };
 }
 
-describe('concurrency/task.new', () => {
+describe('concurrency/task', () => {
   it('sync return', () => {
     const value = Math.random();
 
@@ -234,6 +236,29 @@ describe('concurrency/task.new', () => {
     }
   });
 
+  it('force abort', (done) => {
+    function* task() {
+      while(true){
+        try {
+          yield* delay();
+        } catch {
+          // ignore error
+        }
+      }
+    }
+    try {
+      executeRunnableTask(task(), (ret) => {
+        expect(ret.type).toBe('error');
+        // @ts-ignore
+        expect(ret.error).toBeInstanceOf(TaskKilledError);
+        done();
+      });
+    } catch (e) {
+      const ts = e as TaskSuspended;
+      ts.abort();
+    }
+  });
+
   describe('AbortablePromise',()=>{
     it('is a promise', async () => {
       const promise = new AbortablePromise((resolve) => {
@@ -368,6 +393,13 @@ describe('concurrency/task.new', () => {
         } catch (e) {
           expect(e).toBe(p);
         }
+      })();
+    });
+
+    it('resolves ordinary object', async () => {
+      const obj = {};
+      return await task(function* () {
+        expect(yield* resolve(obj)).toBe(obj);
       })();
     });
 

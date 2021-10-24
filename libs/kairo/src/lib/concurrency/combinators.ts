@@ -4,6 +4,8 @@ import {
   TaskSuspended,
   __fulfill,
   executeRunnableTask,
+  __abort_all,
+  __error,
 } from './task';
 import type { Runnable, TaskResult } from './types';
 
@@ -26,50 +28,38 @@ export function* any<T>(tasks: Iterable<T>): Runnable<ResolveAll<T>> {
     const errors: any[] = [];
     const disposers: TaskSuspended[] = [];
     for (const task of tasks) {
+      const closureIndex = count++;
+      let result: ReturnType<typeof executeRunnableTask>;
       try {
-        const closureIndex = count++;
-        const result = executeRunnableTask(resolve(task), (result) => {
+        result = executeRunnableTask(resolve(task), (result) => {
           if (result.type === 'fulfill') {
             next(result);
-            disposers.forEach((x) => x.abort());
-          } else if (result.type === 'error') {
+            __abort_all(disposers);
+          } else {
             errorCount++;
             errors[closureIndex] = result.error;
             if (count === errorCount) {
-              next({
-                type: 'error',
-                error: new AggregateError(errors, 'All tasks failed.'),
-              });
+              next(__error(new AggregateError(errors, 'All tasks failed.')));
             }
           }
         });
-        // convert illegal complete to
-        if (result.type === 'fulfill') {
-          disposers.forEach((x) => x.abort());
-          return result;
-        } else {
-          if (result.type === 'error') {
-            errorCount++;
-            errors[closureIndex] = result.error;
-          }
-        }
-      } catch (e) {
-        if (e instanceof TaskSuspended) {
-          disposers.push(e);
-          continue;
-        }
-        // istanbul ignore next
-        throw e; // happend while abort
+      } catch (taskSuspended) {
+        disposers.push(taskSuspended as TaskSuspended);
+        continue;
+      }
+      if (result.type === 'fulfill') {
+        __abort_all(disposers);
+        return result;
+      } else {
+        errorCount++;
+        errors[closureIndex] = result.error;
       }
     }
     if (count === errorCount) {
-      return {
-        type: 'error',
-        error: new AggregateError(errors, 'All tasks failed.'),
-      };
+      return __error(new AggregateError(errors, 'All tasks failed.'));
     }
     throw new TaskSuspended(() => {
-      disposers.forEach((x) => x.abort());
+      __abort_all(disposers);
     });
   };
 }
@@ -79,28 +69,25 @@ export function* race<T>(tasks: Iterable<T>): Runnable<ResolveAll<T>> {
     let settled = false;
     const disposers: TaskSuspended[] = [];
     for (const task of tasks) {
+      let result: ReturnType<typeof executeRunnableTask>;
       try {
-        const ret = executeRunnableTask(resolve(task), (result) => {
+        result = executeRunnableTask(resolve(task), (result) => {
           if (settled) return;
           settled = true;
-          disposers.forEach((x) => x.abort());
+          __abort_all(disposers);
           next(result);
         });
-        settled = true;
-        disposers.forEach((x) => x.abort());
-        return ret;
-      } catch (e: any) {
-        if (e instanceof TaskSuspended) {
-          disposers.push(e);
-          continue;
-        }
-        // istanbul ignore next
-        throw e; // happend while abort.
+      } catch (taskSuspended: any) {
+        disposers.push(taskSuspended as TaskSuspended);
+        continue;
       }
+      settled = true;
+      __abort_all(disposers);
+      return result;
     }
     throw new TaskSuspended(() => {
       settled = true;
-      disposers.forEach((x) => x.abort());
+      __abort_all(disposers);
     });
   };
 }
@@ -114,15 +101,16 @@ export function* all<T>(tasks: Iterable<T>): Runnable<Resolve<T>[]> {
     const results: any[] = [];
     const disposers: TaskSuspended[] = [];
     for (const task of tasks) {
+      const closureIndex = count++;
+      let result: ReturnType<typeof executeRunnableTask>;
       try {
-        const closureIndex = count++;
-        const result = executeRunnableTask(resolve(task), (result) => {
+        result = executeRunnableTask(resolve(task), (result) => {
           if (settled) return;
           if (result.type === 'error') {
             settled = true;
-            disposers.forEach((x) => x.abort());
+            __abort_all(disposers);
             next(result);
-          } else if (result.type === 'fulfill') {
+          } else {
             succeedCount++;
             results[closureIndex] = result.value;
             if (count === succeedCount) {
@@ -131,23 +119,17 @@ export function* all<T>(tasks: Iterable<T>): Runnable<Resolve<T>[]> {
             }
           }
         });
-        if (result.type === 'error') {
-          settled = true;
-          disposers.forEach((x) => x.abort());
-          return result;
-        } else {
-          if (result.type === 'fulfill') {
-            succeedCount++;
-            results[closureIndex] = result.value;
-          }
-        }
       } catch (e) {
-        if (e instanceof TaskSuspended) {
-          disposers.push(e);
-          continue;
-        }
-        // istanbul ignore next
-        throw e; // happend while abort
+        disposers.push(e as TaskSuspended);
+        continue;
+      }
+      if (result.type === 'error') {
+        settled = true;
+        __abort_all(disposers);
+        return result;
+      } else {
+        succeedCount++;
+        results[closureIndex] = result.value;
       }
     }
     if (count === succeedCount) {
@@ -155,7 +137,7 @@ export function* all<T>(tasks: Iterable<T>): Runnable<Resolve<T>[]> {
     }
     throw new TaskSuspended(() => {
       settled = true;
-      disposers.forEach((x) => x.abort());
+      __abort_all(disposers);
     });
   };
 }
@@ -207,13 +189,9 @@ export function* allSettled<T>(
           }
         });
         handle(currentIndex, result);
-      } catch (e) {
-        if (e instanceof TaskSuspended) {
-          disposers.push(e);
-          continue;
-        }
-        // istanbul ignore next
-        throw e;
+      } catch (taskSuspended) {
+        disposers.push(taskSuspended as TaskSuspended);
+        continue;
       }
     }
     if (settledCount === count) {
@@ -221,7 +199,7 @@ export function* allSettled<T>(
     }
     throw new TaskSuspended(() => {
       settled = true;
-      disposers.forEach((x) => x.abort());
+      __abort_all(disposers);
     });
   };
 }

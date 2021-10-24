@@ -1,3 +1,5 @@
+/* istanbul ignore file: it's obviously simple. */
+
 import { Cleanable } from './types';
 
 export class ObjectDisposedError extends Error {}

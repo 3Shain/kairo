@@ -1,6 +1,7 @@
 import { AbortedError } from '.';
 import { all, allSettled, any, race } from './combinators';
-import { timeout, delay, executeRunnableTask, TaskSuspended } from './task';
+import { neverFulfill } from './spec-shared';
+import { timeout, delay, executeRunnableTask, TaskSuspended, task } from './task';
 
 // polyfill
 if (typeof AggregateError === 'undefined') {
@@ -42,10 +43,26 @@ describe('concurrency/combinators', () => {
         });
       } catch {}
     });
+
+    it('can be aborted', async ()=> {
+      const fn = jest.fn();
+
+      const p = task(function*(){
+        yield* race([neverFulfill(fn),neverFulfill(fn)]);
+        throw 'never';
+      })();
+
+      setTimeout(()=>{
+        p.abort();
+        expect(fn).toBeCalledTimes(2);
+      });
+
+      await expect(p).rejects.toBeInstanceOf(AbortedError);
+    });
   });
 
   describe('any()', () => {
-    it('any() should yield immediately if a task is synchronously fulfilled', () => {
+    it('should yield immediately if a task is synchronously fulfilled', () => {
       function* task() {
         return 0;
       }
@@ -57,7 +74,7 @@ describe('concurrency/combinators', () => {
       });
     });
 
-    it('any() should yield the first fulfilled task', (done) => {
+    it('should yield the first fulfilled task', (done) => {
       function* task() {
         yield* delay(0);
         return 10;
@@ -74,7 +91,7 @@ describe('concurrency/combinators', () => {
       } catch {}
     });
 
-    it('any() should yield immediately when all sync task failed', () => {
+    it('should yield immediately when all sync task failed', () => {
       function* task() {
         throw new Error();
       }
@@ -83,7 +100,7 @@ describe('concurrency/combinators', () => {
       expect(ret.type).toBe('error');
     });
 
-    it('any() should yield when all async task failed', (done) => {
+    it('should yield when all async task failed', (done) => {
       try {
         executeRunnableTask(
           any([timeout(0), timeout(1), timeout(2)]),
@@ -95,10 +112,27 @@ describe('concurrency/combinators', () => {
         );
       } catch {}
     });
+
+    it('can be aborted', async ()=> {
+      const fn = jest.fn();
+
+      const p = task(function*(){
+        yield* any([neverFulfill(fn),neverFulfill(fn)]);
+        throw 'never';
+      })();
+
+      
+      setTimeout(()=>{
+        p.abort();
+        expect(fn).toBeCalledTimes(2);
+      });
+
+      await expect(p).rejects.toBeInstanceOf(AbortedError);
+    });
   });
 
   describe('all()', () => {
-    it('all() should yield immediately if all tasks synchronously fulfilled', () => {
+    it('should yield immediately if all tasks synchronously fulfilled', () => {
       function* task() {
         return 0;
       }
@@ -110,7 +144,7 @@ describe('concurrency/combinators', () => {
       });
     });
 
-    it('all() should yield when all tasks fulfilled', (done) => {
+    it('should yield when all tasks fulfilled', (done) => {
       function* task() {
         yield* delay(0);
         return 10;
@@ -127,7 +161,7 @@ describe('concurrency/combinators', () => {
       } catch {}
     });
 
-    it('all() should yield immediately when any sync task failed', () => {
+    it('should yield immediately when any sync task failed', () => {
       function* task() {
         throw new Error('custom error');
       }
@@ -138,7 +172,7 @@ describe('concurrency/combinators', () => {
       expect(ret.error.message).toBe('custom error');
     });
 
-    it('all() should yield when any async task failed', (done) => {
+    it('should yield when any async task failed', (done) => {
       try {
         executeRunnableTask(all([delay(0), timeout(1), timeout(2)]), (ret) => {
           expect(ret.type).toBe('error');
@@ -147,10 +181,26 @@ describe('concurrency/combinators', () => {
         });
       } catch {}
     });
+
+    it('can be aborted', async ()=> {
+      const fn = jest.fn();
+
+      const p = task(function*(){
+        yield* all([neverFulfill(fn),neverFulfill(fn)]);
+        throw 'never';
+      })();
+
+      setTimeout(()=>{
+        p.abort();
+        expect(fn).toBeCalledTimes(2);
+      });
+
+      await expect(p).rejects.toBeInstanceOf(AbortedError);
+    });
   });
 
   describe('allSettled()', () => {
-    it('allSettled() should yield immediately if all tasks synchronously fulfilled', () => {
+    it('should yield immediately if all tasks synchronously fulfilled', () => {
       function* task() {
         return 0;
       }
@@ -178,7 +228,7 @@ describe('concurrency/combinators', () => {
       });
     });
 
-    it('allSettled() should yield when all tasks setlled', (done) => {
+    it('should yield when all tasks setlled', (done) => {
       try {
         executeRunnableTask(
           allSettled([delay(0), timeout(1), timeout(2)]),
@@ -193,20 +243,20 @@ describe('concurrency/combinators', () => {
       } catch {}
     });
 
-    it('allSetteld() could be aborted', (done) => {
-      try {
-        executeRunnableTask(
-          allSettled([delay(0), timeout(1), timeout(2)]),
-          (ret) => {
-            expect(ret.type).toBe('error');
-            // @ts-ignore
-            expect(ret.error).toBeInstanceOf(AbortedError);
-            done();
-          }
-        );
-      } catch (taskSuspended) {
-        (taskSuspended as TaskSuspended).abort();
-      }
+    it('can be aborted', async ()=> {
+      const fn = jest.fn();
+
+      const p = task(function*(){
+        yield* allSettled([neverFulfill(fn),neverFulfill(fn)]);
+        throw 'never';
+      })();
+
+      setTimeout(()=>{
+        p.abort();
+        expect(fn).toBeCalledTimes(2);
+      });
+
+      await expect(p).rejects.toBeInstanceOf(AbortedError);
     });
   });
 });

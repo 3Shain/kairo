@@ -1,5 +1,6 @@
-import { task, delay, timeout } from './task';
+import { task, delay, timeout, AbortedError } from './task';
 import { ControlStatements as cs } from './control-statements';
+import { neverFulfill } from './spec-shared';
 
 describe('concurrency/control-statements', () => {
   describe('while()', () => {
@@ -58,6 +59,22 @@ describe('concurrency/control-statements', () => {
       expect(end).toBeCalledTimes(0);
     });
 
+    it('should allow return and it works like continue', async () => {
+      const end = jest.fn();
+      await task(function* () {
+        let cond = 5;
+        yield* cs.while(
+          () => cond > 0,
+          function* () {
+            cond--;
+            return;
+            end();
+          }
+        );
+      })();
+      expect(end).toBeCalledTimes(0);
+    });
+
     it('should async exit current loop when continue', async () => {
       const end = jest.fn();
       await task(function* () {
@@ -68,6 +85,23 @@ describe('concurrency/control-statements', () => {
             yield* delay();
             cond--;
             yield* cs.continue();
+            end();
+          }
+        );
+      })();
+      expect(end).toBeCalledTimes(0);
+    });
+
+    it('should allow async return and it works like continue', async () => {
+      const end = jest.fn();
+      await task(function* () {
+        let cond = 5;
+        yield* cs.while(
+          () => cond > 0,
+          function* () {
+            yield* delay();
+            cond--;
+            return;
             end();
           }
         );
@@ -129,21 +163,104 @@ describe('concurrency/control-statements', () => {
       expect(ret).toBe(0);
     });
 
-    // it('should exit when condition is false', async ()=>{
-    //     const end = jest.fn();
-    //     await task(function*(){
+    it('should allow labelled break', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        yield* cs.while(
+          'alabel',
+          () => true,
+          function* () {
+            yield* cs.loop(function* () {
+              yield* cs.break('alabel');
+              throw 'never';
+            });
+            throw 'never';
+          }
+        );
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
 
-    //     })();
-    //     expect(end).toBeCalledTimes(1);
-    // });
+    it('should allow labelled continue', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        let cond = 1;
+        yield* cs.while(
+          'alabel',
+          () => cond--,
+          function* () {
+            yield* cs.loop(function* () {
+              yield* cs.continue('alabel');
+              throw 'never';
+            });
+            throw 'never';
+          }
+        );
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
 
-    // it('should exit when condition is false', async ()=>{
-    //     const end = jest.fn();
-    //     await task(function*(){
+    it('should allow async labelled break', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        yield* cs.while(
+          'alabel',
+          () => true,
+          function* () {
+            yield* cs.loop(function* () {
+              yield* delay();
+              yield* cs.break('alabel');
+              throw 'never';
+            });
+            throw 'never';
+          }
+        );
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
 
-    //     })();
-    //     expect(end).toBeCalledTimes(1);
-    // });
+    it('should allow async labelled continue', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        let cond = 1;
+        yield* cs.while(
+          'alabel',
+          () => cond--,
+          function* () {
+            yield* cs.loop(function* () {
+              yield* delay();
+              yield* cs.continue('alabel');
+              throw 'never';
+            });
+            throw 'never';
+          }
+        );
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
+
+    it('could be aborted', (next)=>{
+      const fn = jest.fn();
+      const t = task(function* () {
+        try {
+          yield* cs.loop(function*(){
+            yield* neverFulfill(fn);
+          });
+        } catch (e) {
+          expect(e).toBeInstanceOf(AbortedError);
+        }
+      });
+      const promise = t();
+      setTimeout(()=>{
+        promise.abort();
+        expect(fn).toBeCalledTimes(1);
+        next();
+      }); 
+    });
   });
 
   describe('select()', () => {
@@ -183,7 +300,7 @@ describe('concurrency/control-statements', () => {
           .case(delay(20), function* () {
             throw 'never';
           })
-          .case(delay(0), function* () {
+          .case(delay(0), function () { // a normal function works as well
             f();
           });
         expect(f).toBeCalledTimes(1);
@@ -238,5 +355,89 @@ describe('concurrency/control-statements', () => {
         }
       })
     );
+
+    it(
+      'could be aborted',
+       (next)=>{
+        const fn = jest.fn();
+        const t = task(function* () {
+          try {
+            yield* cs.select
+              .case(neverFulfill(fn), function* () {})
+              .case(neverFulfill(fn), function* () {})
+              .case(neverFulfill(fn), function* () {});
+          } catch (e) {
+            expect(e).toBeInstanceOf(AbortedError);
+          }
+        });
+        const promise = t();
+        setTimeout(()=>{
+          promise.abort();
+          expect(fn).toBeCalledTimes(3);
+          next();
+        }); 
+      }
+    );
+  });
+
+  describe('block()', () => {
+    it('should allow return', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        yield* cs.block('foo', function* () {
+          yield* cs.return(p);
+          throw 'never';
+        });
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
+
+    it('should allow break', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        yield* cs.block('foo', function* () {
+          yield* cs.block('bar', function* () {
+            yield* cs.break('foo');
+          });
+          throw 'never';
+        });
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
+
+    it('should allow async break', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        yield* cs.block('foo', function* () {
+          yield* cs.block('bar', function* () {
+            yield* delay();
+            yield* cs.break('foo');
+          });
+          throw 'never';
+        });
+        return p;
+      })();
+      expect(ret).toBe(p);
+    });
+    
+    it('should propagate error', async () => {
+      const p = Math.random();
+      const ret = await task(function* () {
+        try {
+          yield* cs.block('foo', function* () {
+            yield* cs.block('bar', function* () {
+              yield* delay();
+              throw p;
+            });
+            throw 'never';
+          });
+        } catch(e){
+          return e;
+        }
+      })();
+      expect(ret).toBe(p);
+    });
   });
 });
