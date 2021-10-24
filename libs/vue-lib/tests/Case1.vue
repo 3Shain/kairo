@@ -2,7 +2,7 @@
   <div>
     <button @click="onClick">{{ count }}</button>
     <case-1-child :count="doubled">
-      <p :ref="para.bind">{{ viewProp }}</p>
+      <p :ref="bindpara.bind">{{ viewProp }}</p>
     </case-1-child>
   </div>
 </template>
@@ -26,7 +26,7 @@ export default {
     Case1Child: withConcern(()=>{},Case1Child as any )
   },
   setup: ((prop) => {
-    const para = reference<HTMLParagraphElement>(null);
+    const [para,bindpara] = reference<HTMLParagraphElement>(null);
     
     lifecycle(() => {
       prop.initialize();
@@ -49,7 +49,7 @@ export default {
     return {
       count,
       doubled,
-      para,
+      bindpara,
       onClick: () => {
         setCount(count.value + 1);
       }

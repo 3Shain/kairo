@@ -1,5 +1,5 @@
 import { testBed } from './debug';
-import { race, delay, task } from './concurrency';
+import { race, delay, task, ControlStatements as s } from './concurrency';
 import { stream } from './stream';
 import { lifecycle } from './lifecycle-scope';
 
@@ -7,25 +7,37 @@ function useKonami(keys: string[], timeout: number) {
   const [keydownCode, onkeydown] = stream<string>();
   const [effects, doEffects] = stream<boolean>();
 
+  const activate = ()=>doEffects(true);
+  const fail = ()=>doEffects(false);
+
   const loop = task(function* () {
     while (true) {
       const key = yield* keydownCode;
       if (key == keys[0]) {
-        const keysRemain = keys.slice(1).reverse();
-        while (keysRemain.length) {
-          const next = yield* race([keydownCode, delay(timeout)]);
-          if (next !== keysRemain.pop()) {
-            doEffects(false);
-            break;
+        const keysRemain = keys.slice(1);
+        yield* s.while(
+          () => keysRemain.length > 0,
+          function* () {
+            yield* s.select
+              .case(keydownCode, function* (next) {
+                if (next !== keysRemain.shift()) {
+                  fail();
+                  yield* s.break();
+                }
+                if (keysRemain.length == 0) {
+                  activate();
+                }
+              })
+              .case(delay(timeout), function* () {
+                fail();
+                yield* s.break();
+              });
           }
-          if (keysRemain.length == 0) {
-            doEffects(true);
-          }
-        }
+        );
       }
     }
   });
-  lifecycle(() => loop());
+  lifecycle(loop);
 
   return {
     onkeydown,
@@ -34,7 +46,6 @@ function useKonami(keys: string[], timeout: number) {
 }
 
 describe('debug', () => {
-
   it('konami code', () => {
     return testBed((interact) => {
       const { onkeydown, effects } = useKonami(['a', 'a', 'b', 'b'], 1000);

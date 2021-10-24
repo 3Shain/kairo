@@ -1,23 +1,32 @@
-class Reference<T = any> {
-  get bind(): any {
-    return (x: any) => {
-      this.current = x;
+class Reference<T> {
+  get current() {
+    return this._current;
+  }
+
+  constructor(private _current?: T) {}
+
+  [Symbol.toStringTag]: 'Reference';
+
+  static create<T>(V?: T): [Reference<T>, any] {
+    const ref = new Reference(V);
+    const binder = (value: any) => {
+      ref._current = value;
     };
+    Object.defineProperties(binder, {
+      bind: {
+        get: () => binder,
+        set: (value: any) => binder(value),
+      },
+    });
+    (binder as any)[Symbol_bind_reference] = true;
+    return [ref, binder];
   }
-
-  set bind(x: any) {
-    this.current = x;
-  }
-
-  constructor(public current: T | null = null) {}
 }
 
-interface ReadonlyReference<T> {
-  readonly current: T;
+const Symbol_bind_reference: unique symbol = Symbol('binder');
+
+function reference<T>(initial?: T) {
+  return Reference.create(initial);
 }
 
-function reference<T>(initialValue?: T) {
-  return new Reference(initialValue);
-}
-
-export { Reference, ReadonlyReference, reference };
+export { Reference, reference, Symbol_bind_reference };

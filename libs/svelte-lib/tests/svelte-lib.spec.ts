@@ -4,8 +4,15 @@ import Case1 from './Case1.svelte';
 import { tick } from 'svelte';
 import { withConcern } from '../src';
 import { lifecycle } from 'kairo';
+import { Observable } from 'rxjs';
 
 describe('@kairo/svelte', () => {
+  beforeEach(() => {
+    globalThis.Observable = Observable;
+  });
+  afterEach(() => {
+    globalThis.Observable = undefined;
+  });
   it('implement Simple Component Model', async () => {
     const initCallback = jest.fn();
     const cleanCallback = jest.fn();

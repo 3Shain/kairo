@@ -1,8 +1,6 @@
 import {
-  Cell,
   lifecycle,
   Reaction,
-  mutValue,
   collectScope,
   LifecycleScope,
 } from 'kairo';
@@ -25,7 +23,7 @@ export function withKairo<Props>(
   const component: FunctionComponent<Props> = (props) => {
     const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderReaction.execute(() => renderFunction(props));
+    return renderReaction.track(() => renderFunction(props));
   };
   component.displayName = setup.name;
   return component;
@@ -37,7 +35,7 @@ export function forwardRef<Props, Ref>(
   const component: ForwardRefRenderFunction<Ref, Props> = (props, ref) => {
     const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderReaction.execute(() => renderFunction(props, ref));
+    return renderReaction.track(() => renderFunction(props, ref));
   };
   component.displayName = setup.name;
   return reactForwardRef(component);

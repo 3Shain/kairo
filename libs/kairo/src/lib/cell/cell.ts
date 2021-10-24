@@ -6,7 +6,7 @@ import {
   PartialObserver,
 } from '../types';
 import {
-  accessValue,
+  accessValue, accessRefValue,
   cleanupMemo,
   createMemo,
   createReaction,
@@ -24,17 +24,12 @@ export class Cell<T> {
 
   constructor(protected internal: Data<T>) {}
 
-  get value(): T {
+  get $(): T {
     return accessValue(this.internal);
   }
 
-  get error(): any {
-    try {
-      accessValue(this.internal);
-      return null;
-    } catch (e) {
-      return e;
-    }
+  get current(): T {
+    return accessRefValue(this.internal);
   }
 
   [Symbol_observable]() {
@@ -62,13 +57,13 @@ export class Cell<T> {
     return new Observable<T>((observer) => {
       const reaction = new Reaction(() => {
         try {
-          observer.next(this.value);
+          observer.next(this.current);
         } catch (e) {
           observer.error(e);
         }
       });
-      observer.next(this.value);
-      reaction.track(() => this.value);
+      observer.next(this.current);
+      reaction.track(() => this.$);
       return () => reaction.dispose();
     }).subscribe(...params);
   }
@@ -139,7 +134,7 @@ export function computed<T>(expr: () => T): Cell<T> {
   return new Cell(createMemo(expr));
 }
 
-const getCellValue = <T>(x: Cell<T>) => x.value;
+const getAndTrackCellValue = <T>(x: Cell<T>) => x.$;
 
 type Unwrap<T> = {
   [Key in keyof T]: T[Key] extends Cell<infer CellType> ? CellType : T[Key];
@@ -154,14 +149,17 @@ export function combined<TObject extends object>(
 export function combined(obj: any) {
   if (obj instanceof Array) {
     const elementMap = obj.map((item) =>
-      item instanceof Cell ? getCellValue : identity
+      item instanceof Cell ? getAndTrackCellValue : identity
     );
     return computed(() => elementMap.map((x, i) => x(obj[i])));
-  } else if (typeof obj === 'object' && obj !== null) {
+  } /* istanbul ignore else: simple */ else if (
+    typeof obj === 'object' &&
+    obj !== null
+  ) {
     const entryMap = Object.entries(obj).map(
       ([key, value]) =>
         (value instanceof Cell
-          ? [key, getCellValue, value]
+          ? [key, getAndTrackCellValue, value]
           : [key, identity, value]) as [string, Function, any]
     );
     return computed(() =>
@@ -172,7 +170,7 @@ export function combined(obj: any) {
       )
     );
   }
-  // istanbul ignore next
+  // istanbul ignore next: simple
   throw new TypeError(
     __DEV__
       ? `\`combined\` excepts an array or non-null object but ${

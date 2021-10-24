@@ -1,6 +1,9 @@
 import { suspended } from './suspense';
 import { computed, mutable as mut } from './cell';
-import { effect, cleanup } from './cell.spec';
+import {
+  effect,
+  cleanup,
+} from './spec-shared';
 
 describe('cell/suspense', () => {
   const SHARED_FALLBACK = {};
@@ -9,95 +12,107 @@ describe('cell/suspense', () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
-    effect(() => c.error);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    effect(() => {
+      try {
+        c.$;
+      } catch {}
+    });
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(() => c.value).toThrow(`failed_${a.value}`);
+    expect(() => c.current).toThrow(`failed_${a.current}`);
     ma(1);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(() => c.value).toThrow(`failed_${a.value}`);
+    expect(() => c.current).toThrow(`failed_${a.current}`);
   });
 
   it('should be able to cascade', async () => {
     const [a, ma] = mut(0);
     const s = mockFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, undefined);
     const d = suspended(() => {
       return c.read();
     }, SHARED_FALLBACK);
-    const e = computed(() => c.value);
-    effect(() => d.value);
-    effect(() => e.value);
-    expect(d.value).toBe(SHARED_FALLBACK);
-    expect(e.value).toBe(undefined);
+    const e = computed(() => c.$);
+    effect(() => d.$);
+    effect(() => e.$);
+    expect(d.current).toBe(SHARED_FALLBACK);
+    expect(e.current).toBe(undefined);
     await delay(10);
-    expect(d.value).toBe(a.value);
-    expect(e.value).toBe(a.value);
+    expect(d.current).toBe(a.current);
+    expect(e.current).toBe(a.current);
     ma(1);
-    expect(d.value).toBe(SHARED_FALLBACK);
-    expect(e.value).toBe(undefined);
+    expect(d.current).toBe(SHARED_FALLBACK);
+    expect(e.current).toBe(undefined);
     await delay(10);
-    expect(d.value).toBe(a.value);
-    expect(e.value).toBe(a.value);
+    expect(d.current).toBe(a.current);
+    expect(e.current).toBe(a.current);
   });
 
   it('should be able to propagate error', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, undefined);
     const d = suspended(() => {
       return c.read();
     }, SHARED_FALLBACK);
-    const e = computed(() => c.value);
-    effect(() => d.error);
-    effect(() => e.error);
-    expect(d.value).toBe(SHARED_FALLBACK);
-    expect(e.value).toBe(undefined);
+    const e = computed(() => c.$);
+    effect(() => {
+      try {
+        d.$;
+      } catch {}
+    });
+    effect(() => {
+      try {
+        e.$;
+      } catch {}
+    });
+    expect(d.current).toBe(SHARED_FALLBACK);
+    expect(e.current).toBe(undefined);
     await delay(10);
-    expect(() => d.value).toThrow(`failed_${a.value}`);
-    expect(() => e.value).toThrow(`failed_${a.value}`);
+    expect(() => d.current).toThrow(`failed_${a.current}`);
+    expect(() => e.current).toThrow(`failed_${a.current}`);
     ma(1);
-    expect(d.value).toBe(SHARED_FALLBACK);
-    expect(e.value).toBe(undefined);
+    expect(d.current).toBe(SHARED_FALLBACK);
+    expect(e.current).toBe(undefined);
     await delay(10);
-    expect(() => d.value).toThrow(`failed_${a.value}`);
-    expect(() => e.value).toThrow(`failed_${a.value}`);
+    expect(() => d.current).toThrow(`failed_${a.current}`);
+    expect(() => e.current).toThrow(`failed_${a.current}`);
   });
 
   it('should batch if shared', async () => {
     const [a, ma] = mut(0);
     const s = mockSharedFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
     const d = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
     const e = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
     const f = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
     const fn = jest.fn();
-    effect(() => (c.value, d.value, e.value, f.value, fn()));
+    effect(() => (c.$, d.$, e.$, f.$, fn()));
     expect(fn).toBeCalledTimes(1);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(c.value).toBe(a.value);
+    expect(c.current).toBe(a.current);
     expect(fn).toBeCalledTimes(2);
     ma(1);
     expect(fn).toBeCalledTimes(3);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(c.value).toBe(a.value);
+    expect(c.current).toBe(a.current);
     expect(fn).toBeCalledTimes(4);
   });
 
@@ -105,28 +120,36 @@ describe('cell/suspense', () => {
     const [a, ma] = mut(0);
     const s = mockFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
-    effect(() => c.error);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    effect(() => {
+      try {
+        c.$;
+      } catch {}
+    });
+    expect(c.current).toBe(SHARED_FALLBACK);
     ma(1);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(c.value).toBe(a.value);
+    expect(c.current).toBe(a.current);
   });
 
   it('should ignore stale error promise', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
     const c = suspended(() => {
-      return s.read(a.value);
+      return s.read(a.$);
     }, SHARED_FALLBACK);
-    effect(() => c.error);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    effect(() => {
+      try {
+        c.$;
+      } catch {}
+    });
+    expect(c.current).toBe(SHARED_FALLBACK);
     ma(1);
-    expect(c.value).toBe(SHARED_FALLBACK);
+    expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
-    expect(() => c.value).toThrow(`failed_${a.value}`);
+    expect(() => c.current).toThrow(`failed_${a.current}`);
   });
 
   afterEach(() => {

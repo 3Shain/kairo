@@ -64,7 +64,7 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
   }
 
   read(): T {
-    const value = this.value; // log access
+    const value = accessValue(this.internal);
     if (this.isSuspending) {
       throw DEFER_SUSPENSION;
     }
@@ -77,7 +77,7 @@ export function suspended<T, F = undefined>(expr: () => T, fallback?: F) {
 }
 
 const DEFER_SUSPENSION = {
-  [Symbol.toStringTag]: 'DeferSuspension'
+  [Symbol.toStringTag]: 'DeferSuspension',
 };
 
 const queue: (() => void)[] = [];
@@ -95,8 +95,8 @@ function enqueueJob(job: () => void) {
   queue.push(job);
 }
 
-const enqueueTask = (
-  /* istanbul ignore next */ (() => {
+const enqueueTask =  (
+  (/* istanbul ignore next */ () => {
     if (typeof setImmediate === 'function') {
       return setImmediate;
     }

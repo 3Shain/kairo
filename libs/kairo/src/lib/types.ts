@@ -28,7 +28,8 @@ declare global {
   }
 }
 
-export const Symbol_observable = (() =>
+export const Symbol_observable = (
+  /* istanbul ignore next: simple expression*/ () =>
   (typeof Symbol === 'function' && Symbol.observable) || '@@observable')();
 
 /**

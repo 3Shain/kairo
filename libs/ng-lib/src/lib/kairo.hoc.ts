@@ -20,6 +20,7 @@ import {
   collectScope,
   Cell,
   Reaction,
+  Symbol_bind_reference,
 } from 'kairo';
 import { KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
@@ -32,7 +33,7 @@ interface KairoDirectiveInstance {
   ɵɵinit: boolean;
   ngSetup: Function;
   // ɵɵeffectQueue: LayoutQueue;
-  ɵɵreferenceMap: { name: string; reference: Reference<any> }[];
+  ɵɵreferenceMap: { name: string; reference: Function }[];
 }
 
 export function WithKairo() {
@@ -50,18 +51,20 @@ export function WithKairo() {
     const factoryOld = componentType['ɵfac'];
     /** Override component factory */
     Object.defineProperty(componentType, 'ɵfac', {
-      get: () => (...args: any) => {
-        const instance = factoryOld(...args) as KairoDirectiveInstance;
-        instance.ɵɵkairoScope = ɵɵdirectiveInject(
-          KairoScopeRefImpl,
-          InjectFlags.Optional
-        );
-        instance.ɵɵinjector = ɵɵdirectiveInject(Injector, InjectFlags.Self);
-        instance.ɵɵzone = ɵɵdirectiveInject(NgZone);
-        instance.ɵɵinit = false;
-        instance.ɵɵreferenceMap = [];
-        return instance;
-      },
+      get:
+        () =>
+        (...args: any) => {
+          const instance = factoryOld(...args) as KairoDirectiveInstance;
+          instance.ɵɵkairoScope = ɵɵdirectiveInject(
+            KairoScopeRefImpl,
+            InjectFlags.Optional
+          );
+          instance.ɵɵinjector = ɵɵdirectiveInject(Injector, InjectFlags.Self);
+          instance.ɵɵzone = ɵɵdirectiveInject(NgZone);
+          instance.ɵɵinit = false;
+          instance.ɵɵreferenceMap = [];
+          return instance;
+        },
     });
     /**
      * Setup kairo
@@ -75,9 +78,11 @@ export function WithKairo() {
     const hasInputs = Object.keys(directiveDefinition.inputs).length > 0;
 
     // ensure these method exist in prototype cuz ivy will store them.
-    const ngOnChangesOld = (hasInputs
-      ? componentType.prototype.ngOnChanges
-      : componentType.prototype.ngOnInit) as Function;
+    const ngOnChangesOld = (
+      hasInputs
+        ? componentType.prototype.ngOnChanges
+        : componentType.prototype.ngOnInit
+    ) as Function;
     const ngOnDestroyOld = componentType.prototype.ngOnDestroy as Function;
     componentType.prototype.ngOnDestroy = function (
       this: KairoDirectiveInstance
@@ -128,7 +133,10 @@ export function WithKairo() {
             for (const [key, value] of Object.entries(resolve)) {
               if (isCell(value)) {
                 cells.set(key, value);
-              } else if (value instanceof Reference) {
+              } else if (
+                typeof value === 'function' &&
+                Symbol_bind_reference in value
+              ) {
                 this.ɵɵreferenceMap.push({
                   name: key,
                   reference: value,
@@ -137,18 +145,18 @@ export function WithKairo() {
                 this[key] = value;
               }
             }
-            const detechChange = () => {
+            const syncChanges = () => {
               for (let [key, cell] of cells) {
-                this[key] = cell.value;
+                this[key] = cell.$;
               }
             };
             const r = new Reaction(() => {
-              r.execute(detechChange);
+              syncChanges();
               changeDetector.markForCheck();
             });
-            detechChange();
+            syncChanges();
             lifecycle(() => {
-              r.execute(detechChange);
+              r.track(syncChanges);
               return () => r.dispose();
             });
           } finally {
@@ -169,10 +177,10 @@ export function WithKairo() {
     const afterViewInit = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
         const target = this[entry.name];
-        if(target instanceof ElementRef){
-          entry.reference.current = target.nativeElement;
+        if (target instanceof ElementRef) {
+          entry.reference(target.nativeElement);
         } else {
-          entry.reference.current = target;
+          entry.reference(target);
         }
       }
       this.ɵɵlifecycleScope.attach();
@@ -185,10 +193,10 @@ export function WithKairo() {
     const afterViewChecked = function (this: KairoDirectiveInstance) {
       for (const entry of this.ɵɵreferenceMap) {
         const target = this[entry.name];
-        if(target instanceof ElementRef){
-          entry.reference.current = target.nativeElement;
+        if (target instanceof ElementRef) {
+          entry.reference(target.nativeElement);
         } else {
-          entry.reference.current = target;
+          entry.reference(target);
         }
       }
       ngAfterViewCheckedOld?.call(this);

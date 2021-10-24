@@ -5,13 +5,12 @@ import {
   createComponent,
   useContext,
   createSignal,
-  createComputed,
   runWithOwner,
   getOwner,
   onMount,
   untrack,
 } from 'solid-js';
-import { Cell, collectScope, Context, isCell, mutValue, Reaction } from 'kairo';
+import { Cell, collectScope, Reaction } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
 
@@ -21,14 +20,9 @@ import { KairoContext } from './context';
  * patches prototype
  */
 
-Object.defineProperty(Cell.prototype, 'value', {
+Object.defineProperty(Cell.prototype, '$', {
   get: createPatch(
-    Object.getOwnPropertyDescriptor(Cell.prototype, 'value').get
-  ),
-});
-Object.defineProperty(Cell.prototype, 'error', {
-  get: createPatch(
-    Object.getOwnPropertyDescriptor(Cell.prototype, 'error').get
+    Object.getOwnPropertyDescriptor(Cell.prototype, '$').get
   ),
 });
 
@@ -46,7 +40,7 @@ function createPatch(originalGetter: Function) {
       const refRead = this.signal_ref.get(owner);
       if (refRead === undefined) {
         const update = () => {
-          reaction.execute(() =>
+          reaction.track(() =>
             write(untrack(() => originalGetter.call(this)))
           );
         };

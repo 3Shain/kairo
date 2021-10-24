@@ -1,22 +1,28 @@
 import { from, Observable } from 'rxjs';
 import { computed, mutable, Cell, Reaction, combined } from './cell';
 import { batch, BitFlags, Memo, untrack } from './internal';
+import {
+  effect,
+  countObservers,
+  countSources,
+  hasFlag,
+  cleanup,
+} from './spec-shared';
 
 describe('cell', () => {
-
-  beforeAll(()=>{
+  beforeAll(() => {
     globalThis.Observable = Observable;
   });
 
-  afterAll(()=>{
+  afterAll(() => {
     globalThis.Observable = undefined;
-  })
+  });
 
   it('normal', () => {
     const [a, ma] = mutable(0);
-    const b = computed(() => a.value);
+    const b = computed(() => a.$);
     let g = 0;
-    effect(() => (g = b.value));
+    effect(() => (g = b.$));
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(1);
     expect(countSources(b)).toBe(1);
@@ -26,8 +32,8 @@ describe('cell', () => {
 
   it('eager evaluate', () => {
     const [a, ma] = mutable(0);
-    const b = computed(() => a.value);
-    b.value;
+    const b = computed(() => a.$);
+    b.current;
     expect(countObservers(a)).toBe(1);
     expect(countSources(b)).toBe(1);
     ma(1);
@@ -38,23 +44,36 @@ describe('cell', () => {
 
   it('self reference should throw', () => {
     const a = computed(() => {
-      a.value;
+      a.$;
       return 1;
     });
-    expect(() => a.value).toThrow(ReferenceError);
+    expect(() => a.current).toThrow(ReferenceError);
   });
 
   it('circular reference should throw', () => {
     const a = computed(() => {
-      b.value;
+      b.$;
       return 1;
     });
     const b = computed(() => {
-      a.value;
+      a.$;
       return 1;
     });
-    expect(() => a.value).toThrow(ReferenceError);
-    expect(() => b.value).toThrow(ReferenceError);
+    expect(() => a.current).toThrow(ReferenceError);
+    expect(() => b.current).toThrow(ReferenceError);
+  });
+
+  it('circular reference should throw (ref)', () => {
+    const a = computed(() => {
+      b.$;
+      return 1;
+    });
+    const b = computed(() => {
+      a.current;
+      return 1;
+    });
+    expect(() => a.current).toThrow(ReferenceError);
+    expect(() => b.current).toThrow(ReferenceError);
   });
 
   it('unstable 1', () => {
@@ -62,12 +81,12 @@ describe('cell', () => {
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
     const d = computed(() => {
-      if (a.value) {
-        b.value, c.value;
+      if (a.$) {
+        b.$, c.$;
       }
       return 1;
     });
-    effect(() => d.value);
+    effect(() => d.$);
     expect(countSources(d)).toBe(1);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(0);
@@ -89,14 +108,14 @@ describe('cell', () => {
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
     const d = computed(() => {
-      if ((a.value, a.value)) {
-        b.value, c.value;
+      if ((a.$, a.$)) {
+        b.$, c.$;
       } else {
-        c.value, b.value;
+        c.$, b.$;
       }
       return 1;
     });
-    effect(() => d.value);
+    effect(() => d.$);
     expect(countSources(d)).toBe(3);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(1);
@@ -116,18 +135,18 @@ describe('cell', () => {
   it('unstable 3', () => {
     const [a, ma] = mutable(0);
     const b = Cell.of(0);
-    const c = computed(() => a.value + b.value);
-    const e = computed(() => c.value);
+    const c = computed(() => a.$ + b.$);
+    const e = computed(() => c.$);
     const d = computed(() => {
-      if (a.value) {
-        b.value;
+      if (a.$) {
+        b.$;
       } else {
-        e.value;
+        e.$;
       }
       return 1;
     });
-    effect(() => c.value);
-    effect(() => d.value);
+    effect(() => c.$);
+    effect(() => d.$);
     // expect(countSources(d)).toBe(3);
     // expect(countObservers(a)).toBe(1);
     // expect(countObservers(b)).toBe(1);
@@ -144,15 +163,22 @@ describe('cell', () => {
     // expect(countObservers(c)).toBe(1);
   });
 
-  it('', () => {
+  it('throw in computed', () => {
+    const p = new Error('Stub');
     const [a, ma] = mutable(0);
     const b = Cell.of(0);
     const c = computed(() => {
-      a.value, b.value;
-      throw Error('Stub');
+      a.$, b.$;
+      throw p;
     });
 
-    effect(() => c.error);
+    effect(() => {
+      try {
+        c.$;
+      } catch (e) {
+        expect(e).toBe(p);
+      }
+    });
     ma(1);
     ma(0);
   });
@@ -162,12 +188,12 @@ describe('cell', () => {
     const [a, ma] = mutable(0);
     const b = computed(() => {
       if (closure) {
-        a.value;
+        a.$;
       }
       return 1;
     });
 
-    effect(() => b.value);
+    effect(() => b.$);
     ma(1);
     closure = 0;
     ma(0);
@@ -176,17 +202,33 @@ describe('cell', () => {
     expect(countObservers(b)).toBe(1);
   });
 
+  it('unchanged computed', () => {
+    const [a, ma] = mutable(0);
+    const p = Math.random();
+    const b = computed(() => {
+      a.$;
+      return p;
+    });
+    const c = computed(() => b.$);
+
+    effect(() => {
+      expect(c.$).toBe(p);
+    });
+    ma(1);
+    ma(2);
+  });
+
   it('untrack', () => {
     const [a, ma] = mutable(0);
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
     const d = computed(() => {
-      if (a.value) {
-        b.value, untrack(() => c.value);
+      if (a.$) {
+        b.$, untrack(() => c.current);
       }
       return 1;
     });
-    effect(() => d.value);
+    effect(() => d.$);
     expect(countSources(d)).toBe(1);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(0);
@@ -203,111 +245,94 @@ describe('cell', () => {
     expect(countObservers(c)).toBe(0);
   });
 
-  it('batch', () => {});
+  describe('Cell.subscribe()', () => {
+    it('interop observable', () => {
+      const [a, ma] = mutable(0);
+      const interopObservable = from(a);
 
-  it('interop observable', () => {
-    const [a, ma] = mutable(0);
-    const interopObservable = from(a);
-
-    let o = 0;
-    const subscription = interopObservable.subscribe({
-      next: (v) => {
-        o = v;
-      },
+      let o = 0;
+      const subscription = interopObservable.subscribe({
+        next: (v) => {
+          o = v;
+        },
+      });
+      const num = Math.random();
+      ma(num);
+      subscription.unsubscribe();
+      expect(o).toBe(num);
     });
-    const num = Math.random();
-    ma(num);
-    subscription.unsubscribe();
-    expect(o).toBe(num);
-  });
 
-  it('interop observable (function)', () => {
-    const [a, ma] = mutable(0);
+    it('interop observable (error)', () => {
+      const num = Math.random();
+      const [a, ma] = mutable(0);
+      const b = computed(() => {
+        if (a.$) {
+          throw a.$;
+        }
+        return 0;
+      });
+      const interopObservable = from(b);
 
-    let o = 0;
-    const subscription = a.subscribe((v) => {
-      o = v;
-    });
-    const num = Math.random();
-    ma(num);
-    subscription.unsubscribe();
-    expect(o).toBe(num);
-  });
-
-  it('combined object', () => {
-    const [a] = mutable(0);
-
-    const combinedCell = combined({
-      prop1: 0,
-      prop2: a,
-      prop3: {
-        prop4: a,
-      },
-    });
-    expect(combinedCell.value).toStrictEqual({
-      prop1: 0,
-      prop2: 0,
-      prop3: {
-        prop4: a,
-      },
+      let o = 0;
+      const subscription = interopObservable.subscribe({
+        error: (v) => {
+          o = v;
+        },
+      });
+      ma(num);
+      // subscription.unsubscribe();
+      expect(subscription.closed).toBeTruthy();
+      expect(o).toBe(num);
     });
   });
 
-  it('combined array', () => {
-    const [a] = mutable(0);
+  describe('combined()', () => {
+    it('combined object', () => {
+      const [a] = mutable(0);
 
-    const combinedCell = combined([0, a, { prop: a }]);
-    expect(combinedCell.value).toStrictEqual([0, 0, { prop: a }]);
+      const combinedCell = combined({
+        prop1: 0,
+        prop2: a,
+        prop3: {
+          prop4: a,
+        },
+      });
+      expect(combinedCell.current).toStrictEqual({
+        prop1: 0,
+        prop2: 0,
+        prop3: {
+          prop4: a,
+        },
+      });
+    });
+
+    it('combined array', () => {
+      const [a] = mutable(0);
+
+      const combinedCell = combined([0, a, { prop: a }]);
+      expect(combinedCell.current).toStrictEqual([0, 0, { prop: a }]);
+    });
+  });
+
+  describe('batch()', () => {
+    it('internal mutation work as it is', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(() => a.$);
+
+      let g = 0;
+      effect(() => (g = b.$));
+
+      batch(() => {
+        ma(1);
+        expect(b.current).toBe(1);
+        batch(() => {
+          ma(3);
+          ma((x) => x - 1);
+        });
+      });
+      expect(g).toBe(2);
+    });
   });
 
   afterEach(cleanup);
 });
-
-const toCleanup: Function[] = [];
-
-export function cleanup() {
-  toCleanup.forEach((x) => x());
-  toCleanup.length = 0;
-}
-
-export function effect(fn: () => any) {
-  const callback = () => {
-    r.track(fn);
-  };
-  const r = new Reaction(callback);
-  callback();
-  toCleanup.push(() => r.dispose());
-}
-
-export function controlledEffect(fn: () => any) {
-  const callback = () => {
-    r.track(fn);
-  };
-  const r = new Reaction(callback);
-  callback();
-  return () => r.dispose();
-}
-
-export function countObservers(cell: Cell<any>) {
-  let count = 0,
-    lo = cell['internal'].lo;
-  while (lo) {
-    count++;
-    lo = lo.prev;
-  }
-  return count;
-}
-
-export function countSources(cell: Cell<any>) {
-  let count = 0,
-    lo = (cell['internal'] as Memo).ls;
-  while (lo) {
-    count++;
-    lo = lo.prev;
-  }
-  return count;
-}
-
-export function hasFlag(cell: Cell<any>, flag: BitFlags) {
-  return cell['internal'].flags & flag;
-}

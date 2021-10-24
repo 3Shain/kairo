@@ -24,6 +24,11 @@ import { CONTEXT } from './context';
 Object.defineProperty(Cell.prototype, '__v_isRef', {
   value: true,
 });
+Object.defineProperty(Cell.prototype, 'value', {
+  get: function (this:Cell<any>) {
+    return this.$;
+  }
+});
 
 export function useScopeController(scope: LifecycleScope) {
   let detachHandler: Function | null = null;
@@ -93,7 +98,7 @@ export function patchComponent<T extends DefineComponent>(component: T) {
         if (typeof bindings === 'function') {
           return (...args: unknown[]) => (
             // @ts-ignore
-            tracker.value, r.execute(() => bindings(...args))
+            tracker.value, r.track(() => bindings(...args))
           );
         }
         return {
@@ -123,7 +128,7 @@ function patchRender(originalRender: Function) {
     $data: any,
     $options: any
   ) {
-    const ret = _ctx.r.execute(
+    const ret = _ctx.r.track(
       () => originalRender(_ctx, _cache, $props, $setup, $data, $options),
       _ctx.tracker as void
     );

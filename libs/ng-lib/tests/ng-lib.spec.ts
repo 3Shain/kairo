@@ -121,8 +121,8 @@ export class Case1 extends ngSetup(
     viewProp: string;
     viewPropChanged: Function;
   }) => {
-    const para = reference<HTMLParagraphElement>(null);
-    const child = reference<Case1Child>(null);
+    const [para, bindpara] = reference<HTMLParagraphElement>(null);
+    const [child, bindchild] = reference<Case1Child>(null);
 
     lifecycle(() => {
       prop.initialize();
@@ -136,15 +136,15 @@ export class Case1 extends ngSetup(
 
     const [count, setCount] = mut(0);
 
-    const doubled = computed(() => count.value * 2);
+    const doubled = computed(() => count.$ * 2);
 
     return {
       count,
       doubled,
-      para,
-      child,
+      para: bindpara,
+      child: bindchild,
       onClick: () => {
-        setCount(count.value + 1);
+        setCount((x) => x + 1);
       },
     };
   }

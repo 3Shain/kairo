@@ -93,9 +93,9 @@ function accessValue<T>(data: Data<T>): T {
      */
     throw new ReferenceError('A circular reference occurred.'); // [EXIT 5]
   }
-  if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
-    ct.flush();
-  }
+  // if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
+  //   ct.flush();
+  // }
   if (ctx_cc !== null) {
     logDependency(data);
     // if propagating and current are still markForCheck
@@ -113,6 +113,29 @@ function accessValue<T>(data: Data<T>): T {
   }
   return data.value!; // current value [EXIT 1]
 }
+
+export function accessRefValue<T>(data: Data<T>): T {
+  if (data.flags & BitFlags.Estimating) {
+    /**
+     * In fact we could allow circular referencing, by returning the latest value.
+     * However this causes a memo node to _hold a state_.
+     * Thus a memo expression is _impure_: same inputs, changed result.
+     */
+    throw new ReferenceError('A circular reference occurred.'); // [EXIT 5]
+  }
+  if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
+    ct.flush();
+  }
+  if (data.flags & BitFlags.StaleMemo) {
+    data.flags &= ~BitFlags.StaleMemo;
+    estimate(data); // maybe [EXIT 3]
+  }
+  if (data.flags & BitFlags.HasError) {
+    throw data.value; // [EXIT 2]
+  }
+  return data.value!; // current value [EXIT 1]
+}
+
 
 function estimate<T>(data: Data<T>) {
   data.flags |= BitFlags.Estimating;
@@ -478,10 +501,6 @@ function createMemo<T>(fn: () => T): Memo<T> {
     ls: null,
     c: fn,
   };
-}
-
-export function __current_collecting() {
-  return ctx_cc;
 }
 
 export function __current_transaction() {

@@ -63,8 +63,7 @@ async function case1(cComponent: any) {
       clean: cleanCallback,
       viewProp: 'Hello',
       viewPropChanged: viewpropChangedCallback,
-      onEvent: (vtt)=>{
-      }
+      onEvent: (vtt) => {},
     },
   });
   expect(initCallback).toBeCalledTimes(1);
@@ -112,7 +111,7 @@ export const Case1 = withKairo<{
   viewProp: string;
   viewPropChanged: Function;
 }>((prop) => {
-  const para = reference<HTMLParagraphElement>(null);
+  const [para, _para] = reference<HTMLParagraphElement>(null);
 
   lifecycle(() => {
     prop.initialize();
@@ -130,19 +129,19 @@ export const Case1 = withKairo<{
 
   const [count, setCount] = mut(0);
 
-  const doubled = computed(() => count.value * 2);
+  const doubled = computed(() => count.$ * 2);
 
   return (vp) => (
     <div>
-      <p ref={para.bind}>{vp.viewProp}</p>
+      <p ref={_para.bind}>{vp.viewProp}</p>
       <button
         onClick={() => {
-          setCount(count.value + 1);
+          setCount((x) => x + 1);
         }}
       >
-        {count.value}
+        {count.$}
       </button>
-      <Case1Child count={doubled.value} />
+      <Case1Child count={doubled.$} />
     </div>
   );
 });
@@ -150,7 +149,6 @@ export const Case1 = withKairo<{
 Case1.props = ['initialize', 'clean', 'viewProp', 'viewPropChanged'];
 
 const Case1Child = withKairo<{ count: number }>((_) => {
-
   return (props) => <span>{props.count}</span>;
 });
 

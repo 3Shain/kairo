@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "preserve",
+    "jsxFactory": "h",
     "allowJs": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true

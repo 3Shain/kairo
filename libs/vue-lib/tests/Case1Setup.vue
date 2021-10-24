@@ -1,6 +1,6 @@
 <template>
   <div>
-    <p :ref="para.bind">{{ viewProp }}</p>
+    <p :ref="bindpara.bind">{{ viewProp }}</p>
     <button @click="onClick">{{ count }}</button>
     <case-1-child :count="doubled" />
   </div>
@@ -19,7 +19,7 @@ const prop = defineProps({
   viewPropChanged: Function,
 });
 
-const para = reference<HTMLParagraphElement>(null);
+const [para, bindpara ]= reference<HTMLParagraphElement>(null);
 
 lifecycle(() => {
   prop.initialize();
@@ -37,9 +37,9 @@ watchEffect(() => {
 
 const [count, setCount] = mut(0);
 
-const doubled = computed(() => count.value * 2);
+const doubled = computed(() => count.$ * 2);
 
 const onClick = () => {
-  setCount(count.value + 1);
+  setCount(x => x + 1);
 }
 </script>

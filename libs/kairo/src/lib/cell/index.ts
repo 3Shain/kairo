@@ -7,4 +7,4 @@ export {
 } from './cell';
 export { suspended, SuspendedCell } from './suspense';
 
-export { batch, __current_collecting } from './internal';
+export { batch } from './internal';
