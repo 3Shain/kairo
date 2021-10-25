@@ -7,8 +7,8 @@ class Reference<T> {
 
   [Symbol.toStringTag]: 'Reference';
 
-  static create<T>(V?: T): [Reference<T>, any] {
-    const ref = new Reference(V);
+  static create<T>(initial?: T): [Reference<T>, SetReference] {
+    const ref = new Reference(initial);
     const binder = (value: any) => {
       ref._current = value;
     };
@@ -19,14 +19,20 @@ class Reference<T> {
       },
     });
     (binder as any)[Symbol_bind_reference] = true;
-    return [ref, binder];
+    return [ref, binder as SetReference];
   }
 }
 
 const Symbol_bind_reference: unique symbol = Symbol('binder');
 
-function reference<T>(initial?: T) {
+interface SetReference {
+  (value: any): void;
+  bind: any;
+  [Symbol_bind_reference]: true;
+}
+
+function reference<T>(initial?: T): [Reference<T>, SetReference] {
   return Reference.create(initial);
 }
 
-export { Reference, reference, Symbol_bind_reference };
+export { Reference, reference, SetReference, Symbol_bind_reference };

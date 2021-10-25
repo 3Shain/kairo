@@ -61,7 +61,7 @@ export const Case1 = withKairo<{
   viewProp: string;
   viewPropChanged: Function;
 }>((prop) => {
-  const [para, _para] = reference<HTMLParagraphElement>(null);
+  const [para, bindPara] = reference<HTMLParagraphElement>(null);
 
   lifecycle(() => {
     prop.intialize();
@@ -83,7 +83,7 @@ export const Case1 = withKairo<{
     });
     return (
       <div>
-        <p ref={_para.bind}>{vp.viewProp}</p>
+        <p ref={bindPara}>{vp.viewProp}</p>
         <button
           onClick={() => {
             setCount(count.current + 1);

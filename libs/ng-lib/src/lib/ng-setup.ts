@@ -1,19 +1,17 @@
-import { Cell,  Reference } from 'kairo';
+import type { Cell, SetReference } from 'kairo';
 
 export function ngSetup<Props, Model extends object>(
-  setup: (
-    props: Props
-  ) => Model | void
+  setup: (props: Props) => Model | void
 ) {
-  return (class {
+  return class {
     ngSetup = setup;
-  } as unknown) as {
+  } as unknown as {
     new (): Pick<ToModel<Model>, ExcludeReference<Model>>;
   };
 }
 
 type ExcludeReference<T> = {
-  [P in keyof T]: T[P] extends Reference<any> ? never : P;
+  [P in keyof T]: T[P] extends SetReference ? never : P;
 }[keyof T];
 
 type ToModel<T> = {

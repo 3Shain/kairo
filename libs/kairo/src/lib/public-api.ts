@@ -17,5 +17,6 @@ export * from './context';
 export * from './schedule';
 export * from './concurrency';
 export * from './reference';
+export { reference as ref } from './reference';
 export * from './debug';
 export * from './effect';

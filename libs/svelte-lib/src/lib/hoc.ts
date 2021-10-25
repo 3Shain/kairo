@@ -1,3 +1,5 @@
+/* istanbul ignore file: compiler generated code */
+
 import {
   SvelteComponent,
   create_component,
