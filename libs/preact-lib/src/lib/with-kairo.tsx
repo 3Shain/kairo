@@ -84,7 +84,6 @@ function useKairoComponent<Props>(
       if (!didMounted) {
         renderReaction.dispose();
         didUpdateBeforeMounted = true;
-        // if it's the first render of strict mode,
       } else {
         forceUpdate(inc);
       }

@@ -1,4 +1,4 @@
-import { Concern, Concerns, reduceConcerns, collectScope } from 'kairo';
+import { Concern, collectScope } from 'kairo';
 import {
   Component,
   createComponent,
@@ -31,11 +31,4 @@ export function withConcern<Props>(
       });
     }
   };
-}
-
-export function withConcerns<Props>(
-  concerns: Concerns,
-  component: Component<Props>
-) {
-  return withConcern(reduceConcerns(concerns), component);
 }

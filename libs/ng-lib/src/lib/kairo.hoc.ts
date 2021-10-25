@@ -13,14 +13,14 @@ import {
 } from '@angular/core';
 import {
   isCell,
-  Reference,
+  SetReference,
   Context,
   lifecycle,
   LifecycleScope,
   collectScope,
   Cell,
   Reaction,
-  Symbol_bind_reference,
+  isReferenceSetter,
 } from 'kairo';
 import { KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
@@ -33,7 +33,7 @@ interface KairoDirectiveInstance {
   ɵɵinit: boolean;
   ngSetup: Function;
   // ɵɵeffectQueue: LayoutQueue;
-  ɵɵreferenceMap: { name: string; reference: Function }[];
+  ɵɵreferenceMap: { name: string; reference: SetReference }[];
 }
 
 export function WithKairo() {
@@ -133,10 +133,7 @@ export function WithKairo() {
             for (const [key, value] of Object.entries(resolve)) {
               if (isCell(value)) {
                 cells.set(key, value);
-              } else if (
-                typeof value === 'function' &&
-                Symbol_bind_reference in value
-              ) {
+              } else if (isReferenceSetter(value)) {
                 this.ɵɵreferenceMap.push({
                   name: key,
                   reference: value,

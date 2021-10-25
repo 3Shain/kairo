@@ -1,3 +1,5 @@
+/* istanbul ignore file: simple */
+
 class Reference<T> {
   get current() {
     return this._current;
@@ -23,7 +25,7 @@ class Reference<T> {
   }
 }
 
-const Symbol_bind_reference: unique symbol = Symbol('binder');
+const Symbol_bind_reference: unique symbol = Symbol('reference_setter');
 
 interface SetReference {
   (value: any): void;
@@ -31,8 +33,12 @@ interface SetReference {
   [Symbol_bind_reference]: true;
 }
 
+function isReferenceSetter(value: unknown): value is SetReference {
+  return (typeof value === 'function') && (value as SetReference)[Symbol_bind_reference] === true;
+}
+
 function reference<T>(initial?: T): [Reference<T>, SetReference] {
   return Reference.create(initial);
 }
 
-export { Reference, reference, SetReference, Symbol_bind_reference };
+export { Reference, reference, SetReference, isReferenceSetter };

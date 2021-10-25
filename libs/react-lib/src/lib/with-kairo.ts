@@ -58,9 +58,18 @@ function useKairoComponent<Props>(
       didUpdateBeforeMounted = false;
     lifecycle(() => {
       didMounted = true;
+      debugger;
       if (didUpdateBeforeMounted) {
         forceUpdate(inc); // schedule an update
         didUpdateBeforeMounted = false;
+        /**
+         * it's really hard to cover this branch.
+         * current work-around: 
+         * set a cell in children useEffect
+         * the parent is going-to-mount but not mounted yet (coz children will be mounted before parent)
+         * so the parent's reaction will dispose itself and tag `didUpdateBeforeMounted`
+         * what a messy control flow...
+         */
       }
       return () => {
         didMounted = false;
@@ -75,9 +84,13 @@ function useKairoComponent<Props>(
     }
     const renderReaction = new Reaction(() => {
       if (!didMounted) {
+        /** 
+         * subscribe to a free-cell in first render of strict-mode will trigger this
+         * or subscribed cells get modified while children getting mounted
+         */
+        debugger;
         renderReaction.dispose();
         didUpdateBeforeMounted = true;
-        // if it's the first render of strict mode,
       } else {
         forceUpdate(inc);
       }

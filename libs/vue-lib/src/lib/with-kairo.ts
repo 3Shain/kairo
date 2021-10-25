@@ -85,7 +85,7 @@ export function patchComponent<T extends DefineComponent>(component: T) {
       const exitContext = context.runInContext();
       try {
         const bindings = setup(props, setupContext);
-        if (bindings instanceof Promise) {
+        /* istanbul ignore if: unexpected use cases */if (bindings instanceof Promise) {
           throw Error('Async component is not supported.');
         }
         const tracker = ref(0);

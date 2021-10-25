@@ -12,7 +12,7 @@ export function withConcern<P>(
       const exitScope = collectScope();
       try {
         return [parentContext.build(concern), exitScope()];
-      } catch (e) {
+      } catch (e) /* istanbul ignore next: captured by react */ {
         exitScope();
         throw e;
       }

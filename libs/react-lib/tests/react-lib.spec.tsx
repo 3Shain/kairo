@@ -1,8 +1,10 @@
-import { fireEvent, render, cleanup } from '@testing-library/react';
+import { fireEvent, render, cleanup, act } from '@testing-library/react';
 import React, { useEffect } from 'react';
 import { forwardRef, withKairo, withConcern } from '../src';
 import { computed, lifecycle, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
+
+const [freeCell, setFreeCell] = mut(0);
 
 describe('@kairo/react', () => {
   beforeEach(async () => {});
@@ -23,12 +25,14 @@ describe('@kairo/react', () => {
     }, Case1);
 
     const w = render(
-      <Case1Concern
-        intialize={initCallback}
-        clean={cleanCallback}
-        viewProp={'Hello'}
-        viewPropChanged={viewpropChangedCallback}
-      />
+      <React.StrictMode>
+        <Case1Concern
+          intialize={initCallback}
+          clean={cleanCallback}
+          viewProp={'Hello'}
+          viewPropChanged={viewpropChangedCallback}
+        />
+      </React.StrictMode>
     );
     expect(initCallback).toBeCalledTimes(1);
     expect(cleanCallback).toBeCalledTimes(0);
@@ -39,27 +43,33 @@ describe('@kairo/react', () => {
 
     const button = w.container.querySelector('button');
     const span = w.container.querySelector('span');
+    const h1 = w.container.querySelector('h1');
     expect(w.container.querySelector('p')).toHaveTextContent('Hello');
     expect(button).toHaveTextContent('0');
+    expect(h1).toHaveTextContent('1');
 
     w.rerender(
-      <Case1Concern
-        intialize={initCallback}
-        clean={cleanCallback}
-        viewProp={'World'}
-        viewPropChanged={viewpropChangedCallback}
-      />
+      <React.StrictMode>
+        <Case1Concern
+          intialize={initCallback}
+          clean={cleanCallback}
+          viewProp={'World'}
+          viewPropChanged={viewpropChangedCallback}
+        />
+      </React.StrictMode>
     );
     expect(viewpropChangedCallback).toBeCalledTimes(2);
     expect(w.container.querySelector('p')).toHaveTextContent('World');
 
     w.rerender(
-      <Case1Concern
-        intialize={initCallback}
-        clean={cleanCallback}
-        viewProp={'Kairo'}
-        viewPropChanged={viewpropChangedCallback}
-      />
+      <React.StrictMode>
+        <Case1Concern
+          intialize={initCallback}
+          clean={cleanCallback}
+          viewProp={'Kairo'}
+          viewPropChanged={viewpropChangedCallback}
+        />
+      </React.StrictMode>
     );
     expect(viewpropChangedCallback).toBeCalledTimes(3);
     expect(w.container.querySelector('p')).toHaveTextContent('Kairo');
@@ -126,6 +136,7 @@ export const Case1 = withKairo<{
       <div>
         <p ref={_para.bind}>{viewProp}</p>
         <button onClick={add}>{count.$}</button>
+        <h1>{freeCell.$}</h1>
         <Case1Child count={doubled.$} />
       </div>
     );
@@ -133,7 +144,13 @@ export const Case1 = withKairo<{
 });
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return (vp) => <span>{vp.count}</span>;
+  return (vp) => {
+    useEffect(() => {
+      debugger;
+      setFreeCell(1);
+    }, []);
+    return <span>{vp.count}</span>;
+  };
 });
 
 const Case2 = forwardRef<{}, HTMLDivElement>(() => {

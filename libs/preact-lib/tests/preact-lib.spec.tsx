@@ -5,6 +5,8 @@ import '@testing-library/jest-dom';
 import { h } from 'preact';
 import { useEffect } from 'preact/compat';
 
+const [freeCell, setFreeCell] = mut(0);
+
 describe('@kairo/preact', () => {
   it('implement Simple Component Model', () => {
     const initCallback = jest.fn();
@@ -38,9 +40,10 @@ describe('@kairo/preact', () => {
 
     const button = w.container.querySelector('button');
     const span = w.container.querySelector('span');
+    const h1 = w.container.querySelector('h1');
     expect(w.container.querySelector('p')).toHaveTextContent('Hello');
     expect(button).toHaveTextContent('0');
-
+    expect(h1).toHaveTextContent('1');
     w.rerender(
       <Case1Concern
         intialize={initCallback}
@@ -125,6 +128,7 @@ export const Case1 = withKairo<{
       <div>
         <p ref={_para.bind}>{viewProp}</p>
         <button onClick={add}>{count.$}</button>
+        <h1>{freeCell.$}</h1>
         <Case1Child count={doubled.$} />
       </div>
     );
@@ -132,7 +136,12 @@ export const Case1 = withKairo<{
 });
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return (vp) => <span>{vp.count}</span>;
+  return (vp) => {
+    useEffect(()=>{
+      setFreeCell(1);
+    }, [])
+    return <span>{vp.count}</span>;
+  }
 });
 
 const Case2 = forwardRef<{}, HTMLDivElement>(() => {

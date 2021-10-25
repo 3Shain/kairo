@@ -10,7 +10,7 @@ export function withConcern<P>(concern: Concern, Component: ComponentType<P>) {
       const exitScope = collectScope();
       try {
         return [parentContext.build(concern), exitScope()];
-      } catch (e) {
+      } catch (e) /* istanbul ignore next: captured by preact */ {
         exitScope();
         throw e;
       }
