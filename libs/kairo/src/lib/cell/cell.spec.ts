@@ -1,5 +1,11 @@
 import { from, Observable } from 'rxjs';
-import { computed, mutable, Cell, Reaction, combined } from './cell';
+import {
+  computed,
+  mutable,
+  Cell,
+  combined,
+  IncrementalReaction,
+} from './cell';
 import { batch, BitFlags, Memo, untrack } from './internal';
 import {
   effect,
@@ -331,6 +337,27 @@ describe('cell', () => {
         });
       });
       expect(g).toBe(2);
+    });
+  });
+
+  describe('IncrementalReaction', () => {
+    it('should work as expect', () => {
+      const [a, ma] = mutable(0);
+      const [b, mb] = mutable(0);
+      const fn = jest.fn();
+      const reaction = new IncrementalReaction(fn);
+      reaction.track(() => a.$);
+      ma(1);
+      mb(1);
+      expect(fn).toBeCalledTimes(1);
+      reaction.continue(() => (a.$, b.$));
+      ma(1);
+      mb(1);
+      expect(fn).toBeCalledTimes(3);
+      reaction.dispose();
+      ma(1);
+      mb(1);
+      expect(fn).toBeCalledTimes(3);
     });
   });
 

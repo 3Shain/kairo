@@ -6,7 +6,8 @@ import {
   PartialObserver,
 } from '../types';
 import {
-  accessValue, accessRefValue,
+  accessValue,
+  accessRefValue,
   cleanupMemo,
   createMemo,
   createReaction,
@@ -104,6 +105,40 @@ export class Reaction {
    */
   track<T>(program: () => T) {
     return executeReaction<T>(this.internal, program);
+  }
+
+  dispose() {
+    cleanupMemo(this.internal);
+  }
+}
+
+export class IncrementalReaction {
+  private internal: _Reaction;
+
+  constructor(callback: () => void) {
+    this.internal = createReaction(callback);
+  }
+
+  track<T>(program: () => T) {
+    return executeReaction<T>(this.internal, program);
+  }
+
+  continue<T>(program: () => T) {
+    const reaction = this.internal;
+    return executeReaction<T>(this.internal, () => {
+      for (const x of this.getHistoryReads()) {
+        accessValue(x);
+      }
+      return program();
+    });
+  }
+
+  private *getHistoryReads() {
+    let source = this.internal.fs;
+    while (source) {
+      yield source.source;
+      source = source.next;
+    }
   }
 
   dispose() {
