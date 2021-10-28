@@ -24,13 +24,13 @@ export type Cleanable =
 
 declare global {
   interface SymbolConstructor {
-    readonly observable: unique symbol;
+    readonly observable: symbol;
   }
 }
 
-export const Symbol_observable = (
-  /* istanbul ignore next: simple expression*/ () =>
-  (typeof Symbol === 'function' && Symbol.observable) || '@@observable')();
+export const Symbol_observable =
+  /* istanbul ignore next: simple expression*/ (() =>
+    (typeof Symbol === 'function' && Symbol.observable) || '@@observable')();
 
 /**
  * Observable type definations
@@ -51,7 +51,7 @@ export interface Unsubscribable {
   unsubscribe(): void;
 }
 export interface Subscription extends Unsubscribable {
-  get closed(): boolean;
+  readonly closed: boolean;
 }
 
 interface NextObserver<T> {
