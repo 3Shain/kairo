@@ -1,10 +1,7 @@
-export {
-  Cell,
-  Reaction,
-  mutable,
-  computed,
-  combined
-} from './cell';
+export { Cell, Reaction, mutable, computed, combined } from './cell';
 export { suspended, SuspendedCell } from './suspense';
 
-export { batch } from './internal';
+export {
+  batch,
+  takeControlOnCommit as UNSTABLE_takeControlOnCommit,
+} from './internal';

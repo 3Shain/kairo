@@ -136,7 +136,6 @@ export function accessRefValue<T>(data: Data<T>): T {
   return data.value!; // current value [EXIT 1]
 }
 
-
 function estimate<T>(data: Data<T>) {
   data.flags |= BitFlags.Estimating;
   const s_ctx_cc = ctx_cc,
@@ -398,7 +397,7 @@ class Transaction {
     } finally {
       ct = stored;
     }
-    this.commit();
+    controlOnCommit(() => this.commit());
     return retValue;
   }
 
@@ -505,6 +504,15 @@ function createMemo<T>(fn: () => T): Memo<T> {
 
 export function __current_transaction() {
   return ct;
+}
+
+let controlOnCommit = ((x) => x()) as (continuation: () => void) => any;
+
+/* istanbul ignore next: simple */
+export function takeControlOnCommit(
+  controller: (continuation: () => void) => any
+) {
+  controlOnCommit = controller;
 }
 
 /**
