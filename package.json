@@ -53,6 +53,7 @@
     "@angular/router": "12.2.7",
     "@nrwl/angular": "12.9.0",
     "@nrwl/node": "12.9.0",
+    "@testing-library/react-alpha": "npm:@testing-library/react@alpha",
     "babel-types": "^6.26.0",
     "core-js": "^3.6.5",
     "document-register-element": "1.13.1",
@@ -61,6 +62,8 @@
     "preact": "^10.5.13",
     "react": "17.0.1",
     "react-dom": "17.0.1",
+    "react-dom-experimental": "npm:react-dom@experimental",
+    "react-experimental": "npm:react@experimental",
     "react-is": "17.0.1",
     "react-router-dom": "5.2.0",
     "rxjs": "~6.6.3",
@@ -87,6 +90,7 @@
     "@babel/preset-react": "7.9.4",
     "@babel/preset-typescript": "7.9.0",
     "@kairo/vue-sfc-transformer": "^0.0.1",
+    "@kairo/vue3-jest": "27.0.0-alpha.3",
     "@nrwl/cli": "12.9.0",
     "@nrwl/eslint-plugin-nx": "12.9.0",
     "@nrwl/jest": "12.9.0",
@@ -105,8 +109,8 @@
     "@types/benchmark": "^2.1.0",
     "@types/jest": "26.0.8",
     "@types/node": "14.14.33",
-    "@types/react": "16.9.56",
-    "@types/react-dom": "16.9.9",
+    "@types/react": "17.0.33",
+    "@types/react-dom": "17.0.10",
     "@types/react-is": "16.7.1",
     "@types/react-router-dom": "5.1.6",
     "@typescript-eslint/eslint-plugin": "4.28.5",
@@ -153,8 +157,7 @@
     "typescript": "~4.4.2",
     "vite": "^2.3.7",
     "vite-plugin-solid": "^2.0.0",
-    "vite-tsconfig-paths": "^3.2.1",
-    "@kairo/vue3-jest": "27.0.0-alpha.3"
+    "vite-tsconfig-paths": "^3.2.1"
   },
   "resolutions": {
     "**/@testing-library/dom": "^8.0.0"

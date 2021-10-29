@@ -286,6 +286,14 @@
             "jestConfig": "libs/react-lib/jest.config.js",
             "passWithNoTests": true
           }
+        },
+        "test-cm": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/libs/react-lib"],
+          "options": {
+            "jestConfig": "libs/react-lib/jest.config.cm.js",
+            "passWithNoTests": true
+          }
         }
       }
     },

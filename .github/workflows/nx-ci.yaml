@@ -25,6 +25,13 @@ jobs:
           targets: test
           affected: true
           args: --codeCoverage
+      - name: Unit test for React Concurrent Mode
+        uses: mansagroup/nrwl-nx-action@v2.0.4
+        with:
+          projects: react-lib
+          targets: test-cm
+          affected: true
+          args: --codeCoverage
       - name: Unit test for Svelte SSR
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
