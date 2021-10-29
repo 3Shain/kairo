@@ -400,6 +400,14 @@
             "jestConfig": "libs/svelte-lib/jest.config.js",
             "passWithNoTests": true
           }
+        },
+        "test-ssr": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/apps/svelte-lib"],
+          "options": {
+            "jestConfig": "libs/svelte-lib/jest.config.ssr.js",
+            "passWithNoTests": true
+          }
         }
       },
       "root": "libs/svelte-lib",
