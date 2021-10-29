@@ -500,7 +500,7 @@
           "options": {
             "externals": ["kairo", "vue", "@vue/reactivity"],
             "bundleName": "kairo-vue",
-            "copy": []
+            "copy": ["./interop.d.ts"]
           }
         },
         "test": {
