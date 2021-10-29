@@ -12,5 +12,6 @@
     "**/*.spec.jsx",
     "**/*.vue",
     "**/*.d.ts"
-  ]
+  ],
+  "exclude": ["**/interop.d.ts"]
 }
