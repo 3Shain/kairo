@@ -3,7 +3,7 @@ import { resolve, dirname } from 'path';
 import copy from 'rollup-plugin-copy';
 import { writeFile } from 'fs-extra';
 import typescript from 'rollup-plugin-typescript2';
-import { rollup } from 'rollup';
+import { OutputOptions, rollup } from 'rollup';
 import define from 'rollup-plugin-define';
 import filesize from 'rollup-plugin-filesize';
 
@@ -47,7 +47,7 @@ export default async function (
             src: [
               resolve(projectRoot, 'README.md'),
               resolve(projectRoot, 'package.json'),
-              ..._options.copy?.map((x) => resolve(projectRoot, x)) ?? [],
+              ...(_options.copy?.map((x) => resolve(projectRoot, x)) ?? []),
             ],
             dest: outDir,
           },
@@ -77,18 +77,6 @@ export default async function (
         },
         useTsconfigDeclarationDir: true,
       }),
-      copy({
-        targets: [
-          {
-            src: [
-              resolve(projectRoot, 'README.md'),
-              resolve(projectRoot, 'package.json'),
-            ],
-            dest: outDir,
-          },
-        ],
-        hook: 'writeBundle',
-      }),
       define({
         replacements: {
           __DEV__: 'true',
@@ -101,14 +89,15 @@ export default async function (
     input: resolve(projectRoot, _options.entry ?? 'src/index.ts'),
   });
 
-  const outputOptions = [
+  const outputOptions: OutputOptions[] = [
     {
       format: 'esm' as const,
       file: resolve(outDir, `${_options.bundleName}.esm.js`),
     },
     {
       format: 'cjs' as const,
-      file: resolve(outDir, `${_options.bundleName}.cjs.js`),
+      file: resolve(outDir, `${_options.bundleName}.cjs`),
+      exports: 'auto',
     },
   ];
 
@@ -133,15 +122,16 @@ export default async function (
   }
   console.log(packageJson.version);
 
-  packageJson.main = `${_options.bundleName}.cjs.js`;
+  packageJson.main = `${_options.bundleName}.cjs`;
   packageJson.module = `${_options.bundleName}.esm.js`;
+  packageJson.type = 'module';
   packageJson.exports = {
     ...(packageJson.exports ?? {}),
     ...{
       '.': {
         development: `./${_options.bundleName}.dev.esm.js`,
         production: `./${_options.bundleName}.esm.js`,
-        require: `./${_options.bundleName}.cjs.js`,
+        require: `./${_options.bundleName}.cjs`,
         default: `./${_options.bundleName}.esm.js`,
       },
     },

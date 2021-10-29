@@ -8,6 +8,11 @@ import sveltePreprocess from 'svelte-preprocess';
 
 const STUB_FILENAME = '/transformed.$$';
 
+function interopDefault<T>(e: T): { default: T } {
+  // @ts-ignore
+  return e && typeof e === 'object' && 'default' in e ? e : { default: e };
+}
+
 export default function preprocess(
   options: Parameters<typeof sveltePreprocess>[0]
 ) {
@@ -40,7 +45,7 @@ function transform(code: string, map?: RawSourceMap) {
     sourceFilename: STUB_FILENAME,
   });
 
-  traverse(ast, {
+  interopDefault(traverse).default(ast, {
     Program: (path) => {
       const args = [
         path.scope.generateUid('onDestroy'),
@@ -83,7 +88,7 @@ function transform(code: string, map?: RawSourceMap) {
     },
   });
 
-  const generated = generate(ast, {
+  const generated = interopDefault(generate).default(ast, {
     sourceMaps: true,
   });
   if (!map) {
@@ -97,7 +102,7 @@ function transform(code: string, map?: RawSourceMap) {
     map: {
       ...map,
       names: remapped.names,
-      mappings: remapped.mappings
+      mappings: remapped.mappings,
     },
   };
 }

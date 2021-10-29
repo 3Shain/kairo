@@ -1,6 +1,6 @@
 {
   "name": "@kairo/svelte-preprocess",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "dependencies": {
     "@babel/traverse": "^7.0.0",
