@@ -3,5 +3,8 @@
   "compilerOptions": {
     "outDir": "../../dist/out-tsc"
   },
+  "angularCompilerOptions": {
+    "disableTypeScriptVersionCheck": true
+  },
   "files": ["src/main.ts", "src/polyfills.ts"]
 }
