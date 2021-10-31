@@ -21,21 +21,21 @@ jobs:
       - name: Unit test
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: kairo,ng-lib,vue-lib,react-lib,svelte-lib,solid-lib,preact-lib
+          projects: kairo,angular,vue,react,svelte,solid,preact
           targets: test
           affected: true
           args: --codeCoverage
       - name: Unit test for React Concurrent Mode
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: react-lib
+          projects: react
           targets: test-cm
           affected: true
           args: --codeCoverage
       - name: Unit test for Svelte SSR
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: svelte-lib
+          projects: svelte
           targets: test-ssr
           affected: true
           args: --codeCoverage

@@ -8,7 +8,7 @@ module.exports = {
     '^.+\\.tsx?$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
-  coverageDirectory: '../../coverage/apps/vue-app',
+  coverageDirectory: '../../coverage/fixtures/vue-app',
 
   globals: {
     'ts-jest': { tsconfig: '<rootDir>/tsconfig.spec.json' },

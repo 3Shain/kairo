@@ -1,5 +1,5 @@
 module.exports = {
-  displayName: 'vue-lib',
+  displayName: 'vue',
   preset: '../../jest.preset.js',
   transform: {
     '^.+\\.vue$': '@kairo/vue3-jest',
@@ -8,7 +8,7 @@ module.exports = {
     '^.+\\.tsx?$': 'ts-jest',
   },
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
-  coverageDirectory: '../../coverage/libs/vue-lib',
+  coverageDirectory: '../../coverage/packages/vue',
   coverageReporters: [['lcov', { projectRoot: './' }]],
   globals: {
     'ts-jest': {
@@ -16,7 +16,7 @@ module.exports = {
       tsconfig: '<rootDir>/tsconfig.spec.json',
     },
     'vue-jest': {
-      tsConfig: 'libs/vue-lib/tsconfig.spec.json',
+      tsConfig: 'packages/vue/tsconfig.spec.json',
     },
     __DEV__: true,
     __TEST__: true,

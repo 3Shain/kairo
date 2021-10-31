@@ -13,6 +13,10 @@
   "affected": {
     "defaultBase": "master"
   },
+  "workspaceLayout": {
+    "appsDir": "fixtures",
+    "libsDir": "packages"
+  },
   "npmScope": "kairo",
   "tasksRunnerOptions": {
     "default": {
@@ -29,28 +33,28 @@
     "ng-app": {
       "tags": []
     },
-    "ng-lib": {
+    "angular": {
       "tags": []
     },
-    "preact-lib": {
+    "preact": {
       "tags": []
     },
     "react-app": {
       "tags": []
     },
-    "react-lib": {
+    "react": {
       "tags": []
     },
     "solid-app": {
       "tags": []
     },
-    "solid-lib": {
+    "solid": {
       "tags": []
     },
     "svelte-app": {
       "tags": []
     },
-    "svelte-lib": {
+    "svelte": {
       "tags": []
     },
     "svelte-preprocess": {
@@ -62,7 +66,7 @@
     "vite-vue-app": {
       "tags": []
     },
-    "vue-lib": {
+    "vue": {
       "tags": []
     },
     "vue-sfc-transformer": {

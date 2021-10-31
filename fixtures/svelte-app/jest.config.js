@@ -8,11 +8,11 @@ module.exports = {
     '^(.+\\.svelte$)': [
       'svelte-jester',
       {
-        preprocess: 'apps/svelte-app/jest.config.js/svelte.config.js',
+        preprocess: 'fixtures/svelte-app/jest.config.js/svelte.config.js',
       },
     ],
     '^.+\\.[tj]s$': 'ts-jest',
   },
   moduleFileExtensions: ['svelte', 'ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/apps/svelte-app',
+  coverageDirectory: '../../coverage/fixtures/svelte-app',
 };

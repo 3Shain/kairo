@@ -7,5 +7,5 @@ module.exports = {
     },
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  coverageDirectory: '../../coverage/apps/react-app',
+  coverageDirectory: '../../coverage/fixtures/react-app',
 };

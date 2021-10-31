@@ -2,14 +2,14 @@
 /** @type {import('@jest/types').Config.InitialOptions} */
 module.exports =
 {
-  displayName: 'react-lib',
+  displayName: 'react',
   preset: '../../jest.preset.js',
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
   },
   testMatch: ["**/*.spec.ts?(x)", "!**/*.cm.spec.ts?(x)"],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  coverageDirectory: '../../coverage/libs/react-lib',
+  coverageDirectory: '../../coverage/packages/react',
   coverageReporters: [['lcov', { projectRoot: './' }]],
   globals: {
     'ts-jest': { tsconfig: '<rootDir>/tsconfig.spec.json' },

@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import vueJsx from '@vitejs/plugin-vue-jsx';
 // import kairoVueSFC from 'vite-plugin-kairo-vue';
-// import kairoVue from '../../libs/vite-plugin-vue/src';
-import kairoVue from '../../dist/libs/vite-plugin-vue';
+// import kairoVue from '../../packages/vite-plugin-vue/src';
+import kairoVue from '../../dist/packages/vite-plugin-vue';
 
 // https://vitejs.dev/config/
 export default defineConfig({

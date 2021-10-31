@@ -6,7 +6,7 @@ module.exports = {
     '^.+\\.svelte$': [
       'svelte-jester',
       {
-        preprocess: 'libs/svelte-lib/tests/svelte.config.js',
+        preprocess: 'packages/svelte/tests/svelte.config.js',
         compilerOptions: {
           generate: 'ssr'
         }
@@ -15,7 +15,7 @@ module.exports = {
   },
   testMatch: ["**/*.ssr.spec.ts?(x)"],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'svelte'],
-  coverageDirectory: '../../coverage/libs/svelte-lib-ssr',
+  coverageDirectory: '../../coverage/packages/svelte-ssr',
   testEnvironment: 'jsdom',
   globals: {
     'ts-jest': { tsconfig: '<rootDir>/tsconfig.spec.json' },

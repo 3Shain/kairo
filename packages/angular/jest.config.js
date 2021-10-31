@@ -1,5 +1,5 @@
 module.exports = {
-  displayName: 'ng-lib',
+  displayName: 'angular',
   preset: '../../jest.preset.js',
   setupFilesAfterEnv: ['<rootDir>/test-setup.js'],
   globals: {
@@ -11,7 +11,7 @@ module.exports = {
     __DEV__: true,
     __TEST__: true,
   },
-  coverageDirectory: '../../coverage/libs/ng-lib',
+  coverageDirectory: '../../coverage/packages/angular',
   coverageReporters: [['lcov', { projectRoot: './' }]],
   snapshotSerializers: [
     'jest-preset-angular/build/serializers/no-ng-attributes',

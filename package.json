@@ -38,8 +38,8 @@
     "help": "nx help",
     "build-tools": "tsc --build ./tools/tsconfig.tools.json",
     "bench": "tsc --build ./benchmarks/tsconfig.json --clean && tsc --build ./benchmarks/tsconfig.json  && node --expose-gc ./benchmarks/out/benchmarks/bench.js",
-    "build-all": "nx build kairo && nx build react-lib && nx build vue-lib && nx build solid-lib && nx build svelte-lib && nx build preact-lib",
-    "publish-all": "npm publish dist/libs/kairo --access public && npm publish dist/libs/react-lib --access public && npm publish dist/libs/vue-lib --access public && npm publish dist/libs/solid-lib --access public && npm publish dist/libs/svelte-lib --access public && npm publish dist/libs/preact-lib --access public"
+    "build-all": "nx build kairo && nx build react && nx build vue&& nx build solid&& nx build svelte&& nx build preact",
+    "publish-all": "npm publish dist/packages/kairo --access public && npm publish dist/packages/react --access public && npm publish dist/packages/vue --access public && npm publish dist/packages/solid --access public && npm publish dist/packages/svelte --access public && npm publish dist/packages/preact --access public"
   },
   "private": true,
   "dependencies": {

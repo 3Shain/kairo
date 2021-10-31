@@ -18,13 +18,13 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "kairo": ["libs/kairo/src/index.ts"],
-      "@kairo/angular": ["libs/ng-lib/src/index.ts"],
-      "@kairo/react": ["libs/react-lib/src/index.ts"],
-      "@kairo/vue": ["libs/vue-lib/src/index.ts"],
-      "@kairo/solid": ["libs/solid-lib/src/index.ts"],
-      "@kairo/svelte": ["libs/svelte-lib/src/index.ts"],
-      "@kairo/preact": ["libs/preact-lib/src/index.ts"]
+      "kairo": ["packages/kairo/src/index.ts"],
+      "@kairo/angular": ["packages/angular/src/index.ts"],
+      "@kairo/react": ["packages/react/src/index.ts"],
+      "@kairo/vue": ["packages/vue/src/index.ts"],
+      "@kairo/solid": ["packages/solid/src/index.ts"],
+      "@kairo/svelte": ["packages/svelte/src/index.ts"],
+      "@kairo/preact": ["packages/preact/src/index.ts"]
     }
   },
   "include": ["**/*.d.ts"],

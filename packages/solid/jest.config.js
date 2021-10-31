@@ -1,11 +1,11 @@
 module.exports = {
-  displayName: 'solid-lib',
+  displayName: 'solid',
   preset: '../../jest.preset.js',
   transform: {
     '^.+\\.tsx?$': ['ts-jest'],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  coverageDirectory: '../../coverage/libs/solid-lib',
+  coverageDirectory: '../../coverage/packages/solid',
   coverageReporters: [['lcov', { projectRoot: './' }]],
   globals: {
     'ts-jest': {
