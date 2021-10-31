@@ -56,6 +56,6 @@ describe('context', () => {
   it('should throw if not found', () => {
     expect(() => {
       new Context().build(testConcern5);
-    }).toThrow(ReferenceError);
+    }).toThrow(IdentifierNotFoundError);
   });
 });

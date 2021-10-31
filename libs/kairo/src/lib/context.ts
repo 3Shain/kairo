@@ -126,13 +126,6 @@ function reduceConcerns(concerns: Concerns): Concern {
         const concernExport = concern() ?? {};
         Object.assign(exports, concernExport);
         context = context.inherit(concernExport as any);
-      } catch (e) {
-        if (e instanceof IdentifierNotFoundError) {
-          throw new ReferenceError(
-            `Concern [${concern.name}] requires "${e.identifier.description}" but it's not defined.`
-          );
-        }
-        throw e;
       } finally {
         exitContext();
       }
