@@ -1,11 +1,5 @@
 import { from, Observable } from 'rxjs';
-import {
-  computed,
-  mutable,
-  Cell,
-  combined,
-  IncrementalReaction,
-} from './cell';
+import { computed, mutable, Cell, combined, IncrementalReaction } from './cell';
 import { batch, BitFlags, Memo, untrack } from './internal';
 import {
   effect,
@@ -26,9 +20,9 @@ describe('cell', () => {
 
   it('normal', () => {
     const [a, ma] = mutable(0);
-    const b = computed(() => a.$);
+    const b = computed(($) => $(a));
     let g = 0;
-    effect(() => (g = b.$));
+    effect(($) => (g = $(b)));
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(1);
     expect(countSources(b)).toBe(1);
@@ -38,7 +32,7 @@ describe('cell', () => {
 
   it('eager evaluate', () => {
     const [a, ma] = mutable(0);
-    const b = computed(() => a.$);
+    const b = computed(($) => $(a));
     b.current;
     expect(countObservers(a)).toBe(1);
     expect(countSources(b)).toBe(1);
@@ -49,20 +43,20 @@ describe('cell', () => {
   });
 
   it('self reference should throw', () => {
-    const a = computed(() => {
-      a.$;
+    const a = computed(($) => {
+      $(a);
       return 1;
     });
     expect(() => a.current).toThrow(ReferenceError);
   });
 
   it('circular reference should throw', () => {
-    const a = computed(() => {
-      b.$;
+    const a = computed(($) => {
+      $(b);
       return 1;
     });
-    const b = computed(() => {
-      a.$;
+    const b = computed(($) => {
+      $(a);
       return 1;
     });
     expect(() => a.current).toThrow(ReferenceError);
@@ -70,11 +64,11 @@ describe('cell', () => {
   });
 
   it('circular reference should throw (ref)', () => {
-    const a = computed(() => {
-      b.$;
+    const a = computed(($) => {
+      $(b);
       return 1;
     });
-    const b = computed(() => {
+    const b = computed(($) => {
       a.current;
       return 1;
     });
@@ -86,13 +80,13 @@ describe('cell', () => {
     const [a, ma] = mutable(0);
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
-    const d = computed(() => {
-      if (a.$) {
-        b.$, c.$;
+    const d = computed(($) => {
+      if ($(a)) {
+        $(b), $(c);
       }
       return 1;
     });
-    effect(() => d.$);
+    effect(($) => $(d));
     expect(countSources(d)).toBe(1);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(0);
@@ -113,15 +107,15 @@ describe('cell', () => {
     const [a, ma] = mutable(0);
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
-    const d = computed(() => {
-      if ((a.$, a.$)) {
-        b.$, c.$;
+    const d = computed(($) => {
+      if (($(a), $(a))) {
+        $(b), $(c);
       } else {
-        c.$, b.$;
+        $(c), $(b);
       }
       return 1;
     });
-    effect(() => d.$);
+    effect(($) => $(d));
     expect(countSources(d)).toBe(3);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(1);
@@ -141,18 +135,18 @@ describe('cell', () => {
   it('unstable 3', () => {
     const [a, ma] = mutable(0);
     const b = Cell.of(0);
-    const c = computed(() => a.$ + b.$);
-    const e = computed(() => c.$);
-    const d = computed(() => {
-      if (a.$) {
-        b.$;
+    const c = computed(($) => $(a) + $(b));
+    const e = computed(($) => $(c));
+    const d = computed(($) => {
+      if ($(a)) {
+        $(b);
       } else {
-        e.$;
+        $(e);
       }
       return 1;
     });
-    effect(() => c.$);
-    effect(() => d.$);
+    effect(($) => $(c));
+    effect(($) => $(d));
     // expect(countSources(d)).toBe(3);
     // expect(countObservers(a)).toBe(1);
     // expect(countObservers(b)).toBe(1);
@@ -173,14 +167,14 @@ describe('cell', () => {
     const p = new Error('Stub');
     const [a, ma] = mutable(0);
     const b = Cell.of(0);
-    const c = computed(() => {
-      a.$, b.$;
+    const c = computed(($) => {
+      $(a), $(b);
       throw p;
     });
 
-    effect(() => {
+    effect(($) => {
       try {
-        c.$;
+        $(c);
       } catch (e) {
         expect(e).toBe(p);
       }
@@ -192,14 +186,14 @@ describe('cell', () => {
   it('self-destroying computation?', () => {
     let closure = 1;
     const [a, ma] = mutable(0);
-    const b = computed(() => {
+    const b = computed(($) => {
       if (closure) {
-        a.$;
+        $(a);
       }
       return 1;
     });
 
-    effect(() => b.$);
+    effect(($) => $(b));
     ma(1);
     closure = 0;
     ma(0);
@@ -211,14 +205,14 @@ describe('cell', () => {
   it('unchanged computed', () => {
     const [a, ma] = mutable(0);
     const p = Math.random();
-    const b = computed(() => {
-      a.$;
+    const b = computed(($) => {
+      $(a);
       return p;
     });
-    const c = computed(() => b.$);
+    const c = computed(($) => $(b));
 
-    effect(() => {
-      expect(c.$).toBe(p);
+    effect(($) => {
+      expect($(c)).toBe(p);
     });
     ma(1);
     ma(2);
@@ -228,13 +222,13 @@ describe('cell', () => {
     const [a, ma] = mutable(0);
     const [b, mb] = mutable(0);
     const [c, mc] = mutable(0);
-    const d = computed(() => {
-      if (a.$) {
-        b.$, untrack(() => c.current);
+    const d = computed(($) => {
+      if ($(a)) {
+        $(b), untrack(() => c.current);
       }
       return 1;
     });
-    effect(() => d.$);
+    effect(($) => $(d));
     expect(countSources(d)).toBe(1);
     expect(countObservers(a)).toBe(1);
     expect(countObservers(b)).toBe(0);
@@ -271,9 +265,9 @@ describe('cell', () => {
     it('interop observable (error)', () => {
       const num = Math.random();
       const [a, ma] = mutable(0);
-      const b = computed(() => {
-        if (a.$) {
-          throw a.$;
+      const b = computed(($) => {
+        if ($(a)) {
+          throw $(a);
         }
         return 0;
       });
@@ -323,10 +317,10 @@ describe('cell', () => {
   describe('batch()', () => {
     it('internal mutation work as it is', () => {
       const [a, ma] = mutable(0);
-      const b = computed(() => a.$);
+      const b = computed(($) => $(a));
 
       let g = 0;
-      effect(() => (g = b.$));
+      effect(($) => (g = $(b)));
 
       batch(() => {
         ma(1);
@@ -346,13 +340,13 @@ describe('cell', () => {
       const [b, mb] = mutable(0);
       const fn = jest.fn();
       const reaction = new IncrementalReaction(fn);
-      reaction.track(() => a.$);
+      reaction.track(($) => $(a));
       ma(1);
       mb(1);
       expect(fn).toBeCalledTimes(1);
-      reaction.continue(() => (a.$, b.$));
-      ma(1);
-      mb(1);
+      reaction.continue(($) => ($(a), $(b)));
+      ma(2);
+      mb(2);
       expect(fn).toBeCalledTimes(3);
       reaction.dispose();
       ma(1);

@@ -1,6 +1,6 @@
 import type { RunnableGenerator } from './concurrency/types';
 import { Cleanable, TeardownLogic } from './types';
-import { doCleanup } from './misc';
+import { doCleanup, identity } from './misc';
 import { __fulfill, TaskSuspended } from './concurrency/task';
 
 interface SubscriptionNode {
@@ -104,20 +104,28 @@ export class EventStream<T> {
 
   filter(filterFn: (value: T) => boolean) {
     return new EventStream<T>((next) => {
-      return this.__internal_subscribe((v) => filterFn(v) ?? next(v));
+      return this.__internal_subscribe((v) => {
+        if (filterFn(v)) {
+          next(v);
+        }
+      });
     });
   }
 
-  static create<T>(): [EventStream<T>, (payload: T) => void] {
+  static create<T, S = T>(
+    transformer: (value: S) => T = identity as any
+  ): [EventStream<T>, (payload: S) => void] {
     const stream = new EventStream<T>(() => {
       return () => {};
     });
-    return [stream, (payload: T) => stream.next(payload)];
+    return [stream, (payload: S) => stream.next(transformer(payload))];
   }
 }
 
-export function stream<T = any>() {
-  return EventStream.create<T>();
+export function stream<T = any, S = T>(
+  transformer: (value: S) => T = identity as any
+) {
+  return EventStream.create<T, S>(transformer);
 }
 
 export function never<T = never>() {

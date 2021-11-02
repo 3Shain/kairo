@@ -10,7 +10,7 @@ export function cleanup() {
   toCleanup.length = 0;
 }
 
-export function effect(fn: () => any) {
+export function effect(fn: ($:Function) => any) {
   const callback = () => {
     r.track(fn);
   };

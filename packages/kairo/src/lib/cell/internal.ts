@@ -34,6 +34,7 @@ interface Data<T = unknown> {
   flags: BitFlags;
   lo: ObserverLinked<Memo> | null;
   value: T | null;
+  cp: (a: any, b: any) => boolean;
 }
 interface Memo<T = unknown> extends Data<T> {
   dc: number;
@@ -70,6 +71,9 @@ function setData<T>(data: Data<T>, value: T): void {
   if (!ct) {
     return batch(() => setData(data, value));
   }
+  /* istanbul ignore if: noop */ if (data.cp(data.value, value)) {
+    return;
+  }
   data.value = value;
   if (data.flags & BitFlags.Changed) {
     return;
@@ -84,37 +88,7 @@ function setData<T>(data: Data<T>, value: T): void {
  * @returns current value, or previous value if circularly referenced
  * @throws User-land errors, DEFER_COMPUTATION
  */
-function accessValue<T>(data: Data<T>): T {
-  if (data.flags & BitFlags.Estimating) {
-    /**
-     * In fact we could allow circular referencing, by returning the latest value.
-     * However this causes a memo node to _hold a state_.
-     * Thus a memo expression is _impure_: same inputs, changed result.
-     */
-    throw new ReferenceError('A circular reference occurred.'); // [EXIT 5]
-  }
-  // if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
-  //   ct.flush();
-  // }
-  if (ctx_cc !== null) {
-    logDependency(data);
-    // if propagating and current are still markForCheck
-    if (data.flags & BitFlags.MarkForCheck) {
-      // currently if MarkForCheck it must be in propagate phase
-      throw DEFER_COMPUTATION; // [EXIT 4]
-    }
-  }
-  if (data.flags & BitFlags.StaleMemo) {
-    data.flags &= ~BitFlags.StaleMemo;
-    estimate(data); // maybe [EXIT 3]
-  }
-  if (data.flags & BitFlags.HasError) {
-    throw data.value; // [EXIT 2]
-  }
-  return data.value!; // current value [EXIT 1]
-}
-
-export function accessRefValue<T>(data: Data<T>): T {
+function accessValue<T>(data: Data<T>, readDeps: boolean): T {
   if (data.flags & BitFlags.Estimating) {
     /**
      * In fact we could allow circular referencing, by returning the latest value.
@@ -125,6 +99,14 @@ export function accessRefValue<T>(data: Data<T>): T {
   }
   if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
     ct.flush();
+  }
+  if (readDeps && ctx_cc !== null) {
+    logDependency(data);
+    // if propagating and current are still markForCheck
+    if (data.flags & BitFlags.MarkForCheck) {
+      // currently if MarkForCheck it must be in propagate phase
+      throw DEFER_COMPUTATION; // [EXIT 4]
+    }
   }
   if (data.flags & BitFlags.StaleMemo) {
     data.flags &= ~BitFlags.StaleMemo;
@@ -334,7 +316,7 @@ function propagate(stack: Data[]): void {
               const currentValue = evaluate(observer, observer.c, null);
               // compare value , if changed, mark as changed
               if (
-                currentValue !== observer.value ||
+                !observer.cp(currentValue, observer.value) ||
                 observer.flags & BitFlags.HasError
               ) {
                 observer.flags &= ~BitFlags.HasError;
@@ -465,8 +447,9 @@ function insertNewObserver(source: Data, observer: Memo): ObserverLinked<Memo> {
 function createReaction(onCommit: () => void): Reaction {
   return {
     flags: BitFlags.Effect,
-    lo: null,
-    value: null,
+    lo: null, // never used
+    value: null, // never used
+    cp: null!, // never used
     dc: 0,
     fs: null,
     ls: null,
@@ -482,19 +465,27 @@ function executeReaction<T>(reaction: Reaction, fn: () => T) {
   return evaluate(reaction, fn, null);
 }
 
-function createData<T>(value: T): Data<T> {
+function createData<T>(
+  value: T,
+  comp: (a: T, b: T) => boolean = Object.is
+): Data<T> {
   return {
     flags: BitFlags.Data,
     lo: null,
     value: value,
+    cp: comp,
   };
 }
 
-function createMemo<T>(fn: () => T): Memo<T> {
+function createMemo<T>(
+  fn: () => T,
+  comp: (a: T, b: T) => boolean = Object.is
+): Memo<T> {
   return {
     flags: BitFlags.Memo | BitFlags.StaleMemo,
     lo: null,
     value: null!,
+    cp: comp,
     dc: 0,
     fs: null,
     ls: null,

@@ -1,9 +1,6 @@
 import { suspended } from './suspense';
 import { computed, mutable as mut } from './cell';
-import {
-  effect,
-  cleanup,
-} from './spec-shared';
+import { effect, cleanup } from './spec-shared';
 
 describe('cell/suspense', () => {
   const SHARED_FALLBACK = {};
@@ -11,12 +8,12 @@ describe('cell/suspense', () => {
   it('should throw if failed', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    effect(() => {
+    const c = suspended(($) => s.read($(a)), {
+      fallback: SHARED_FALLBACK,
+    });
+    effect(($) => {
       try {
-        c.$;
+        $(c);
       } catch {}
     });
     expect(c.current).toBe(SHARED_FALLBACK);
@@ -31,15 +28,18 @@ describe('cell/suspense', () => {
   it('should be able to cascade', async () => {
     const [a, ma] = mut(0);
     const s = mockFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
-    }, undefined);
-    const d = suspended(() => {
-      return c.read();
-    }, SHARED_FALLBACK);
-    const e = computed(() => c.$);
-    effect(() => d.$);
-    effect(() => e.$);
+    const c = suspended(($) => s.read($(a)), undefined);
+    const d = suspended(
+      ($) => {
+        return $.read(c);
+      },
+      {
+        fallback: SHARED_FALLBACK,
+      }
+    );
+    const e = computed(($) => $(c));
+    effect(($) => $(d));
+    effect(($) => $(e));
     expect(d.current).toBe(SHARED_FALLBACK);
     expect(e.current).toBe(undefined);
     await delay(10);
@@ -56,21 +56,26 @@ describe('cell/suspense', () => {
   it('should be able to propagate error', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
+    const c = suspended(($) => {
+      return s.read($(a));
     }, undefined);
-    const d = suspended(() => {
-      return c.read();
-    }, SHARED_FALLBACK);
-    const e = computed(() => c.$);
-    effect(() => {
+    const d = suspended(
+      ($) => {
+        return $.read(c);
+      },
+      {
+        fallback: SHARED_FALLBACK,
+      }
+    );
+    const e = computed(($) => $(c));
+    effect(($) => {
       try {
-        d.$;
+        $(d);
       } catch {}
     });
-    effect(() => {
+    effect(($) => {
       try {
-        e.$;
+        $(e);
       } catch {}
     });
     expect(d.current).toBe(SHARED_FALLBACK);
@@ -89,20 +94,30 @@ describe('cell/suspense', () => {
   it('should batch if shared', async () => {
     const [a, ma] = mut(0);
     const s = mockSharedFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    const d = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    const e = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    const f = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
+    const c = suspended(
+      ($) => {
+        return s.read($(a));
+      },
+      {
+        fallback: SHARED_FALLBACK,
+      }
+    );
+    const d = suspended(($) => s.read($(a)), {
+      fallback: SHARED_FALLBACK,
+    });
+    const e = suspended(($) => s.read($(a)), {
+      fallback: SHARED_FALLBACK,
+    });
+    const f = suspended(
+      ($) => {
+        return s.read($(a));
+      },
+      {
+        fallback: SHARED_FALLBACK,
+      }
+    );
     const fn = jest.fn();
-    effect(() => (c.$, d.$, e.$, f.$, fn()));
+    effect(($) => ($(c), $(d), $(e), $(f), fn()));
     expect(fn).toBeCalledTimes(1);
     expect(c.current).toBe(SHARED_FALLBACK);
     await delay(10);
@@ -119,12 +134,17 @@ describe('cell/suspense', () => {
   it('should ignore stale promise', async () => {
     const [a, ma] = mut(0);
     const s = mockFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    effect(() => {
+    const c = suspended(
+      ($) => {
+        return s.read($(a));
+      },
+      {
+        fallback: SHARED_FALLBACK,
+      }
+    );
+    effect(($) => {
       try {
-        c.$;
+        $(c);
       } catch {}
     });
     expect(c.current).toBe(SHARED_FALLBACK);
@@ -137,12 +157,12 @@ describe('cell/suspense', () => {
   it('should ignore stale error promise', async () => {
     const [a, ma] = mut(0);
     const s = mockFailedFetch();
-    const c = suspended(() => {
-      return s.read(a.$);
-    }, SHARED_FALLBACK);
-    effect(() => {
+    const c = suspended(($) => s.read($(a)), {
+      fallback: SHARED_FALLBACK,
+    });
+    effect(($) => {
       try {
-        c.$;
+        $(c);
       } catch {}
     });
     expect(c.current).toBe(SHARED_FALLBACK);

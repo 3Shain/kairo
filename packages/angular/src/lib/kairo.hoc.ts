@@ -144,7 +144,7 @@ export function WithKairo() {
             }
             const syncChanges = () => {
               for (let [key, cell] of cells) {
-                this[key] = cell.$;
+                this[key] = Cell.track(cell);
               }
             };
             const r = new Reaction(() => {

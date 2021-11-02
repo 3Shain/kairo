@@ -7,7 +7,6 @@ import {
 } from '../types';
 import {
   accessValue,
-  accessRefValue,
   cleanupMemo,
   createMemo,
   createReaction,
@@ -16,6 +15,7 @@ import {
   executeReaction,
   Reaction as _Reaction,
   setData,
+  untrack,
 } from './internal';
 
 export class Cell<T> {
@@ -23,14 +23,14 @@ export class Cell<T> {
     return new Cell(createData(initial));
   }
 
-  constructor(protected internal: Data<T>) {}
-
-  get $(): T {
-    return accessValue(this.internal);
+  static track<T>(cell: Cell<T>) {
+    return accessValue(cell.internal, true);
   }
 
+  constructor(protected internal: Data<T>) {}
+
   get current(): T {
-    return accessRefValue(this.internal);
+    return accessValue(this.internal, false);
   }
 
   [Symbol_observable]() {
@@ -38,6 +38,10 @@ export class Cell<T> {
   }
 
   [Symbol.toStringTag] = 'Cell';
+
+  map<R>(fn: (value: T) => R): Cell<R> {
+    return computed(() => untrack(fn, accessValue(this.internal, true)));
+  }
 
   /**
    * @deprecated Should be only used for interop.
@@ -64,7 +68,7 @@ export class Cell<T> {
         }
       });
       observer.next(this.current);
-      reaction.track(() => this.$);
+      reaction.track(() => accessValue(this.internal, true));
       return () => reaction.dispose();
     }).subscribe(...params);
   }
@@ -85,7 +89,7 @@ interface SubscriptionObserver<T> {
 
   complete: () => void;
 
-  get closed(): Boolean;
+  readonly closed: boolean;
 }
 
 declare var Observable: ObservableConstructor;
@@ -103,8 +107,8 @@ export class Reaction {
    * @returns return value of `program`
    * @throws User-land errors in program()
    */
-  track<T>(program: () => T) {
-    return executeReaction<T>(this.internal, program);
+  track<T>(program: ($: typeof Cell.track) => T) {
+    return executeReaction<T>(this.internal, () => program(Cell.track));
   }
 
   dispose() {
@@ -119,17 +123,16 @@ export class IncrementalReaction {
     this.internal = createReaction(callback);
   }
 
-  track<T>(program: () => T) {
-    return executeReaction<T>(this.internal, program);
+  track<T>(program: ($: typeof Cell.track) => T) {
+    return executeReaction<T>(this.internal, () => program(Cell.track));
   }
 
-  continue<T>(program: () => T) {
-    const reaction = this.internal;
+  continue<T>(program: ($: typeof Cell.track) => T) {
     return executeReaction<T>(this.internal, () => {
       for (const x of this.getHistoryReads()) {
-        accessValue(x);
+        accessValue(x, true);
       }
-      return program();
+      return program(Cell.track);
     });
   }
 
@@ -147,12 +150,15 @@ export class IncrementalReaction {
 }
 
 export function mutable<T>(
-  initialValue: T
+  initialValue: T,
+  options?: {
+    comparator: (a: T, b: T) => boolean;
+  }
 ): [
   Cell<T>,
   (value: (T extends Function ? never : T) | ((current: T) => T)) => void
 ] {
-  const internal = createData(initialValue);
+  const internal = createData(initialValue, options?.comparator);
   return [
     new Cell(internal),
     (v) => {
@@ -165,11 +171,14 @@ export function mutable<T>(
   ];
 }
 
-export function computed<T>(expr: () => T): Cell<T> {
-  return new Cell(createMemo(expr));
+export function computed<T>(
+  expr: ($: typeof Cell.track) => T,
+  options?: {
+    comparator: (a: T, b: T) => boolean;
+  }
+): Cell<T> {
+  return new Cell(createMemo(() => expr(Cell.track), options?.comparator));
 }
-
-const getAndTrackCellValue = <T>(x: Cell<T>) => x.$;
 
 type Unwrap<T> = {
   [Key in keyof T]: T[Key] extends Cell<infer CellType> ? CellType : T[Key];
@@ -184,7 +193,7 @@ export function combined<TObject extends object>(
 export function combined(obj: any) {
   if (obj instanceof Array) {
     const elementMap = obj.map((item) =>
-      item instanceof Cell ? getAndTrackCellValue : identity
+      item instanceof Cell ? Cell.track : identity
     );
     return computed(() => elementMap.map((x, i) => x(obj[i])));
   } /* istanbul ignore else: simple */ else if (
@@ -194,7 +203,7 @@ export function combined(obj: any) {
     const entryMap = Object.entries(obj).map(
       ([key, value]) =>
         (value instanceof Cell
-          ? [key, getAndTrackCellValue, value]
+          ? [key, Cell.track, value]
           : [key, identity, value]) as [string, Function, any]
     );
     return computed(() =>

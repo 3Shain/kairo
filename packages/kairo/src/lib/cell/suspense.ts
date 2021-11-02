@@ -9,23 +9,38 @@ import {
   __current_transaction,
 } from './internal';
 
+export type SuspendedCellOptions<T, F> = {
+  fallback: F;
+  comparator: (a: T, b: T) => boolean;
+  keepPrevious: boolean;
+};
+
 export class SuspendedCell<T, F> extends Cell<T | F> {
   private isSuspending = false;
 
+
+  static read<T, F>(cell: SuspendedCell<T, F>): T {
+    const value = accessValue(cell.internal, true);
+    if (cell.isSuspending) {
+      throw DEFER_SUSPENSION;
+    }
+    return value as T;
+  }
+
   [Symbol.toStringTag] = 'SuspendedCell';
 
-  constructor(expr: () => T, fallback: F) {
+  constructor(expr: () => T, options?: Partial<SuspendedCellOptions<T, F>>) {
     super(
       createMemo(() => {
         try {
-          accessValue(notifier);
+          accessValue(notifier, true);
           this.isSuspending = true;
           const value = expr();
           this.isSuspending = false;
           return value;
         } catch (e) {
           if (DEFER_SUSPENSION === e) {
-            return fallback;
+            return keepPrevious ? this.internal.value : fallback;
           }
           if (e instanceof Promise) {
             e.then(
@@ -52,28 +67,29 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
               }
             );
             awaiting = e;
-            return fallback;
+            return keepPrevious ? this.internal.value : fallback;
           }
           this.isSuspending = false; // throw user-land error, or DEFER_COMPUTATION
           throw e;
         }
-      })
+      }, options?.comparator)
     );
     let awaiting: Promise<any> | null = null;
     const notifier = createData(0);
-  }
-
-  read(): T {
-    const value = accessValue(this.internal);
-    if (this.isSuspending) {
-      throw DEFER_SUSPENSION;
-    }
-    return value as T;
+    const fallback = options?.fallback as any;
+    const keepPrevious = options?.keepPrevious === true;
   }
 }
 
-export function suspended<T, F = undefined>(expr: () => T, fallback?: F) {
-  return new SuspendedCell(expr, fallback);
+(Cell.track as any).read = SuspendedCell.read;
+
+type SuspendedTrack = typeof Cell.track & { read: typeof SuspendedCell.read };
+
+export function suspended<T, F = undefined>(
+  expr: ($: SuspendedTrack) => T,
+  options?: Partial<SuspendedCellOptions<T, F>>
+) {
+  return new SuspendedCell(() => expr(Cell.track as any), options);
 }
 
 const DEFER_SUSPENSION = {
