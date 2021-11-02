@@ -120,30 +120,30 @@ export const Case1 = withKairo<{
     setCount((x) => x + 1);
   };
 
-  const doubled = computed(() => count.$ * 2);
+  const doubled = computed(($) => $(count) * 2);
 
-  return ({ viewProp, viewPropChanged }) => {
+  return ($, { viewProp, viewPropChanged }) => {
     useEffect(() => viewPropChanged(), [viewProp]);
     return (
       <div>
         <p ref={_para.bind}>{viewProp}</p>
-        <button onClick={add}>{count.$}</button>
-        <h1>{freeCell.$}</h1>
-        <Case1Child count={doubled.$} />
+        <button onClick={add}>{$(count)}</button>
+        <h1>{$(freeCell)}</h1>
+        <Case1Child count={$(doubled)} />
       </div>
     );
   };
 });
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return (vp) => {
-    useEffect(()=>{
+  return (_, vp) => {
+    useEffect(() => {
       setFreeCell(1);
-    }, [])
+    }, []);
     return <span>{vp.count}</span>;
-  }
+  };
 });
 
 const Case2 = forwardRef<{}, HTMLDivElement>(() => {
-  return (_, ref) => <div ref={ref}>TARGET</div>;
+  return (_, __, ref) => <div ref={ref}>TARGET</div>;
 });

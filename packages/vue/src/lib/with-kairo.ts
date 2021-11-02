@@ -25,9 +25,9 @@ Object.defineProperty(Cell.prototype, '__v_isRef', {
   value: true,
 });
 Object.defineProperty(Cell.prototype, 'value', {
-  get: function (this:Cell<any>) {
-    return this.$;
-  }
+  get: function (this: Cell<any>) {
+    return Cell.track(this);
+  },
 });
 
 export function useScopeController(scope: LifecycleScope) {
@@ -59,13 +59,16 @@ export function useScopeController(scope: LifecycleScope) {
 }
 
 export function withKairo<Props>(
-  component: (props: Props, ctx: SetupContext) => (props: Props) => VNodeChild
+  component: (
+    props: Props,
+    ctx: SetupContext
+  ) => (track: typeof Cell.track, props: Props) => VNodeChild
 ) {
   return patchComponent(
     defineComponent<Props>((props, ctx) => {
       const renderFn = component(props, ctx);
       return (() => {
-        return renderFn({ ...props });
+        return renderFn(Cell.track, { ...props });
       }) as RenderFunction;
     })
   );
@@ -85,7 +88,9 @@ export function patchComponent<T extends DefineComponent>(component: T) {
       const exitContext = context.runInContext();
       try {
         const bindings = setup(props, setupContext);
-        /* istanbul ignore if: unexpected use cases */if (bindings instanceof Promise) {
+        /* istanbul ignore if: unexpected use cases */ if (
+          bindings instanceof Promise
+        ) {
           throw Error('Async component is not supported.');
         }
         const tracker = ref(0);

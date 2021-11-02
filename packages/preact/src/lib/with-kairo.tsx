@@ -1,9 +1,4 @@
-import {
-  lifecycle,
-  Reaction,
-  collectScope,
-  LifecycleScope,
-} from 'kairo';
+import { lifecycle, Reaction, collectScope, LifecycleScope, Cell } from 'kairo';
 import {
   useContext,
   useEffect,
@@ -13,36 +8,37 @@ import {
   useState,
 } from 'preact/compat';
 import { h } from 'preact';
-import type { FunctionComponent } from 'preact';
+import type { FunctionComponent, RenderableProps, VNode, Ref } from 'preact';
 import type { ForwardFn } from 'preact/compat';
 import { KairoContext } from './context';
 
-type ForwardRefRenderFunction<R, T> = ForwardFn<T, R>;
+type Render<T> = (
+  track: typeof Cell.track,
+  props: RenderableProps<T>
+) => VNode<any> | null;
+type RenderWithRef<R, T> = (
+  track: typeof Cell.track,
+  props: RenderableProps<T>,
+  ref: Ref<R>
+) => VNode<any> | null;
 
-export function withKairo<Props>(
-  setup: (props: Props) => FunctionComponent<Props>
-) {
+export function withKairo<Props>(setup: (props: Props) => Render<Props>) {
   const component: FunctionComponent<Props> = (props) => {
     const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderReaction.track(() => renderFunction(props));
+    return renderReaction.track(($) => renderFunction($, props));
   };
   component.displayName = setup.name;
   return component;
 }
 
 export function forwardRef<Props, Ref>(
-  setup: (props: Props) => ForwardRefRenderFunction<Ref, Props>
+  setup: (props: Props) => RenderWithRef<Ref, Props>
 ) {
-  const component: ForwardRefRenderFunction<Ref, Props> = (props, ref) => {
-    const { renderFunction, renderReaction } = useKairoComponent(
-      props,
-      setup as (props: Props) => FunctionComponent<Props>
-    );
+  const component: ForwardFn<Props, Ref> = (props, ref) => {
+    const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
-    return renderReaction.track(() =>
-      (renderFunction as ForwardRefRenderFunction<Ref, Props>)(props, ref)
-    );
+    return renderReaction.track(($) => renderFunction($, props, ref));
   };
   component.displayName = setup.name;
   return reactForwardRef(component);
@@ -50,16 +46,16 @@ export function forwardRef<Props, Ref>(
 
 const inc = (x: number) => x + 1;
 
-function useKairoComponent<Props>(
+function useKairoComponent<Props, Render>(
   props: Props,
-  setup: (props: Props) => FunctionComponent<Props>
+  setup: (props: Props) => Render
 ) {
   const parentContext = useContext(KairoContext);
   const [, forceUpdate] = useState(0);
   const instance = useMemo(() => {
     const exitScope = collectScope();
     const exitContext = parentContext.runInContext();
-    let renderFunction: FunctionComponent<Props>;
+    let renderFunction: Render;
     let scope: LifecycleScope;
     let didMounted = false,
       didUpdateBeforeMounted = false;

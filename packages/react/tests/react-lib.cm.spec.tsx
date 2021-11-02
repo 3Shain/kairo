@@ -187,6 +187,19 @@ describe('@kairo/react in concurrent mode', () => {
     expect(appClean).toBeCalledTimes(2);
   });
 
+  it('CM API forwardRef', () => {
+    const ref = {
+      current: null as HTMLDivElement,
+    };
+
+    const w = render(<Case2CM ref={ref} />);
+
+    expect(ref.current).toHaveTextContent('TARGET');
+
+    w.unmount();
+  });
+
+
   afterAll(() => {
     cleanup();
   });
@@ -215,23 +228,23 @@ export const Case1 = withKairo<{
     setCount((x) => x + 1);
   };
 
-  const doubled = computed(() => count.$ * 2);
+  const doubled = computed(($) => $(count) * 2);
 
-  return ({ viewProp, viewPropChanged }) => {
+  return ($, { viewProp, viewPropChanged }) => {
     useEffect(() => viewPropChanged(), [viewProp]);
     return (
       <div>
         <p ref={_para.bind}>{viewProp}</p>
-        <button onClick={add}>{count.$}</button>
-        <h1>{freeCell.$}</h1>
-        <Case1Child count={doubled.$} />
+        <button onClick={add}>{$(count)}</button>
+        <h1>{$(freeCell)}</h1>
+        <Case1Child count={$(doubled)} />
       </div>
     );
   };
 });
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return ({ count }) => {
+  return (_, { count }) => {
     useEffect(() => {
       setFreeCell(1);
     }, []);
@@ -240,7 +253,7 @@ const Case1Child = withKairo<{ count: number }>(() => {
 });
 
 const Case2 = forwardRef<{}, HTMLDivElement>(() => {
-  return (_, ref) => <div ref={ref}>TARGET</div>;
+  return (_, __, ref) => <div ref={ref}>TARGET</div>;
 });
 
 export const Case1CM = ConcurrentMode.withKairo<{
@@ -265,9 +278,9 @@ export const Case1CM = ConcurrentMode.withKairo<{
     setCount((x) => x + 1);
   };
 
-  const doubled = computed(() => count.$ * 2);
+  const doubled = computed(($) => $(count) * 2);
 
-  return ({ viewProp, viewPropChanged, useCell }) => {
+  return (useCell, { viewProp, viewPropChanged }) => {
     useEffect(() => viewPropChanged(), [viewProp]);
     const count_ = useCell(count);
     const freeCell_ = useCell(freeCell);
@@ -281,5 +294,14 @@ export const Case1CM = ConcurrentMode.withKairo<{
         <Case1Child count={doubled_} />
       </div>
     );
+  };
+});
+
+const Case2CM = ConcurrentMode.forwardRef<{}, HTMLDivElement>(() => {
+  return (useCell, __, ref) => {
+
+    useCell(freeCell);
+
+    return <div ref={ref}>TARGET</div>
   };
 });

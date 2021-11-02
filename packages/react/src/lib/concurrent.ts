@@ -5,81 +5,68 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  forwardRef as reactForwardRef,
 } from 'react';
 import { Cell, collectScope, LifecycleScope, Reaction } from 'kairo';
 import { KairoContext } from './context';
 
-type FunctionComponent<T> = React.FunctionComponent<T>;
-type ForwardRefRenderFunction<R, T> = React.ForwardRefRenderFunction<R, T>;
+type Render<T> = (
+  track: typeof Cell.track,
+  props: React.PropsWithChildren<T>
+) => React.ReactElement<any, any> | null;
+type RenderWithRef<R, T> = (
+  track: typeof Cell.track,
+  props: React.PropsWithChildren<T>,
+  ref: React.ForwardedRef<R>
+) => React.ReactElement<any, any> | null;
 
-function withKairo<Props>(
-  setup: (
-    props: Props
-  ) => FunctionComponent<Props & { useCell: <C>(cell: Cell<C>) => C }>
-) {
+function withKairo<Props>(setup: (props: Props) => Render<Props>) {
   function Component(props: Props) {
     const render = useConcurrentKairoComponent(props, setup);
 
     const useCell = useCallback(<T>(cell: Cell<T>) => {
       const subscribe = useCallback((onChange: () => void) => {
         const reaction = new Reaction(onChange);
-        reaction.track(() => cell.$);
+        reaction.track(($) => $(cell));
         return () => reaction.dispose();
       }, []);
       return useSyncExternalStore(subscribe, () => cell.current);
     }, []);
 
-    return render({
-      ...props,
-      useCell,
-    });
+    return render(useCell, props);
   }
   return Component;
 }
 
-// function forwardRef<Props, Ref>(
-//   setup: (
-//     props: Props
-//   ) => ForwardRefRenderFunction<
-//     Ref,
-//     Props & { useCell: <C>(cell: Cell<C>) => C }
-//   >
-// ) {
-//   function Component(props: Props) {
-//     const render = useConcurrentKairoComponent(props, setup);
+function forwardRef<Props, Ref>(
+  setup: (props: Props) => RenderWithRef<Ref, Props>
+) {
+  function Component(props: Props, ref: React.Ref<Ref>) {
+    const render = useConcurrentKairoComponent(props, setup);
 
-//     const useCell = useCallback(<T>(cell: Cell<T>) => {
-//       const subscribe = useCallback(
-//         (onChange: () => void) => {
-//           const reaction = new Reaction(onChange);
-//           reaction.track(() => cell.$);
-//           return () => reaction.dispose();
-//         },
-//         [cell]
-//       );
-//       const getSnapshot = useCallback(() => cell.current, [cell]);
-//       useSyncExternalStore(subscribe, getSnapshot);
-//     }, []);
+    const useCell = useCallback(<T>(cell: Cell<T>) => {
+      const subscribe = useCallback((onChange: () => void) => {
+        const reaction = new Reaction(onChange);
+        reaction.track(($) => $(cell));
+        return () => reaction.dispose();
+      }, []);
+      return useSyncExternalStore(subscribe, () => cell.current);
+    }, []);
 
-//     return render({
-//       ...props,
-//       useCell,
-//     });
-//   }
-//   return Component;
-// }
+    return render(useCell, props, ref);
+  }
+  return reactForwardRef(Component);
+}
 
-function useConcurrentKairoComponent<Props>(
+function useConcurrentKairoComponent<Props, Render>(
   props: Props,
-  setup: (
-    props: Props
-  ) => FunctionComponent<Props & { useCell: <C>(cell: Cell<C>) => C }>
+  setup: (props: Props) => Render
 ) {
   const parentContext = useContext(KairoContext);
   const [render, scope] = useMemo(() => {
     const exitScope = collectScope();
     const exitContext = parentContext.runInContext();
-    let renderFunction: FunctionComponent<Props>;
+    let renderFunction: Render;
     let scope: LifecycleScope;
     try {
       renderFunction = setup(props);
@@ -97,5 +84,5 @@ function useConcurrentKairoComponent<Props>(
 
 export const ConcurrentMode = {
   withKairo,
-  // forwardRef,
+  forwardRef,
 };

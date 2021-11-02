@@ -2,7 +2,7 @@ import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
 import { withConcern, withKairo } from '../src';
 import { computed, lifecycle, mut, reference } from 'kairo';
-import { createComputed, createSignal } from 'solid-js';
+import { $PROXY, createComputed, createSignal } from 'solid-js';
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {
@@ -74,9 +74,9 @@ export const Case1 = withKairo<{
 
   const [count, setCount] = mut(0);
 
-  const doubled = computed(() => count.$ * 2);
+  const doubled = computed(($) => $(count) * 2);
 
-  return (vp) => {
+  return ($, vp) => {
     createComputed(() => {
       vp.viewProp;
       vp.viewPropChanged();
@@ -89,14 +89,14 @@ export const Case1 = withKairo<{
             setCount(count.current + 1);
           }}
         >
-          {count.$}
+          {$(count)}
         </button>
-        <Case1Child count={doubled.$} />
+        <Case1Child count={$(doubled)} />
       </div>
     );
   };
 });
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return (props) => <span>{props.count}</span>;
+  return (_, props) => <span>{props.count}</span>;
 });

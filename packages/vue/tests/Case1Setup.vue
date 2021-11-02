@@ -37,7 +37,7 @@ watchEffect(() => {
 
 const [count, setCount] = mut(0);
 
-const doubled = computed(() => count.$ * 2);
+const doubled = computed(($) => $(count) * 2);
 
 const onClick = () => {
   setCount(x => x + 1);

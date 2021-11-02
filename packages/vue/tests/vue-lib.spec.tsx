@@ -129,9 +129,9 @@ export const Case1 = withKairo<{
 
   const [count, setCount] = mut(0);
 
-  const doubled = computed(() => count.$ * 2);
+  const doubled = computed(($) => $(count) * 2);
 
-  return (vp) => (
+  return ($, vp) => (
     <div>
       <p ref={bindPara}>{vp.viewProp}</p>
       <button
@@ -139,9 +139,9 @@ export const Case1 = withKairo<{
           setCount((x) => x + 1);
         }}
       >
-        {count.$}
+        {$(count)}
       </button>
-      <Case1Child count={doubled.$} />
+      <Case1Child count={$(doubled)} />
     </div>
   );
 });
@@ -149,7 +149,7 @@ export const Case1 = withKairo<{
 Case1.props = ['initialize', 'clean', 'viewProp', 'viewPropChanged'];
 
 const Case1Child = withKairo<{ count: number }>(() => {
-  return (props) => <span>{props.count}</span>;
+  return (_, props) => <span>{props.count}</span>;
 });
 
 Case1Child.props = ['count'];

@@ -2,71 +2,58 @@ import {
   Component,
   onCleanup,
   getListener,
-  createComponent,
   useContext,
   createSignal,
   runWithOwner,
   getOwner,
   onMount,
   untrack,
+  PropsWithChildren,
 } from 'solid-js';
 import { Cell, collectScope, Reaction } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
 
-
-/**
- * side effects
- * patches prototype
- */
-
-Object.defineProperty(Cell.prototype, '$', {
-  get: createPatch(
-    Object.getOwnPropertyDescriptor(Cell.prototype, '$').get
-  ),
-});
-
-function createPatch(originalGetter: Function) {
-  return function patchedGetter(
-    this: Cell<any> & {
-      signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
+function patchedTrack<T>(
+  cell: Cell<T> & {
+    signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
+  }
+) {
+  if (getListener()) {
+    const { owner } = getListener();
+    if (!cell.signal_ref) {
+      cell.signal_ref = new WeakMap();
     }
-  ) {
-    if (getListener()) {
-      const { owner } = getListener();
-      if (!this.signal_ref) {
-        this.signal_ref = new WeakMap();
-      }
-      const refRead = this.signal_ref.get(owner);
-      if (refRead === undefined) {
-        const update = () => {
-          reaction.track(() =>
-            write(untrack(() => originalGetter.call(this)))
-          );
-        };
-        const reaction = new Reaction(update);
-        const [read, write] = createSignal();
-        update();
-        this.signal_ref.set(owner, read);
-        runWithOwner(owner, () => {
-          onCleanup(() => {
-            reaction.dispose();
-            this.signal_ref.delete(owner);
-          });
+    const refRead = cell.signal_ref.get(owner);
+    if (refRead === undefined) {
+      const update = () => {
+        reaction.track(($) => write(() => untrack(() => $(cell))));
+      };
+      const reaction = new Reaction(update);
+      const [read, write] = createSignal();
+      update();
+      cell.signal_ref.set(owner, read);
+      runWithOwner(owner, () => {
+        onCleanup(() => {
+          reaction.dispose();
+          cell.signal_ref.delete(owner);
         });
-        return read();
-      } else {
-        return refRead();
-      }
+      });
+      return read();
+    } else {
+      return refRead();
     }
-    return originalGetter.call(this);
-  };
+  }
+  return Cell.track(cell);
 }
 
 function withKairo<Props>(
   setup: (
     props: Props
-  ) => Component<Props>
+  ) => (
+    track: typeof Cell.track,
+    props: PropsWithChildren<Props>
+  ) => JSX.Element
 ): Component<Props> {
   return (
     props: Props & {
@@ -77,13 +64,14 @@ function withKairo<Props>(
 
     const exitScope = collectScope();
     const exitContext = context.runInContext();
-    let Component: Component<Props>;
+    let Component: (
+      track: typeof Cell.track,
+      props: PropsWithChildren<Props>
+    ) => JSX.Element;
     try {
-      Component = setup(
-        {
-          ...props,
-        } as any
-      );
+      Component = setup({
+        ...props,
+      } as any);
     } finally {
       exitContext();
       const lifecycle = exitScope();
@@ -93,7 +81,7 @@ function withKairo<Props>(
       });
     }
 
-    return createComponent(Component, props);
+    return Component(patchedTrack, props);
   };
 }
 
