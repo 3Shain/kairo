@@ -1,10 +1,11 @@
-import { Cell, Reaction } from './cell';
+import { Reaction } from './cell';
+import type { Track } from './cell/cell';
 import { lifecycle } from './lifecycle-scope';
 
-export function effect(sideEffect: ($: typeof Cell.track) => void) {
-  const doEffect = () => {
+export function effect(sideEffect: ($: Track) => void) {
+  const doEffect = ($: Track) => {
     try {
-      sideEffect(Cell.track);
+      sideEffect($);
     } catch (e) {
       console.error(`Captured error inside effect().`, e);
     }

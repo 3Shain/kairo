@@ -1,175 +1,86 @@
-import { suspended } from './suspense';
-import { computed, mutable as mut } from './cell';
+import { suspended, CellSuspended } from './suspense';
+import { computed, mutable as mut, Reaction } from './cell';
 import { effect, cleanup } from './spec-shared';
 
 describe('cell/suspense', () => {
   const SHARED_FALLBACK = {};
 
-  it('should throw if failed', async () => {
+  it('it is a memo', () => {
     const [a, ma] = mut(0);
-    const s = mockFailedFetch();
-    const c = suspended(($) => s.read($(a)), {
-      fallback: SHARED_FALLBACK,
-    });
-    effect(($) => {
-      try {
-        $(c);
-      } catch {}
-    });
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(() => c.current).toThrow(`failed_${a.current}`);
-    ma(1);
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(() => c.current).toThrow(`failed_${a.current}`);
-  });
-
-  it('should be able to cascade', async () => {
-    const [a, ma] = mut(0);
-    const s = mockFetch();
-    const c = suspended(($) => s.read($(a)), undefined);
-    const d = suspended(
-      ($) => {
-        return $.read(c);
-      },
-      {
-        fallback: SHARED_FALLBACK,
-      }
-    );
-    const e = computed(($) => $(c));
-    effect(($) => $(d));
-    effect(($) => $(e));
-    expect(d.current).toBe(SHARED_FALLBACK);
-    expect(e.current).toBe(undefined);
-    await delay(10);
-    expect(d.current).toBe(a.current);
-    expect(e.current).toBe(a.current);
-    ma(1);
-    expect(d.current).toBe(SHARED_FALLBACK);
-    expect(e.current).toBe(undefined);
-    await delay(10);
-    expect(d.current).toBe(a.current);
-    expect(e.current).toBe(a.current);
-  });
-
-  it('should be able to propagate error', async () => {
-    const [a, ma] = mut(0);
-    const s = mockFailedFetch();
+    const b = suspended(($) => $(a));
+    const e = new Error('custom');
     const c = suspended(($) => {
-      return s.read($(a));
-    }, undefined);
-    const d = suspended(
-      ($) => {
-        return $.read(c);
-      },
-      {
-        fallback: SHARED_FALLBACK,
-      }
-    );
-    const e = computed(($) => $(c));
-    effect(($) => {
-      try {
-        $(d);
-      } catch {}
+      $(a);
+      throw e;
     });
-    effect(($) => {
-      try {
-        $(e);
-      } catch {}
-    });
-    expect(d.current).toBe(SHARED_FALLBACK);
-    expect(e.current).toBe(undefined);
-    await delay(10);
-    expect(() => d.current).toThrow(`failed_${a.current}`);
-    expect(() => e.current).toThrow(`failed_${a.current}`);
+
+    expect(b.current).toBe(0);
+    expect(() => c.current).toThrow(e);
+
+    effect(($) => $(b));
     ma(1);
-    expect(d.current).toBe(SHARED_FALLBACK);
-    expect(e.current).toBe(undefined);
-    await delay(10);
-    expect(() => d.current).toThrow(`failed_${a.current}`);
-    expect(() => e.current).toThrow(`failed_${a.current}`);
   });
 
-  it('should batch if shared', async () => {
-    const [a, ma] = mut(0);
-    const s = mockSharedFetch();
-    const c = suspended(
+  it('will suspend', async () => {
+    const cache = mockCache();
+    const [a, ma] = mut('hello');
+    const b = suspended(
       ($) => {
-        return s.read($(a));
+        return cache.get($(a));
       },
-      {
-        fallback: SHARED_FALLBACK,
-      }
+      { fallback: SHARED_FALLBACK }
     );
-    const d = suspended(($) => s.read($(a)), {
-      fallback: SHARED_FALLBACK,
-    });
-    const e = suspended(($) => s.read($(a)), {
-      fallback: SHARED_FALLBACK,
-    });
-    const f = suspended(
-      ($) => {
-        return s.read($(a));
-      },
-      {
-        fallback: SHARED_FALLBACK,
-      }
-    );
-    const fn = jest.fn();
-    effect(($) => ($(c), $(d), $(e), $(f), fn()));
-    expect(fn).toBeCalledTimes(1);
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(c.current).toBe(a.current);
-    expect(fn).toBeCalledTimes(2);
-    ma(1);
-    expect(fn).toBeCalledTimes(3);
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(c.current).toBe(a.current);
-    expect(fn).toBeCalledTimes(4);
+
+    expect(b.current).toBe(SHARED_FALLBACK);
+
+    const r = new Reaction(() => {});
+    r.track((s) => s(b));
+    cache.assertItemExist('hello');
+    await cache.wait('hello');
+    expect(b.current).toBe('hello');
   });
 
-  it('should ignore stale promise', async () => {
-    const [a, ma] = mut(0);
-    const s = mockFetch();
-    const c = suspended(
+  it('will abort previous', async () => {
+    const cache = mockCache();
+    const [a, ma] = mut('hello');
+    const b = suspended(
       ($) => {
-        return s.read($(a));
+        return cache.get($(a));
       },
-      {
-        fallback: SHARED_FALLBACK,
-      }
+      { fallback: SHARED_FALLBACK }
     );
-    effect(($) => {
-      try {
-        $(c);
-      } catch {}
-    });
-    expect(c.current).toBe(SHARED_FALLBACK);
-    ma(1);
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(c.current).toBe(a.current);
+
+    expect(b.current).toBe(SHARED_FALLBACK);
+
+    const r = new Reaction(() => {});
+    r.track((s) => s(b));
+    cache.assertItemExist('hello');
+    ma('world');
+    cache.assertItemExist('world');
+    await cache.wait('world');
+    expect(b.current).toBe('world');
   });
 
-  it('should ignore stale error promise', async () => {
-    const [a, ma] = mut(0);
-    const s = mockFailedFetch();
-    const c = suspended(($) => s.read($(a)), {
-      fallback: SHARED_FALLBACK,
+  it('cascade', async () => {
+    const cache = mockCache();
+    const [a, ma] = mut('hello');
+    const c = suspended(($) => {
+      return cache.get($(a));
     });
-    effect(($) => {
-      try {
-        $(c);
-      } catch {}
-    });
-    expect(c.current).toBe(SHARED_FALLBACK);
-    ma(1);
-    expect(c.current).toBe(SHARED_FALLBACK);
-    await delay(10);
-    expect(() => c.current).toThrow(`failed_${a.current}`);
+    const b = suspended(
+      (_, read) => {
+        return read(c) + '_';
+      },
+      { fallback: SHARED_FALLBACK }
+    );
+
+    expect(b.current).toBe(SHARED_FALLBACK);
+
+    const r = new Reaction(() => {});
+    r.track((s) => s(b));
+    cache.assertItemExist('hello');
+    await cache.wait('hello');
+    expect(b.current).toBe('hello_');
   });
 
   afterEach(() => {
@@ -177,65 +88,32 @@ describe('cell/suspense', () => {
   });
 });
 
-function mockFetch() {
-  let cache = {};
+function mockCache() {
+  const cache = {};
+  const suspending = {};
+
   return {
-    read(parameter: number) {
-      if (cache[parameter] === undefined) {
-        throw new Promise((res) => {
-          setTimeout(() => {
-            cache[parameter] = parameter;
-            res(undefined);
-          }, 0);
-        });
+    get(id: string): string {
+      if (cache[id]) {
+        return cache[id];
+      } else {
+        throw new CellSuspended(
+          () =>
+            (suspending[id] = new Promise((resolve) => {
+              cache[id] = id;
+              setTimeout(resolve, 1);
+            }))
+        );
       }
-      return cache[parameter];
+    },
+
+    assertItemExist(id: string) {
+      if (cache[id] === undefined) {
+        throw new Error('Assertation failed');
+      }
+    },
+    wait(id: string) {
+      return suspending[id];
     },
   };
-}
-
-function mockFailedFetch() {
-  let cache = {};
-  return {
-    read(parameter: number) {
-      if (cache[parameter] === undefined) {
-        throw new Promise((_, rej) => {
-          setTimeout(() => {
-            cache[parameter] = parameter;
-            rej(new Error(`failed_${parameter}`));
-          }, 0);
-        });
-      }
-      return cache[parameter];
-    },
-  };
-}
-
-function mockSharedFetch() {
-  let cache = {},
-    fetching = {};
-  return {
-    read(parameter: number) {
-      if (cache[parameter] === undefined) {
-        if (fetching[parameter] !== undefined) {
-          throw fetching[parameter];
-        }
-        fetching[parameter] = new Promise((res) => {
-          setTimeout(() => {
-            cache[parameter] = parameter;
-            fetching[parameter] = undefined;
-            res(undefined);
-          }, 0);
-        });
-        throw fetching[parameter];
-      }
-      return cache[parameter];
-    },
-  };
-}
-
-function delay(time: number) {
-  return new Promise((res) => {
-    setTimeout(res, time);
-  });
 }

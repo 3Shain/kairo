@@ -10,13 +10,14 @@ export function cleanup() {
   toCleanup.length = 0;
 }
 
-export function effect(fn: ($:Function) => any) {
+export function effect(fn: ($: Function) => any) {
   const callback = () => {
     r.track(fn);
   };
   const r = new Reaction(callback);
   callback();
   toCleanup.push(() => r.dispose());
+  return () => r.dispose();
 }
 
 export function controlledEffect(fn: () => any) {
@@ -38,7 +39,7 @@ export function countObservers(cell: Cell<any>) {
   return count;
 }
 
-export function countSources(cell: Cell<any>) {
+export function countSources(cell: Cell<any> | Reaction) {
   let count = 0,
     lo = (cell['internal'] as Memo).ls;
   while (lo) {
@@ -50,4 +51,8 @@ export function countSources(cell: Cell<any>) {
 
 export function hasFlag(cell: Cell<any>, flag: BitFlags) {
   return cell['internal'].flags & flag;
+}
+
+export function internalValue(cell: Cell<any>) {
+  return cell['internal'].value;
 }

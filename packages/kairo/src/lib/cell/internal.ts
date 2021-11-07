@@ -13,7 +13,7 @@ const enum BitFlags {
    * current value is changed (so need to propagate)
    */
   Changed = 1 << 3,
-  Estimating = 1 << 4,
+  Evalutating = 1 << 4,
   /**
    * (computation) current value maybe dirty
    */
@@ -26,23 +26,36 @@ const enum BitFlags {
   Effect = 1 << 8,
   // Propagating = 1 << 9,
   /** only memo can be stale */
-  StaleMemo = 1 << 10,
-  HasError = 1 << 11,
+  Stale = 1 << 10,
+  ValueIsError = 1 << 11,
+  Managed = 1 << 13,
+  ManagedMemo = Managed | Memo,
+  ValueWasError = 1 << 14,
 }
 
-interface Data<T = unknown> {
+interface InternalNode {
   flags: BitFlags;
-  lo: ObserverLinked<Memo> | null;
+}
+interface Data<T = unknown> extends InternalNode {
+  lo: ObserverLinked<Observer> | null;
   value: T | null;
   cp: (a: any, b: any) => boolean;
 }
-interface Memo<T = unknown> extends Data<T> {
+interface Observer extends InternalNode {
   dc: number;
   fs: SourceLinked<Data> | null;
   ls: SourceLinked<Data> | null;
-  c: () => T;
 }
-interface Reaction extends Memo<void> {}
+interface Memo<T = unknown> extends Data<T>, Observer {
+  c: Expression<T>;
+  hs: T;
+}
+interface Reaction<T = unknown> extends Observer {
+  e: () => T;
+}
+interface Expression<T> {
+  (track: <D>(data: Data<D>) => D): T;
+}
 type SourceLinked<T> = {
   prev: SourceLinked<T> | null;
   next: SourceLinked<T> | null;
@@ -55,202 +68,165 @@ type ObserverLinked<T> = {
   observer: T;
 };
 
-let ctx_cc: Memo | null = null;
-let ctx_cn: SourceLinked<Data> | null = null;
-let ctx_cln: SourceLinked<Data> | null = null;
-let ctx_lr: Data | null = null;
+class TrackContext {
+  constructor(private observer: Observer) {}
 
-function setData<T>(data: Data<T>, value: T): void {
-  /* istanbul ignore if */
-  if (__DEV__ && ctx_cc) {
-    console.error(
-      `Violated action: You can't mutate any behavior inside a computation or reaction.`
-    );
-    return;
-  }
-  if (!ct) {
-    return batch(() => setData(data, value));
-  }
-  /* istanbul ignore if: noop */ if (data.cp(data.value, value)) {
-    return;
-  }
-  data.value = value;
-  if (data.flags & BitFlags.Changed) {
-    return;
-  }
-  data.flags |= BitFlags.Changed;
-  ct.addDirty(data);
-}
+  private lastLog: Data | null = null;
+  private cursor: SourceLinked<Data> | null = this.observer.fs;
+  private clean: SourceLinked<Data> | null = null;
 
-/**
- * Get the value of a node _in many contexts_. Full of dirty side-effects.
- * @param data
- * @returns current value, or previous value if circularly referenced
- * @throws User-land errors, DEFER_COMPUTATION
- */
-function accessValue<T>(data: Data<T>, readDeps: boolean): T {
-  if (data.flags & BitFlags.Estimating) {
-    /**
-     * In fact we could allow circular referencing, by returning the latest value.
-     * However this causes a memo node to _hold a state_.
-     * Thus a memo expression is _impure_: same inputs, changed result.
-     */
-    throw new ReferenceError('A circular reference occurred.'); // [EXIT 5]
-  }
-  if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
-    ct.flush();
-  }
-  if (readDeps && ctx_cc !== null) {
-    logDependency(data);
+  track<T>(data: Data<T>) {
+    if (data.flags & BitFlags.Evalutating) {
+      if ((data as unknown) === this.observer) {
+        if (data.flags & BitFlags.ValueWasError) throw (data as Memo<T>).hs; // [EXIT 7]
+        return (data as Memo<T>).hs; // [EXIT 6]
+      }
+      throw new ReferenceError('A circular reference occurred.'); // [EXIT 5]
+    }
+    this.logSource(data);
     // if propagating and current are still markForCheck
     if (data.flags & BitFlags.MarkForCheck) {
       // currently if MarkForCheck it must be in propagate phase
       throw DEFER_COMPUTATION; // [EXIT 4]
     }
+    if (data.flags & BitFlags.Stale) {
+      estimate(data as Memo<T>); // maybe [EXIT 3]
+    }
+    if (data.flags & BitFlags.ValueIsError) {
+      throw data.value; // [EXIT 2]
+    }
+    return data.value!; // current value [EXIT 1]
   }
-  if (data.flags & BitFlags.StaleMemo) {
-    data.flags &= ~BitFlags.StaleMemo;
-    estimate(data); // maybe [EXIT 3]
+
+  private logSource(data: Data) {
+    if (this.lastLog) {
+      if (this.lastLog === data) {
+        return;
+      }
+    }
+    this.lastLog = data;
+    if (this.cursor === null) {
+      insertNewSource(this.observer, data);
+    } else {
+      if (this.cursor.source !== data) {
+        this.clean = this.observer.ls;
+        this.observer.ls = this.cursor.prev;
+        if (this.observer.ls) {
+          this.observer.ls!.next = null; // new last_source
+          this.cursor.prev = null; //
+        } else {
+          this.observer.fs = null;
+        }
+        this.cursor = null;
+        insertNewSource(this.observer, data);
+      } else {
+        this.cursor = this.cursor.next;
+      }
+    }
   }
-  if (data.flags & BitFlags.HasError) {
-    throw data.value; // [EXIT 2]
+
+  cleanup() {
+    if (this.cursor !== null) {
+      this.clean = this.observer.ls;
+      this.observer.ls = this.cursor.prev;
+      if (this.observer.ls) {
+        this.observer.ls.next = null; // new last_source
+        this.cursor.prev = null;
+      } else {
+        // cursor.prev == null => zero dependency is logged: settled forever.
+        this.observer.fs = null;
+      }
+    }
+    return this.clean;
   }
-  return data.value!; // current value [EXIT 1]
 }
 
-function estimate<T>(data: Data<T>) {
-  data.flags |= BitFlags.Estimating;
-  const s_ctx_cc = ctx_cc,
-    s_ctx_cn = ctx_cn,
-    s_ctx_cln = ctx_cln,
-    s_ctx_lr = ctx_lr;
-  (ctx_cc = data as Memo<T>), (ctx_lr = null), (ctx_cln = null);
+class EvalContext {
+  toCleanup: SourceLinked<Data>[] = [];
+
+  cleanup() {
+    for (const c of this.toCleanup) {
+      cleanupSources(c, null);
+    }
+  }
+
+  /**
+   * Evaluate the expression and track (refresh) dependencies.
+   * @param observer
+   * @param expression
+   * @returns Computed latest vaue
+   * @throws User-land errors, DEFER_COMPUTATION
+   */
+  evaluate<T>(observer: Observer, expression: Expression<T>): T {
+    const ctx = new TrackContext(observer);
+    observer.flags |= BitFlags.Evalutating;
+    try {
+      return expression((x) => ctx.track(x));
+    } finally {
+      observer.flags &= ~BitFlags.Evalutating;
+      const clean = ctx.cleanup();
+      if (clean) this.toCleanup.push(clean);
+    }
+  }
+}
+
+function setData<T>(data: Data<T>, value: T): void {
+  if (!ct) {
+    return nt.start(() => setData(data, value));
+  }
+  ct.setData(data, value);
+}
+
+function accessCurrent<T>(data: Data<T>, obs: Memo<any> | null = null): T {
+  if (data.flags & BitFlags.Evalutating) {
+    if ((data as unknown) === obs) {
+      if (data.flags & BitFlags.ValueWasError) throw (data as Memo<T>).hs;
+      return (data as Memo<T>).hs;
+    }
+    throw new ReferenceError('A circular reference occurred.');
+  }
+  if (data.flags & BitFlags.MarkForCheck && ct !== null && !ct.flushing) {
+    ct.flush();
+  }
+  if (data.flags & BitFlags.Stale) {
+    // eager evaluate latest value
+    try {
+      data.flags |= BitFlags.Evalutating;
+      return (data as Memo).c((x) => accessCurrent(x, data as Memo)) as T;
+    } finally {
+      data.flags &= ~BitFlags.Evalutating;
+    }
+  } else {
+    if (data.flags & BitFlags.ValueIsError) {
+      throw data.value; // [EXIT 2]
+    }
+    return data.value!; // current value [EXIT 1]
+  }
+}
+
+function estimate<T>(memo: Memo<T>) {
+  memo.flags &= ~BitFlags.Stale;
+  const ctx = new EvalContext();
   try {
-    data.value = evaluate(data as Memo<T>, (data as Memo<T>).c, s_ctx_cc);
-    data.flags &= ~BitFlags.HasError;
+    memo.value = ctx.evaluate(memo, memo.c);
+    memo.flags &= ~BitFlags.ValueIsError;
   } catch (e: any) {
     if (e === DEFER_COMPUTATION) {
       // it will be propagated later
       // _must mark dirty_ because the source may be unchanged but this node must be recomputed.
-      data.flags |= BitFlags.MarkForCheck | BitFlags.Dirty;
-      (data as Memo).dc++;
+      memo.flags |= BitFlags.MarkForCheck | BitFlags.Dirty | BitFlags.Stale;
+      memo.dc++;
       throw e; // [EXIT 3]
     }
-    data.flags |= BitFlags.HasError;
-    data.value = e;
-  } finally {
-    (ctx_lr = s_ctx_lr), (ctx_cln = s_ctx_cln), (ctx_cn = s_ctx_cn);
-    data.flags &= ~BitFlags.Estimating;
+    memo.flags |= BitFlags.ValueIsError;
+    memo.value = e;
   }
+  ctx.cleanup(); //should be just no-op
 }
 
-/**
- * Assure ctx_cc is not null
- * @param accessing
- * @returns
- */
-function logDependency(accessing: Data) {
-  if (ctx_lr) {
-    if (ctx_lr === accessing) {
-      return;
-    }
-  }
-  ctx_lr = accessing;
-  if (ctx_cn === null) {
-    insertNewSource(ctx_cc!, accessing);
-  } else {
-    if (ctx_cn.source !== accessing) {
-      ctx_cln = ctx_cc!.ls;
-      ctx_cc!.ls = ctx_cn.prev;
-      ctx_cc!.ls!.next = null; // new last_source
-      ctx_cn.prev = null; //
-      ctx_cn = null;
-      insertNewSource(ctx_cc!, accessing);
-    } else {
-      ctx_cn = ctx_cn.next;
-    }
-  }
-}
-
-function untrack<T, Args extends any[]>(
-  fn: (...args: Args) => T,
-  ...args: Args
-) {
-  const stored = ctx_cc,
-    s_ctx_cn = ctx_cn,
-    s_ctx_cln = ctx_cln,
-    s_ctx_lr = ctx_lr;
-  /* reset context */
-  ctx_cc = null;
-  ctx_cn = null;
-  ctx_cln = null;
-  ctx_lr = null;
-  let ret = null;
-  try {
-    ret = fn(...args);
-  } finally {
-    ctx_lr = s_ctx_lr;
-    ctx_cln = s_ctx_cln;
-    ctx_cn = s_ctx_cn;
-    ctx_cc = stored;
-  }
-  return ret;
-}
-
-const NO_ERROR = {};
-
-/**
- * Compute the latest value of a memo node. And track (refresh) dependencies. (insert then clean-up)
- * @param observer
- * @param expr
- * @returns Computed latest vaue
- * @throws User-land errors, DEFER_COMPUTATION
- */
-function evaluate<T>(
-  observer: Memo,
-  expr: () => T,
-  restore_ctx_cc: typeof ctx_cc
-) {
-  ctx_cn = (ctx_cc = observer).fs;
-
-  let calculatedValue: T | null,
-    error = NO_ERROR;
-
-  try {
-    calculatedValue = expr();
-  } catch (e: any) {
-    error = e;
-  }
-  ctx_lr = null;
-  if (ctx_cn !== null) {
-    /* istanbul ignore if */
-    if (__DEV__ && observer.ls === null) {
-      throw Error('panic 7');
-    }
-    // collected source num is less than expected
-    // but it's fine as we remove the extra sources.
-    cleanupSources(observer.ls!, ctx_cn.prev);
-    observer.ls = ctx_cn.prev;
-    if (observer.ls) {
-      observer.ls.next = null;
-    } else {
-      observer.fs = null; // no source. will not update. (but not stale.)
-    }
-    ctx_cn = null;
-  } else if (ctx_cln !== null) {
-    // why deferred: to not clean a node so early
-    cleanupSources(ctx_cln, null);
-    ctx_cln = null;
-  }
-  ctx_cc = restore_ctx_cc;
-  if (error !== NO_ERROR) {
-    throw error;
-  }
-  return calculatedValue! as T;
-}
-
-function cleanupMemo(memo: Memo) {
+function cleanupObserver(memo: Observer) {
   if (memo.ls === null) {
+    debugger;
     return;
   }
   cleanupSources(memo.ls, null);
@@ -271,105 +247,50 @@ function cleanupSources(
     (next ? (next.prev = prev) : (source.lo = prev))
       ? (prev!.next = next)
       : null;
-    if (source.flags & BitFlags.Memo && source.lo === null) {
+    if (
+      (source.flags & BitFlags.ManagedMemo) === BitFlags.ManagedMemo &&
+      source.lo === null
+    ) {
+      source.flags = (source.flags | BitFlags.Stale) & ~BitFlags.MarkForCheck;
+      (source as Memo).dc = 0; // not usable...
+      (source as Memo).value = null;
       // it's last observer // but propagation might tackle this.
-      cleanupMemo(source as Memo);
-      source.flags |= BitFlags.StaleMemo;
+      cleanupObserver(source as Memo);
     }
   } while ((last = last.prev!) !== until);
 }
 
-function propagate(stack: Data[]): void {
-  while (stack.length > 0) {
-    const data = stack.pop()!;
-    const sdf = data.flags;
-    const dirtyIfChanged = (sdf & BitFlags.Changed) >> 1; // 8>>1 = 4
-    data.flags &= ~BitFlags.Changed;
-    let lo = data.lo;
-    while (lo !== null) {
-      const observer = lo.observer;
-      lo = lo.prev;
-      observer.flags |= dirtyIfChanged; // changes -> dirty
-      observer.dc--;
-      if (observer.dc === 0) {
-        const scf = (observer.flags &= ~BitFlags.MarkForCheck);
-        if (scf & BitFlags.Effect) {
-          if (scf & BitFlags.Dirty) {
-            observer.flags &= ~BitFlags.Dirty;
-            if (~scf & BitFlags.EffectWillCommit) {
-              ct!.effects.push(observer as Reaction);
-              observer.flags |= BitFlags.EffectWillCommit;
-            }
-          }
-        } else if (observer.lo === null) {
-          // it's a memo but no one observing.
-          cleanupMemo(observer);
-          observer.flags &= ~BitFlags.Dirty;
-          observer.flags |= BitFlags.StaleMemo;
-        } else {
-          // it's a memo
-          stack.push(observer); // push()
-          if (scf & BitFlags.Dirty) {
-            observer.flags &= ~BitFlags.Dirty;
-            // if propagate receives array of data then the if is not necessary
-            try {
-              const currentValue = evaluate(observer, observer.c, null);
-              // compare value , if changed, mark as changed
-              if (
-                !observer.cp(currentValue, observer.value) ||
-                observer.flags & BitFlags.HasError
-              ) {
-                observer.flags &= ~BitFlags.HasError;
-                observer.value = currentValue;
-                observer.flags |= BitFlags.Changed;
-              }
-            } catch (e) {
-              if (e === DEFER_COMPUTATION) {
-                // computation deferred as a upstream dependency is waiting for propagation.
-                stack.pop(); // pop()
-                observer.flags |= BitFlags.Dirty | BitFlags.MarkForCheck;
-                observer.dc++;
-              } else {
-                // TODO: should check error equality?
-                observer.value = e;
-                observer.flags |= BitFlags.Changed | BitFlags.HasError;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+function isMemo(node: Observer): node is Memo {
+  return (node.flags & BitFlags.Memo) === BitFlags.Memo;
 }
 
 function markObserversForCheck(stack: Data[]) {
   while (stack.length > 0) {
-    const node = stack.pop()!;
-    let lo = node.lo;
+    let lo = stack.pop()!.lo;
     while (lo !== null) {
       const observer = lo.observer;
-      lo = lo.prev;
       observer.dc++;
-      if (observer.flags & BitFlags.MarkForCheck) {
-        continue;
+      if ((observer.flags & BitFlags.MarkForCheck) === 0) {
+        observer.flags |= BitFlags.MarkForCheck;
+        if (observer.flags & BitFlags.Memo) {
+          stack.push(observer as unknown as Data);
+        }
       }
-      observer.flags |= BitFlags.MarkForCheck;
-      if (~observer.flags & BitFlags.Effect) {
-        stack.push(observer);
-      }
+      lo = lo.prev;
     }
   }
 }
 
-let ct: Transaction | null = null;
+let ct: TransactionContext | null = null;
 
-class Transaction {
+class TransactionContext {
   dirty: Data[] = [];
   effects: Reaction[] = [];
+  flushing: boolean = false;
 
   constructor() {}
 
-  start(fn: () => any) {
+  start<T>(fn: () => T) {
     const stored = ct;
     ct = this;
     let retValue = null;
@@ -383,11 +304,9 @@ class Transaction {
     return retValue;
   }
 
-  flushing: boolean = false;
-
   flush() {
     this.flushing = true;
-    propagate(this.dirty);
+    this.propagate(this.dirty);
     this.flushing = false;
   }
 
@@ -400,17 +319,92 @@ class Transaction {
        * should catch error here?
        * no. and unrecoverable.
        */
-      x.c();
+      x.e();
     }
   }
 
-  addDirty(data: Data) {
-    markObserversForCheck([data]);
+  setData<T>(data: Data, value: T) {
+    /* istanbul ignore if: noop */ if (data.cp(data.value, value)) {
+      return;
+    }
+    data.value = value;
+    if (data.flags & BitFlags.Changed) {
+      return;
+    }
+    data.flags |= BitFlags.Changed;
+    markObserversForCheck([data]); //
     this.dirty.push(data);
+  }
+
+  propagate(stack: Data[]): void {
+    const ctx = new EvalContext();
+    while (stack.length > 0) {
+      const data = stack.pop()!;
+      const sdf = data.flags;
+      const dirtyIfChanged = (sdf & BitFlags.Changed) >> 1; // 8>>1 = 4
+      data.flags &= ~BitFlags.Changed;
+      let lo = data.lo;
+      while (lo !== null) {
+        const observer = lo.observer;
+        lo = lo.prev;
+        observer.flags |= dirtyIfChanged; // changes -> dirty
+        observer.dc--;
+
+        if (observer.dc === 0) {
+          const scf = (observer.flags &= ~BitFlags.MarkForCheck);
+          if (isMemo(observer)) {
+            // it's a memo
+            stack.push(observer); // push()
+            if (scf & BitFlags.Dirty) {
+              observer.flags =
+                ((scf & BitFlags.ValueIsError) > 0
+                  ? observer.flags | BitFlags.ValueWasError
+                  : observer.flags & ~BitFlags.ValueWasError) & ~BitFlags.Dirty;
+              observer.hs = observer.value;
+              try {
+                const currentValue = ctx.evaluate(observer, observer.c);
+                // compare value , if changed, mark as changed
+                if (
+                  !observer.cp(currentValue, observer.value) ||
+                  observer.flags & BitFlags.ValueIsError
+                ) {
+                  observer.flags =
+                    (observer.flags | BitFlags.Changed) & ~BitFlags.ValueIsError;
+                  observer.value = currentValue;
+                }
+              } catch (e) {
+                debugger;
+                if (e === DEFER_COMPUTATION) {
+                  // computation deferred as a upstream dependency is waiting for propagation.
+                  stack.pop(); // pop()
+                  observer.flags |= BitFlags.Dirty | BitFlags.MarkForCheck;
+                  observer.dc++;
+                  continue;
+                }
+                // TODO: should check error equality?
+                observer.value = e;
+                observer.flags |= BitFlags.Changed | BitFlags.ValueIsError;
+              }
+            }
+          } else {
+            // if (scf & BitFlags.Effect) {
+            if (scf & BitFlags.Dirty) {
+              observer.flags &= ~BitFlags.Dirty;
+              if (~scf & BitFlags.EffectWillCommit) {
+                this.effects.push(observer as Reaction);
+                observer.flags |= BitFlags.EffectWillCommit;
+              }
+            }
+            // }
+          }
+        }
+      }
+    }
+    ctx.cleanup();
   }
 }
 
-const nt = new Transaction();
+const nt = new TransactionContext();
 function batch(fn: Function) {
   if (ct !== null) {
     return fn();
@@ -418,7 +412,7 @@ function batch(fn: Function) {
   return nt.start(fn as any);
 }
 
-function insertNewSource(observer: Memo, source: Data): void {
+function insertNewSource(observer: Observer, source: Data): void {
   observer.ls = observer.ls
     ? (observer.ls.next = {
         prev: observer.ls,
@@ -434,7 +428,10 @@ function insertNewSource(observer: Memo, source: Data): void {
       });
 }
 
-function insertNewObserver(source: Data, observer: Memo): ObserverLinked<Memo> {
+function insertNewObserver(
+  source: Data,
+  observer: Observer
+): ObserverLinked<Observer> {
   return (source.lo = source.lo
     ? (source.lo.next = {
         prev: source.lo,
@@ -447,22 +444,20 @@ function insertNewObserver(source: Data, observer: Memo): ObserverLinked<Memo> {
 function createReaction(onCommit: () => void): Reaction {
   return {
     flags: BitFlags.Effect,
-    lo: null, // never used
-    value: null, // never used
-    cp: null!, // never used
     dc: 0,
     fs: null,
     ls: null,
-    c: onCommit,
+    e: onCommit,
   };
 }
 
-function executeReaction<T>(reaction: Reaction, fn: () => T) {
-  /* istanbul ignore if */
-  if (__TEST__ && ctx_cc) {
-    throw Error('should be not in computation or reaction');
+function executeReaction<T>(reaction: Observer, fn: Expression<T>) {
+  const ctx = new EvalContext();
+  try {
+    return ctx.evaluate(reaction, fn);
+  } finally {
+    ctx.cleanup();
   }
-  return evaluate(reaction, fn, null);
 }
 
 function createData<T>(
@@ -478,11 +473,12 @@ function createData<T>(
 }
 
 function createMemo<T>(
-  fn: () => T,
-  comp: (a: T, b: T) => boolean = Object.is
+  fn: Expression<T>,
+  comp: (a: T, b: T) => boolean = Object.is,
+  initial?: T
 ): Memo<T> {
   return {
-    flags: BitFlags.Memo | BitFlags.StaleMemo,
+    flags: BitFlags.Memo | BitFlags.Stale | BitFlags.Managed,
     lo: null,
     value: null!,
     cp: comp,
@@ -490,11 +486,8 @@ function createMemo<T>(
     fs: null,
     ls: null,
     c: fn,
+    hs: initial!,
   };
-}
-
-export function __current_transaction() {
-  return ct;
 }
 
 let controlOnCommit = ((x) => x()) as (continuation: () => void) => any;
@@ -518,11 +511,11 @@ export {
   Reaction,
   batch,
   setData,
-  accessValue,
+  accessCurrent as accessReferenceValue,
   createData,
   createMemo,
-  untrack,
+  // untrack,
   createReaction,
   executeReaction,
-  cleanupMemo,
+  cleanupObserver,
 };

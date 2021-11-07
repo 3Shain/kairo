@@ -6,8 +6,7 @@ import {
   PartialObserver,
 } from '../types';
 import {
-  accessValue,
-  cleanupMemo,
+  cleanupObserver,
   createMemo,
   createReaction,
   createData,
@@ -15,7 +14,7 @@ import {
   executeReaction,
   Reaction as _Reaction,
   setData,
-  untrack,
+  accessReferenceValue,
 } from './internal';
 
 export class Cell<T> {
@@ -23,14 +22,14 @@ export class Cell<T> {
     return new Cell(createData(initial));
   }
 
-  static track<T>(cell: Cell<T>) {
-    return accessValue(cell.internal, true);
+  protected static track<C>(t: <D>(data: Data<D>) => D, cell: Cell<C>): C {
+    return t(cell.internal);
   }
 
   constructor(protected internal: Data<T>) {}
 
   get current(): T {
-    return accessValue(this.internal, false);
+    return accessReferenceValue(this.internal);
   }
 
   [Symbol_observable]() {
@@ -40,7 +39,7 @@ export class Cell<T> {
   [Symbol.toStringTag] = 'Cell';
 
   map<R>(fn: (value: T) => R): Cell<R> {
-    return computed(() => untrack(fn, accessValue(this.internal, true)));
+    return new Cell(createMemo(($) => fn($(this.internal))));
   }
 
   /**
@@ -68,10 +67,15 @@ export class Cell<T> {
         }
       });
       observer.next(this.current);
-      reaction.track(() => accessValue(this.internal, true));
+      reaction.track((t) => t(this));
       return () => reaction.dispose();
     }).subscribe(...params);
   }
+}
+
+function trackCell<T>($: (data: Data<T>) => T) {
+  // @ts-expect-error: internal static method
+  return (cell: Cell<T>) => $(cell.internal);
 }
 
 interface Observable<T> extends Subscribable<T> {}
@@ -92,6 +96,8 @@ interface SubscriptionObserver<T> {
   readonly closed: boolean;
 }
 
+export type Track = <C>(cell: Cell<C>) => C;
+
 declare var Observable: ObservableConstructor;
 
 export class Reaction {
@@ -107,12 +113,12 @@ export class Reaction {
    * @returns return value of `program`
    * @throws User-land errors in program()
    */
-  track<T>(program: ($: typeof Cell.track) => T) {
-    return executeReaction<T>(this.internal, () => program(Cell.track));
+  track<T>(program: ($: Track) => T) {
+    return executeReaction<T>(this.internal, ($) => program(trackCell($)));
   }
 
   dispose() {
-    cleanupMemo(this.internal);
+    cleanupObserver(this.internal);
   }
 }
 
@@ -123,16 +129,16 @@ export class IncrementalReaction {
     this.internal = createReaction(callback);
   }
 
-  track<T>(program: ($: typeof Cell.track) => T) {
-    return executeReaction<T>(this.internal, () => program(Cell.track));
+  track<T>(program: ($: Track) => T) {
+    return executeReaction<T>(this.internal, ($) => program(trackCell($)));
   }
 
-  continue<T>(program: ($: typeof Cell.track) => T) {
-    return executeReaction<T>(this.internal, () => {
+  continue<T>(program: ($: Track) => T) {
+    return executeReaction<T>(this.internal, (t) => {
       for (const x of this.getHistoryReads()) {
-        accessValue(x, true);
+        t(x);
       }
-      return program(Cell.track);
+      return program(trackCell(t));
     });
   }
 
@@ -145,7 +151,7 @@ export class IncrementalReaction {
   }
 
   dispose() {
-    cleanupMemo(this.internal);
+    cleanupObserver(this.internal);
   }
 }
 
@@ -172,17 +178,22 @@ export function mutable<T>(
 }
 
 export function computed<T>(
-  expr: ($: typeof Cell.track) => T,
+  expr: ($: Track) => T,
+  initial?: T,
   options?: {
     comparator: (a: T, b: T) => boolean;
   }
 ): Cell<T> {
-  return new Cell(createMemo(() => expr(Cell.track), options?.comparator));
+  return new Cell(
+    createMemo((t) => expr(trackCell(t)), options?.comparator, initial)
+  );
 }
 
 type Unwrap<T> = {
   [Key in keyof T]: T[Key] extends Cell<infer CellType> ? CellType : T[Key];
 };
+
+const d = (cell: Cell<any>, track: Track) => track(cell);
 
 export function combined<TArray extends any[]>(
   array: TArray
@@ -192,24 +203,24 @@ export function combined<TObject extends object>(
 ): Cell<Unwrap<TObject>>;
 export function combined(obj: any) {
   if (obj instanceof Array) {
-    const elementMap = obj.map((item) =>
-      item instanceof Cell ? Cell.track : identity
-    );
-    return computed(() => elementMap.map((x, i) => x(obj[i])));
+    const elementMap = obj.map((item) => (item instanceof Cell ? d : identity));
+    return computed(($) => elementMap.map((x, i) => x(obj[i], $)));
   } /* istanbul ignore else: simple */ else if (
     typeof obj === 'object' &&
     obj !== null
   ) {
     const entryMap = Object.entries(obj).map(
       ([key, value]) =>
-        (value instanceof Cell
-          ? [key, Cell.track, value]
-          : [key, identity, value]) as [string, Function, any]
+        (value instanceof Cell ? [key, d, value] : [key, identity, value]) as [
+          string,
+          Function,
+          any
+        ]
     );
-    return computed(() =>
+    return computed(($) =>
       Object.fromEntries(
         entryMap.map(([key, map, value]) => {
-          return [key, map(value)];
+          return [key, map(value, $)];
         })
       )
     );

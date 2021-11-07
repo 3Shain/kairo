@@ -1,12 +1,20 @@
 import { from, Observable } from 'rxjs';
-import { computed, mutable, Cell, combined, IncrementalReaction } from './cell';
-import { batch, BitFlags, Memo, untrack } from './internal';
+import {
+  computed,
+  mutable,
+  Cell,
+  combined,
+  IncrementalReaction,
+  Reaction,
+} from './cell';
+import { batch, BitFlags, Memo } from './internal';
 import {
   effect,
   countObservers,
   countSources,
   hasFlag,
   cleanup,
+  internalValue,
 } from './spec-shared';
 
 describe('cell', () => {
@@ -18,231 +26,271 @@ describe('cell', () => {
     globalThis.Observable = undefined;
   });
 
-  it('normal', () => {
-    const [a, ma] = mutable(0);
-    const b = computed(($) => $(a));
-    let g = 0;
-    effect(($) => (g = $(b)));
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countSources(b)).toBe(1);
-    ma(1);
-    expect(g).toBe(1);
-  });
-
-  it('eager evaluate', () => {
-    const [a, ma] = mutable(0);
-    const b = computed(($) => $(a));
-    b.current;
-    expect(countObservers(a)).toBe(1);
-    expect(countSources(b)).toBe(1);
-    ma(1);
-    expect(countObservers(a)).toBe(0);
-    expect(countSources(b)).toBe(0);
-    expect(hasFlag(b, BitFlags.StaleMemo)).toBeTruthy();
-  });
-
-  it('self reference should throw', () => {
-    const a = computed(($) => {
-      $(a);
-      return 1;
-    });
-    expect(() => a.current).toThrow(ReferenceError);
-  });
-
-  it('circular reference should throw', () => {
-    const a = computed(($) => {
-      $(b);
-      return 1;
-    });
-    const b = computed(($) => {
-      $(a);
-      return 1;
-    });
-    expect(() => a.current).toThrow(ReferenceError);
-    expect(() => b.current).toThrow(ReferenceError);
-  });
-
-  it('circular reference should throw (ref)', () => {
-    const a = computed(($) => {
-      $(b);
-      return 1;
-    });
-    const b = computed(($) => {
-      a.current;
-      return 1;
-    });
-    expect(() => a.current).toThrow(ReferenceError);
-    expect(() => b.current).toThrow(ReferenceError);
-  });
-
-  it('unstable 1', () => {
-    const [a, ma] = mutable(0);
-    const [b, mb] = mutable(0);
-    const [c, mc] = mutable(0);
-    const d = computed(($) => {
-      if ($(a)) {
-        $(b), $(c);
+  it('do not evaluate if dependencies are unchanged', ()=>{
+    const [a,ma] = mutable(0);
+    const [b,mb] = mutable(0);
+    const c = computed($=>$(a)+$(b));
+    const d = c.map(x=>x);
+    let run = false;
+    effect($=>{
+      if(run){
+        throw 'Not expected effect';
       }
-      return 1;
+      $(d);
+      run = true;
     });
-    effect(($) => $(d));
-    expect(countSources(d)).toBe(1);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(0);
-    expect(countObservers(c)).toBe(0);
-    ma(1);
-    expect(countSources(d)).toBe(3);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countObservers(c)).toBe(1);
-    ma(0);
-    expect(countSources(d)).toBe(1);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(0);
-    expect(countObservers(c)).toBe(0);
+    batch(()=>{
+      ma(1);
+      mb(-1);
+    });
   });
 
-  it('unstable 2', () => {
-    const [a, ma] = mutable(0);
-    const [b, mb] = mutable(0);
-    const [c, mc] = mutable(0);
-    const d = computed(($) => {
-      if (($(a), $(a))) {
-        $(b), $(c);
-      } else {
-        $(c), $(b);
-      }
-      return 1;
-    });
-    effect(($) => $(d));
-    expect(countSources(d)).toBe(3);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countObservers(c)).toBe(1);
-    ma(1);
-    expect(countSources(d)).toBe(3);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countObservers(c)).toBe(1);
-    ma(0);
-    expect(countSources(d)).toBe(3);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countObservers(c)).toBe(1);
-  });
-
-  it('unstable 3', () => {
-    const [a, ma] = mutable(0);
-    const b = Cell.of(0);
-    const c = computed(($) => $(a) + $(b));
-    const e = computed(($) => $(c));
-    const d = computed(($) => {
-      if ($(a)) {
-        $(b);
-      } else {
-        $(e);
-      }
-      return 1;
-    });
-    effect(($) => $(c));
-    effect(($) => $(d));
-    // expect(countSources(d)).toBe(3);
-    // expect(countObservers(a)).toBe(1);
-    // expect(countObservers(b)).toBe(1);
-    // expect(countObservers(c)).toBe(1);
-    ma(1);
-    // expect(countSources(d)).toBe(3);
-    // expect(countObservers(a)).toBe(1);
-    // expect(countObservers(b)).toBe(1);
-    // expect(countObservers(c)).toBe(1);
-    ma(0);
-    // expect(countSources(d)).toBe(3);
-    // expect(countObservers(a)).toBe(1);
-    // expect(countObservers(b)).toBe(1);
-    // expect(countObservers(c)).toBe(1);
-  });
-
-  it('throw in computed', () => {
-    const p = new Error('Stub');
-    const [a, ma] = mutable(0);
-    const b = Cell.of(0);
-    const c = computed(($) => {
-      $(a), $(b);
-      throw p;
+  describe('dynamic dependencies', () => {
+    it('|[dependencies]| increase', () => {
+      const [a, ma] = mutable(0);
+      const b = Cell.of(0);
+      let step = 0;
+      const c = computed(($) => {
+        switch (step) {
+          case 0:
+            return $(a);
+          case 1:
+            return $(a), $(b);
+        }
+      });
+      effect(($) => $(c));
+      expect(countObservers(b)).toBe(0);
+      step = 1;
+      ma(1);
+      expect(countObservers(b)).toBe(1);
     });
 
-    effect(($) => {
-      try {
-        $(c);
-      } catch (e) {
-        expect(e).toBe(p);
-      }
-    });
-    ma(1);
-    ma(0);
-  });
-
-  it('self-destroying computation?', () => {
-    let closure = 1;
-    const [a, ma] = mutable(0);
-    const b = computed(($) => {
-      if (closure) {
+    it("|[dependencies]| increase - edge case: exists 'MarkForCheck in [new dependencies] ", () => {
+      const [a, ma] = mutable(0);
+      const d = computed(($) => $(a));
+      let step = 0;
+      let pass = false;
+      const c = computed(($) => {
         $(a);
-      }
-      return 1;
+        switch (step) {
+          case 0:
+            return 0;
+          case 1:
+            if (!pass) {
+              expect(hasFlag(d, BitFlags.MarkForCheck)).toBeTruthy();
+              pass = true;
+            } else {
+              expect(hasFlag(d, BitFlags.MarkForCheck)).toBeFalsy();
+            }
+            return $(d);
+        }
+      });
+      effect(($) => {
+        $(d), $(c); // this order matter
+      });
+      step = 1;
+      batch(() => {
+        ma(1);
+      });
     });
 
-    effect(($) => $(b));
-    ma(1);
-    closure = 0;
-    ma(0);
-    expect(countObservers(a)).toBe(0);
-    expect(countSources(b)).toBe(0);
-    expect(countObservers(b)).toBe(1);
+    it("|[dependencies]| increase - edge case: exists 'Stale in [new dependencies] and it (directly/indirectly) dependes on 'MarkForCheck", () => {
+      const [a, ma] = mutable(0);
+      const d = computed(($) => $(a));
+      const e = computed(($) => $(d));
+      let step = 0;
+      let pass = false;
+      const c = computed(($) => {
+        $(a);
+        switch (step) {
+          case 0:
+            return 0;
+          case 1:
+            if (!pass) {
+              expect(hasFlag(e, BitFlags.Stale)).toBeTruthy();
+              expect(hasFlag(e, BitFlags.MarkForCheck)).toBeFalsy();
+              pass = true;
+              try {
+                return $(e);
+              } catch (err) {
+                expect(err).toStrictEqual({});
+                throw err;
+              }
+            } else {
+              pass = false;
+              expect(hasFlag(e, BitFlags.MarkForCheck)).toBeFalsy();
+              return $(e);
+            }
+        }
+      });
+      effect(($) => {
+        $(d), $(c); // this order does matter!
+      });
+      step = 1;
+      batch(() => {
+        ma(1);
+      });
+      expect(pass).toBe(false);
+    });
+
+    it('|[dependencies]| decrease', () => {
+      const [a, ma] = mutable(0);
+      const b = Cell.of(0);
+      let step = 0;
+      const c = computed(($) => {
+        switch (step) {
+          case 0:
+            return $(a), $(b);
+          case 1:
+            return $(a);
+        }
+      });
+      effect(($) => $(c));
+      expect(countObservers(b)).toBe(1);
+      step = 1;
+      ma(1);
+      expect(countObservers(b)).toBe(0);
+    });
+
+    it('|[dependencies]| decrease - edge case: |[dependencies]| = 0', () => {
+      const [a, ma] = mutable(0);
+      const [b] = mutable(0);
+      let step = 0;
+      const c = computed(($) => {
+        switch (step) {
+          case 0:
+            return $(a), $(b);
+          case 1:
+            return 0;
+        }
+      });
+      effect(($) => $(c));
+      expect(countObservers(b)).toBe(1);
+      step = 1;
+      ma(1);
+      expect(countObservers(b)).toBe(0);
+      expect(countObservers(a)).toBe(0);
+      expect(countSources(c)).toBe(0);
+    });
+
+    it('[dependencies] changes', () => {
+      const [a, ma] = mutable(0);
+      const [b] = mutable(0);
+      const [c] = mutable(0);
+      let step = 0;
+      const d = computed(($) => {
+        switch (step) {
+          case 0:
+            return $(a), $(c);
+          case 1:
+            return $(a), $(b);
+        }
+      });
+      effect(($) => $(d));
+      expect(countObservers(b)).toBe(0);
+      expect(countObservers(c)).toBe(1);
+      step = 1;
+      ma(1);
+      expect(countObservers(b)).toBe(1);
+      expect(countObservers(c)).toBe(0);
+    });
   });
 
-  it('unchanged computed', () => {
-    const [a, ma] = mutable(0);
-    const p = Math.random();
-    const b = computed(($) => {
-      $(a);
-      return p;
+  describe('stateful computed()', () => {
+    it('get history', () => {
+      const [a, ma] = mutable(0);
+      const b: Cell<number> /* type broken? */ = computed(($) => {
+        if ($(b) > 10) {
+          return $(b);
+        }
+        return $(a);
+      }, 0);
+      const cleanEffect = effect(($) => $(b));
+      ma(1);
+      expect(b.current).toBe(1);
+      ma(11);
+      expect(b.current).toBe(11);
+      ma(2); // b has no source now!
+      expect(b.current).toBe(11);
+      cleanEffect();
+      expect(hasFlag(b, BitFlags.Stale)).toBeTruthy();
+      expect(b.current).toBe(11);
     });
-    const c = computed(($) => $(b));
 
-    effect(($) => {
-      expect($(c)).toBe(p);
+    it('get history error', () => {
+      const p = new Error('custom');
+      const [a, ma] = mutable(0);
+      const b: Cell<number> /* type broken? */ = computed(($) => {
+        $(a);
+        if ($(b) > 10) {
+          throw p;
+        }
+        return $(a);
+      }, 0);
+      const cleanEffect = effect(($) => {
+        try {
+          $(b);
+        } catch {
+          // ignore
+        }
+      });
+      ma(1);
+      expect(b.current).toBe(1);
+      ma(11);
+      expect(b.current).toBe(11);
+
+      ma(2);
+      expect(() => b.current).toThrow(p);
+      ma(3);
+      expect(() => b.current).toThrow(p);
+      cleanEffect();
+      expect(hasFlag(b, BitFlags.Stale)).toBeTruthy();
+      expect(() => b.current).toThrow(p);
     });
-    ma(1);
-    ma(2);
   });
 
-  it('untrack', () => {
-    const [a, ma] = mutable(0);
-    const [b, mb] = mutable(0);
-    const [c, mc] = mutable(0);
-    const d = computed(($) => {
-      if ($(a)) {
-        $(b), untrack(() => c.current);
-      }
-      return 1;
+  describe('circular dependency', () => {
+    it('circular reactive reference should throw', () => {
+      const a = computed(($) => {
+        $(b);
+        return 1;
+      });
+      const b = computed(($) => {
+        $(a);
+        return 1;
+      });
+      const r = new Reaction(() => {});
+      expect(() => r.track(($) => $(a))).toThrow(ReferenceError);
+      expect(countSources(a)).toBe(1);
+      expect(countSources(b)).toBe(0);
+      expect(countObservers(b)).toBe(1);
+      expect(countObservers(a)).toBe(1);
+      expect(countSources(r)).toBe(1);
+      expect(() => r.track(($) => $(b))).toThrow(ReferenceError);
+      expect(countSources(a)).toBe(0);
+      expect(countObservers(a)).toBe(0);
+      expect(countSources(b)).toBe(0);
+      expect(countObservers(b)).toBe(1); // 1? -> it's r
+      expect(countSources(r)).toBe(1);
+      expect(() => r.track(($) => $(b))).toThrow(ReferenceError);
+      expect(countSources(a)).toBe(0);
+      expect(countSources(b)).toBe(0);
+      expect(countSources(r)).toBe(1);
+      r.dispose();
     });
-    effect(($) => $(d));
-    expect(countSources(d)).toBe(1);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(0);
-    expect(countObservers(c)).toBe(0);
-    ma(1);
-    expect(countSources(d)).toBe(2);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(1);
-    expect(countObservers(c)).toBe(0);
-    ma(0);
-    expect(countSources(d)).toBe(1);
-    expect(countObservers(a)).toBe(1);
-    expect(countObservers(b)).toBe(0);
-    expect(countObservers(c)).toBe(0);
+
+    it('circular value reference should throw', () => {
+      const a = computed(($) => {
+        b.current;
+        return 1;
+      });
+      const b = computed(($) => {
+        a.current;
+        return 1;
+      });
+      expect(() => a.current).toThrow(ReferenceError);
+      expect(() => b.current).toThrow(ReferenceError);
+    });
   });
 
   describe('Cell.subscribe()', () => {
