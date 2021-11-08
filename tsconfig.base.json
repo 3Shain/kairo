@@ -24,7 +24,8 @@
       "@kairo/vue": ["packages/vue/src/index.ts"],
       "@kairo/solid": ["packages/solid/src/index.ts"],
       "@kairo/svelte": ["packages/svelte/src/index.ts"],
-      "@kairo/preact": ["packages/preact/src/index.ts"]
+      "@kairo/preact": ["packages/preact/src/index.ts"],
+      "@kairo/router": ["packages/router/src/index.ts"]
     }
   },
   "include": ["**/*.d.ts"],

@@ -77,7 +77,10 @@
             "main": "fixtures/ng-app/src/main.ts",
             "polyfills": "fixtures/ng-app/src/polyfills.ts",
             "tsConfig": "fixtures/ng-app/tsconfig.app.json",
-            "assets": ["fixtures/ng-app/src/favicon.ico", "fixtures/ng-app/src/assets"],
+            "assets": [
+              "fixtures/ng-app/src/favicon.ico",
+              "fixtures/ng-app/src/assets"
+            ],
             "styles": ["fixtures/ng-app/src/styles.scss"],
             "scripts": [],
             "vendorChunk": true,
@@ -437,7 +440,9 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["packages/svelte-preprocess/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "packages/svelte-preprocess/**/*.{ts,tsx,js,jsx}"
+            ]
           },
           "outputs": ["{options.outputFile}"]
         }
@@ -459,7 +464,9 @@
         "lint": {
           "builder": "@nrwl/linter:eslint",
           "options": {
-            "lintFilePatterns": ["packages/vite-plugin-vue/**/*.{ts,tsx,js,jsx}"]
+            "lintFilePatterns": [
+              "packages/vite-plugin-vue/**/*.{ts,tsx,js,jsx}"
+            ]
           },
           "outputs": ["{options.outputFile}"]
         }
@@ -552,6 +559,29 @@
             ]
           },
           "outputs": ["{options.outputFile}"]
+        }
+      }
+    },
+    "router": {
+      "root": "packages/router",
+      "sourceRoot": "packages/router/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": [],
+            "bundleName": "index",
+            "copy": []
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/packages/router"],
+          "options": {
+            "jestConfig": "packages/router/jest.config.js",
+            "passWithNoTests": true
+          }
         }
       }
     }

@@ -1,0 +1,10 @@
+{
+    "name": "@kairo/router",
+    "version": "0.0.0",
+    "description": "Declarative SPA router for kairo",
+    "peerDependencies": {
+      "history": "^5.0.1",
+      "kairo": "0.0.0"
+    }
+  }
+  

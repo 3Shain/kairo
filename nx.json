@@ -71,6 +71,9 @@
     },
     "vue-sfc-transformer": {
       "tags": []
+    },
+    "router": {
+      "tags": []
     }
   },
   "targetDependencies": {
