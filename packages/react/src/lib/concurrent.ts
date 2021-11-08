@@ -1,21 +1,22 @@
 /// <reference types="react/experimental" />
 import React, {
   unstable_useSyncExternalStore as useSyncExternalStore,
-  useMemo,
   useCallback,
   useContext,
   useEffect,
   forwardRef as reactForwardRef,
+  useState,
 } from 'react';
+import type { Track } from 'kairo';
 import { Cell, collectScope, LifecycleScope, Reaction } from 'kairo';
 import { KairoContext } from './context';
 
 type Render<T> = (
-  track: typeof Cell.track,
+  track: Track,
   props: React.PropsWithChildren<T>
 ) => React.ReactElement<any, any> | null;
 type RenderWithRef<R, T> = (
-  track: typeof Cell.track,
+  track: Track,
   props: React.PropsWithChildren<T>,
   ref: React.ForwardedRef<R>
 ) => React.ReactElement<any, any> | null;
@@ -63,7 +64,7 @@ function useConcurrentKairoComponent<Props, Render>(
   setup: (props: Props) => Render
 ) {
   const parentContext = useContext(KairoContext);
-  const [render, scope] = useMemo(() => {
+  const [[render, scope]] = useState(() => {
     const exitScope = collectScope();
     const exitContext = parentContext.runInContext();
     let renderFunction: Render;
@@ -74,8 +75,8 @@ function useConcurrentKairoComponent<Props, Render>(
       exitContext();
       scope = exitScope();
     }
-    return [renderFunction, scope];
-  }, []);
+    return [renderFunction, scope] as [Render, LifecycleScope];
+  });
 
   useEffect(() => scope.attach(), []);
 

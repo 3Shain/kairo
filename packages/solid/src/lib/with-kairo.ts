@@ -11,49 +11,67 @@ import {
   PropsWithChildren,
 } from 'solid-js';
 import { Cell, collectScope, Reaction } from 'kairo';
+import type { Track } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
 
-function patchedTrack<T>(
-  cell: Cell<T> & {
-    signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
-  }
-) {
+// function patchedTrack<T>(
+//   cell: Cell<T> & {
+//     signal_ref?: WeakMap<ReturnType<typeof getOwner>, Function>;
+//   }
+// ) {
+//   if (getListener()) {
+//     const { owner } = getListener();
+//     if (!cell.signal_ref) {
+//       cell.signal_ref = new WeakMap();
+//     }
+//     const refRead = cell.signal_ref.get(owner);
+//     if (refRead === undefined) {
+//       const update = () => {
+//         reaction.track(($) => write(() => untrack(() => $(cell))));
+//       };
+//       const reaction = new Reaction(update);
+//       const [read, write] = createSignal();
+//       update();
+//       cell.signal_ref.set(owner, read);
+//       runWithOwner(owner, () => {
+//         onCleanup(() => {
+//           reaction.dispose();
+//           cell.signal_ref.delete(owner);
+//         });
+//       });
+//       return read();
+//     } else {
+//       return refRead();
+//     }
+//   }
+//   return cell.current;
+// }
+
+// TODO: it might not work with transition? test it out
+function passiveTrack<T>(cell: Cell<T>) {
   if (getListener()) {
-    const { owner } = getListener();
-    if (!cell.signal_ref) {
-      cell.signal_ref = new WeakMap();
-    }
-    const refRead = cell.signal_ref.get(owner);
-    if (refRead === undefined) {
-      const update = () => {
-        reaction.track(($) => write(() => untrack(() => $(cell))));
-      };
-      const reaction = new Reaction(update);
-      const [read, write] = createSignal();
-      update();
-      cell.signal_ref.set(owner, read);
-      runWithOwner(owner, () => {
-        onCleanup(() => {
-          reaction.dispose();
-          cell.signal_ref.delete(owner);
-        });
-      });
-      return read();
-    } else {
-      return refRead();
-    }
+    let disposed = false;
+    const reaction = new Reaction(() => {
+      write(() => cell.current);
+      if (disposed) {
+        reaction.dispose();
+      }
+    });
+    const [read, write] = createSignal();
+    onCleanup(() => {
+      disposed = true;
+    });
+    read(); // trig track
+    return reaction.track(($) => $(cell));
   }
-  return Cell.track(cell);
+  return cell.current;
 }
 
 function withKairo<Props>(
   setup: (
     props: Props
-  ) => (
-    track: typeof Cell.track,
-    props: PropsWithChildren<Props>
-  ) => JSX.Element
+  ) => (track: Track, props: PropsWithChildren<Props>) => JSX.Element
 ): Component<Props> {
   return (
     props: Props & {
@@ -65,7 +83,7 @@ function withKairo<Props>(
     const exitScope = collectScope();
     const exitContext = context.runInContext();
     let Component: (
-      track: typeof Cell.track,
+      track: Track,
       props: PropsWithChildren<Props>
     ) => JSX.Element;
     try {
@@ -81,7 +99,7 @@ function withKairo<Props>(
       });
     }
 
-    return Component(patchedTrack, props);
+    return Component(passiveTrack, props);
   };
 }
 

@@ -1,6 +1,6 @@
-import { collectScope, Concern } from 'kairo';
+import { collectScope, Concern, Context, LifecycleScope } from 'kairo';
 import { KairoContext } from './context';
-import React, { useContext, useEffect, useMemo } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 
 export function withConcern<P>(
   concern: Concern,
@@ -8,15 +8,18 @@ export function withConcern<P>(
 ) {
   const Module: React.FunctionComponent<P> = (props) => {
     const parentContext = useContext(KairoContext);
-    const [context, scope] = useMemo(() => {
+    const [[context, scope]] = useState(() => {
       const exitScope = collectScope();
       try {
-        return [parentContext.build(concern), exitScope()];
+        return [parentContext.build(concern), exitScope()] as [
+          Context,
+          LifecycleScope
+        ];
       } catch (e) /* istanbul ignore next: captured by react */ {
         exitScope();
         throw e;
       }
-    }, []);
+    });
     useEffect(() => scope.attach(), []);
     return React.createElement(
       KairoContext.Provider,

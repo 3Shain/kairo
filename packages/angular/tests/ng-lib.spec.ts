@@ -136,7 +136,7 @@ export class Case1 extends ngSetup(
 
     const [count, setCount] = mut(0);
 
-    const doubled = computed(() => count.$ * 2);
+    const doubled = computed(($) => $(count) * 2);
 
     return {
       count,

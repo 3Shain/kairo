@@ -4,6 +4,7 @@
 
 
 
+
     {
       "name": "Bench",
       "type": "node",
@@ -27,7 +28,7 @@
       "trace": "all"
     },
     {
-      "name": "Jest Tests (angukar)",
+      "name": "Jest Tests (angular)",
       "type": "node",
       "request": "launch",
       "skipFiles": ["<node_internals>/**"],
@@ -44,6 +45,17 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceRoot}/node_modules/.bin/nx",
       "args": ["test", "react", "--runInBand", "-i"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "trace": "all"
+    },
+    {
+      "name": "Jest Tests (react-cm)",
+      "type": "node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceRoot}/node_modules/.bin/nx",
+      "args": ["run", "react:test-cm", "--runInBand", "-i"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "trace": "all"

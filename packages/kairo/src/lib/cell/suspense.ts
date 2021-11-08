@@ -63,7 +63,7 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
             if (e instanceof CellSuspended) {
               this._currentSuspension = e;
               //
-              if ((this.internal.flags & BitFlags.Stale) === 0) {
+              if ((this.internal.flags & BitFlags.Stale) === 0) { // TODO: isn't it abusing?
                 // estimate or propagate
                 this.cancelLatest();
                 this.forkCurrent(e);

@@ -6,6 +6,7 @@ import {
   Context,
   LifecycleScope,
 } from 'kairo';
+import type { Track } from 'kairo';
 import {
   DefineComponent,
   inject,
@@ -26,9 +27,11 @@ Object.defineProperty(Cell.prototype, '__v_isRef', {
 });
 Object.defineProperty(Cell.prototype, 'value', {
   get: function (this: Cell<any>) {
-    return Cell.track(this);
+    return ctx_track(this);
   },
 });
+
+let ctx_track: Track | null = null;
 
 export function useScopeController(scope: LifecycleScope) {
   let detachHandler: Function | null = null;
@@ -62,13 +65,13 @@ export function withKairo<Props>(
   component: (
     props: Props,
     ctx: SetupContext
-  ) => (track: typeof Cell.track, props: Props) => VNodeChild
+  ) => (track: Track, props: Props) => VNodeChild
 ) {
   return patchComponent(
     defineComponent<Props>((props, ctx) => {
       const renderFn = component(props, ctx);
       return (() => {
-        return renderFn(Cell.track, { ...props });
+        return renderFn(ctx_track, { ...props });
       }) as RenderFunction;
     })
   );
@@ -102,8 +105,15 @@ export function patchComponent<T extends DefineComponent>(component: T) {
         });
         if (typeof bindings === 'function') {
           return (...args: unknown[]) => (
-            // @ts-ignore
-            tracker.value, r.track(() => bindings(...args))
+            tracker.value,
+            r.track(($) => {
+              const tmp = ctx_track;
+              ctx_track = $;
+              // @ts-expect-error
+              const ret = bindings(...args);
+              ctx_track = tmp;
+              return ret;
+            })
           );
         }
         return {
@@ -133,10 +143,16 @@ function patchRender(originalRender: Function) {
     $data: any,
     $options: any
   ) {
-    const ret = _ctx.r.track(
-      () => originalRender(_ctx, _cache, $props, $setup, $data, $options),
+    const tmp = ctx_track;
+    const ret = (_ctx.r as Reaction).track(
+      ($) => (
+        (ctx_track = $),
+        originalRender(_ctx, _cache, $props, $setup, $data, $options)
+      ),
+      // @ts-expect-error
       _ctx.tracker as void
     );
+    ctx_track = tmp;
     return ret;
   };
 }

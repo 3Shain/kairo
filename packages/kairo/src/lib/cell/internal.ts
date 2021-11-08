@@ -226,7 +226,6 @@ function estimate<T>(memo: Memo<T>) {
 
 function cleanupObserver(memo: Observer) {
   if (memo.ls === null) {
-    debugger;
     return;
   }
   cleanupSources(memo.ls, null);
@@ -373,7 +372,6 @@ class TransactionContext {
                   observer.value = currentValue;
                 }
               } catch (e) {
-                debugger;
                 if (e === DEFER_COMPUTATION) {
                   // computation deferred as a upstream dependency is waiting for propagation.
                   stack.pop(); // pop()

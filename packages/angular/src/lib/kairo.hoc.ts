@@ -21,6 +21,7 @@ import {
   Cell,
   Reaction,
   isReferenceSetter,
+  Track,
 } from 'kairo';
 import { KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
@@ -142,16 +143,16 @@ export function WithKairo() {
                 this[key] = value;
               }
             }
-            const syncChanges = () => {
+            const syncChanges = ($:Track) => {
               for (let [key, cell] of cells) {
-                this[key] = Cell.track(cell);
+                this[key] = $(cell);
               }
             };
             const r = new Reaction(() => {
-              syncChanges();
+              syncChanges(x=>x.current);
               changeDetector.markForCheck();
             });
-            syncChanges();
+            syncChanges(x=>x.current);
             lifecycle(() => {
               r.track(syncChanges);
               return () => r.dispose();

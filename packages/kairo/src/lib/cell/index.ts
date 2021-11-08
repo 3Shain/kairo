@@ -1,5 +1,6 @@
 export { Cell, Reaction, mutable, computed, combined } from './cell';
 export { suspended, SuspendedCell, CellSuspended } from './suspense';
+export type { Track } from './cell';
 
 export {
   batch,

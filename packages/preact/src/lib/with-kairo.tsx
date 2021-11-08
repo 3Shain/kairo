@@ -1,8 +1,8 @@
-import { lifecycle, Reaction, collectScope, LifecycleScope, Cell } from 'kairo';
+import { Reaction, collectScope, LifecycleScope, Cell } from 'kairo';
+import type { Track } from 'kairo';
 import {
   useContext,
   useEffect,
-  useMemo,
   useReducer,
   forwardRef as reactForwardRef,
   useState,
@@ -12,12 +12,9 @@ import type { FunctionComponent, RenderableProps, VNode, Ref } from 'preact';
 import type { ForwardFn } from 'preact/compat';
 import { KairoContext } from './context';
 
-type Render<T> = (
-  track: typeof Cell.track,
-  props: RenderableProps<T>
-) => VNode<any> | null;
+type Render<T> = (track: Track, props: RenderableProps<T>) => VNode<any> | null;
 type RenderWithRef<R, T> = (
-  track: typeof Cell.track,
+  track: Track,
   props: RenderableProps<T>,
   ref: Ref<R>
 ) => VNode<any> | null;
@@ -44,53 +41,75 @@ export function forwardRef<Props, Ref>(
   return reactForwardRef(component);
 }
 
-const inc = (x: number) => x + 1;
+const inc = (x: number, _: void) => x + 1;
 
 function useKairoComponent<Props, Render>(
   props: Props,
   setup: (props: Props) => Render
 ) {
   const parentContext = useContext(KairoContext);
-  const [, forceUpdate] = useState(0);
-  const instance = useMemo(() => {
+  const [, forceUpdate] = useReducer(inc, 0);
+  const [instance] = useState(() => {
     const exitScope = collectScope();
     const exitContext = parentContext.runInContext();
     let renderFunction: Render;
     let scope: LifecycleScope;
-    let didMounted = false,
-      didUpdateBeforeMounted = false;
-    lifecycle(() => {
-      didMounted = true;
-      if (didUpdateBeforeMounted) {
-        forceUpdate(inc); // schedule an update
-        didUpdateBeforeMounted = false;
-      }
-      return () => {
-        didMounted = false;
-        renderReaction.dispose();
-      };
-    });
     try {
       renderFunction = setup(props);
     } finally {
       exitContext();
       scope = exitScope();
     }
-    const renderReaction = new Reaction(() => {
-      if (!didMounted) {
-        renderReaction.dispose();
-        didUpdateBeforeMounted = true;
-      } else {
-        forceUpdate(inc);
-      }
-    });
+    const renderReaction = new RenderReaction(forceUpdate);
 
     return {
       renderFunction,
       renderReaction,
       scope,
     };
-  }, []);
+  });
+  useEffect(() => instance.renderReaction.mount(), []);
   useEffect(() => instance.scope.attach(), []);
   return instance;
+}
+
+class RenderReaction {
+  private mounted = false;
+  private logs: [Cell<any>, any][] = [];
+  private _reaction: Reaction;
+
+  constructor(private callback: () => void) {
+    this._reaction = new Reaction(callback);
+  }
+
+  track<T>(program: ($: Track) => T) {
+    if (this.mounted) {
+      return this._reaction.track(program);
+    } else {
+      this.logs = [];
+      return program((cell) => {
+        const ret = cell.current;
+        this.logs.push([cell, ret]);
+        return ret;
+      });
+    }
+  }
+
+  mount() {
+    this.mounted = true;
+    let needToRerender = false;
+    this._reaction.track(($) => {
+      this.logs.forEach((x) => {
+        const ret = $(x[0]);
+        needToRerender ||= !Object.is(ret, x[1]);
+        return ret;
+      });
+    });
+    this.logs = [];
+    if (needToRerender) this.callback();
+    return () => {
+      this.mounted = false;
+      this._reaction.dispose();
+    };
+  }
 }

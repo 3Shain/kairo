@@ -2,7 +2,7 @@ import { render, cleanup, fireEvent } from 'solid-testing-library';
 import '@testing-library/jest-dom';
 import { withConcern, withKairo } from '../src';
 import { computed, lifecycle, mut, reference } from 'kairo';
-import { $PROXY, createComputed, createSignal } from 'solid-js';
+import { createComputed, createSignal } from 'solid-js';
 
 describe('@kairo/solid', () => {
   it('implement Simple Component Model', () => {

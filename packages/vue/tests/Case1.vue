@@ -51,7 +51,7 @@ export default {
       doubled,
       bindpara,
       onClick: () => {
-        setCount(count.value + 1);
+        setCount(count.current + 1);
       }
     };
   }),
