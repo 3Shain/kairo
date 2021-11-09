@@ -20,19 +20,19 @@ type RenderWithRef<R, T> = (
 ) => React.ReactElement<any, any> | null;
 
 export function withKairo<Props>(setup: (props: Props) => Render<Props>) {
-  const component: React.FunctionComponent<Props> = (props) => {
+  const KairoComponent: React.FunctionComponent<Props> = (props) => {
     const { renderFunction, renderReaction } = useKairoComponent(props, setup);
 
     return renderReaction.track(($) => renderFunction($, props));
   };
-  component.displayName = setup.name;
-  return component;
+  KairoComponent.displayName = setup.name;
+  return KairoComponent;
 }
 
 export function forwardRef<Props, Ref>(
   setup: (props: Props) => RenderWithRef<Ref, Props>
 ) {
-  const component: React.ForwardRefRenderFunction<Ref, Props> = (
+  const KairForwardRef: React.ForwardRefRenderFunction<Ref, Props> = (
     props,
     ref
   ) => {
@@ -40,8 +40,8 @@ export function forwardRef<Props, Ref>(
 
     return renderReaction.track(($) => renderFunction($, props, ref));
   };
-  component.displayName = setup.name;
-  return reactForwardRef(component);
+  KairForwardRef.displayName = setup.name;
+  return reactForwardRef(KairForwardRef);
 }
 
 const inc = (x: number) => x + 1;
@@ -90,11 +90,24 @@ class RenderReaction {
       return this._reaction.track(program);
     } else {
       this.logs = [];
-      return program((cell) => {
+      const track = (cell: Cell<any>) => {
         const ret = cell.current;
         this.logs.push([cell, ret]);
         return ret;
+      };
+      Object.defineProperty(track, 'error', {
+        value: (cell: Cell<any>) => {
+          try {
+            cell.current;
+            this.logs.push([cell, null]);
+            return null;
+          } catch (e) {
+            this.logs.push([cell, e]);
+            return e;
+          }
+        },
       });
+      return program(track as any);
     }
   }
 

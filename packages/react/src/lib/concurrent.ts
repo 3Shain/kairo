@@ -11,12 +11,13 @@ import type { Track } from 'kairo';
 import { Cell, collectScope, LifecycleScope, Reaction } from 'kairo';
 import { KairoContext } from './context';
 
+type UseCell = <T>(cell: Cell<T>) => T;
 type Render<T> = (
-  track: Track,
+  track: UseCell,
   props: React.PropsWithChildren<T>
 ) => React.ReactElement<any, any> | null;
 type RenderWithRef<R, T> = (
-  track: Track,
+  track: UseCell,
   props: React.PropsWithChildren<T>,
   ref: React.ForwardedRef<R>
 ) => React.ReactElement<any, any> | null;

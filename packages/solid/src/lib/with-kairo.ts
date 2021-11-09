@@ -28,7 +28,13 @@ import { KairoContext } from './context';
 //     const refRead = cell.signal_ref.get(owner);
 //     if (refRead === undefined) {
 //       const update = () => {
-//         reaction.track(($) => write(() => untrack(() => $(cell))));
+//         console.log('hey update!');
+//         console.log(cell.current);
+//         reaction.track(($) => {
+//           console.log('you should update?');
+//           console.log($(cell))
+//           write(() => untrack(() => $(cell)));
+//         });
 //       };
 //       const reaction = new Reaction(update);
 //       const [read, write] = createSignal();
@@ -36,6 +42,7 @@ import { KairoContext } from './context';
 //       cell.signal_ref.set(owner, read);
 //       runWithOwner(owner, () => {
 //         onCleanup(() => {
+//           console.log('imfucked');
 //           reaction.dispose();
 //           cell.signal_ref.delete(owner);
 //         });
@@ -68,6 +75,46 @@ function passiveTrack<T>(cell: Cell<T>) {
   return cell.current;
 }
 
+function passiveTrackError<T>(cell: Cell<T>) {
+  if (getListener()) {
+    let disposed = false;
+    const reaction = new Reaction(() => {
+      write(() => {
+        try {
+          cell.current;
+          return null;
+        } catch (e) {
+          return e;
+        }
+      });
+      if (disposed) {
+        reaction.dispose();
+      }
+    });
+    const [read, write] = createSignal();
+    onCleanup(() => {
+      disposed = true;
+    });
+    read(); // trig track
+    return reaction.track(($) => {
+      try {
+        $(cell);
+        return null;
+      } catch (e) {
+        return e;
+      }
+    });
+  }
+  try {
+    cell.current;
+    return null;
+  } catch (e) {
+    return e;
+  }
+}
+
+Object.defineProperty(passiveTrack,'error',{value: passiveTrackError});
+
 function withKairo<Props>(
   setup: (
     props: Props
@@ -99,7 +146,7 @@ function withKairo<Props>(
       });
     }
 
-    return Component(passiveTrack, props);
+    return Component(passiveTrack as any, props);
   };
 }
 

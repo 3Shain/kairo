@@ -6,7 +6,7 @@ export function withConcern<P>(
   concern: Concern,
   Component: React.ComponentType<P>
 ) {
-  const Module: React.FunctionComponent<P> = (props) => {
+  const KairoModule: React.FunctionComponent<P> = (props) => {
     const parentContext = useContext(KairoContext);
     const [[context, scope]] = useState(() => {
       const exitScope = collectScope();
@@ -28,5 +28,5 @@ export function withConcern<P>(
     );
   };
 
-  return Module;
+  return KairoModule;
 }

@@ -87,11 +87,24 @@ class RenderReaction {
       return this._reaction.track(program);
     } else {
       this.logs = [];
-      return program((cell) => {
+      const track = (cell: Cell<any>) => {
         const ret = cell.current;
         this.logs.push([cell, ret]);
         return ret;
+      };
+      Object.defineProperty(track, 'error', {
+        value: (cell: Cell<any>) => {
+          try {
+            cell.current;
+            this.logs.push([cell, null]);
+            return null;
+          } catch (e) {
+            this.logs.push([cell, e]);
+            return e;
+          }
+        },
       });
+      return program(track as any);
     }
   }
 
