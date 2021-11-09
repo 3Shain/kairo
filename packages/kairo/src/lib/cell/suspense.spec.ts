@@ -18,6 +18,7 @@ describe('cell/suspense', () => {
     expect(() => c.current).toThrow(e);
 
     effect(($) => $(b));
+    effect(($) => expect($.error(c)).toBe(e));
     ma(1);
   });
 
@@ -68,8 +69,8 @@ describe('cell/suspense', () => {
       return cache.get($(a));
     });
     const b = suspended(
-      (_, read) => {
-        return read(c) + '_';
+      ($) => {
+        return $.suspend(c) + '_';
       },
       { fallback: SHARED_FALLBACK }
     );

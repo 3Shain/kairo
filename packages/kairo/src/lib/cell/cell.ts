@@ -22,11 +22,8 @@ export class Cell<T> {
     return new Cell(createData(initial));
   }
 
-  protected static track<C>(t: <D>(data: Data<D>) => D, cell: Cell<C>): C {
-    return t(cell.internal);
-  }
-
-  constructor(protected internal: Data<T>) {}
+  /**  @internal */
+  constructor(/**  @internal */ public internal: Data<T>) {}
 
   get current(): T {
     return accessReferenceValue(this.internal);
@@ -73,9 +70,21 @@ export class Cell<T> {
   }
 }
 
-function trackCell<T>($: (data: Data<T>) => T) {
-  // @ts-expect-error: internal static method
-  return (cell: Cell<T>) => $(cell.internal);
+function createTrackFn<T>($: (data: Data<T>) => T) {
+  const ret = (cell: Cell<T>) => $(cell.internal);
+  Object.defineProperties(ret, {
+    error: {
+      value: (cell: Cell<T>) => {
+        try {
+          ret(cell);
+          return null;
+        } catch (e) {
+          return e;
+        }
+      },
+    },
+  });
+  return ret as Track;
 }
 
 interface Observable<T> extends Subscribable<T> {}
@@ -96,12 +105,16 @@ interface SubscriptionObserver<T> {
   readonly closed: boolean;
 }
 
-export type Track = <C>(cell: Cell<C>) => C;
+export type Track = {
+  <C>(cell: Cell<C>): C;
+  error(cell: Cell<any>): any;
+};
 
 declare var Observable: ObservableConstructor;
 
 export class Reaction {
-  private internal: _Reaction;
+  /**  @internal */
+  internal: _Reaction;
 
   constructor(callback: () => void) {
     this.internal = createReaction(callback);
@@ -114,7 +127,7 @@ export class Reaction {
    * @throws User-land errors in program()
    */
   track<T>(program: ($: Track) => T) {
-    return executeReaction<T>(this.internal, ($) => program(trackCell($)));
+    return executeReaction<T>(this.internal, ($) => program(createTrackFn($)));
   }
 
   dispose() {
@@ -123,14 +136,15 @@ export class Reaction {
 }
 
 export class IncrementalReaction {
-  private internal: _Reaction;
+  /**  @internal */
+  internal: _Reaction;
 
   constructor(callback: () => void) {
     this.internal = createReaction(callback);
   }
 
   track<T>(program: ($: Track) => T) {
-    return executeReaction<T>(this.internal, ($) => program(trackCell($)));
+    return executeReaction<T>(this.internal, ($) => program(createTrackFn($)));
   }
 
   continue<T>(program: ($: Track) => T) {
@@ -138,7 +152,7 @@ export class IncrementalReaction {
       for (const x of this.getHistoryReads()) {
         t(x);
       }
-      return program(trackCell(t));
+      return program(createTrackFn(t));
     });
   }
 
@@ -185,7 +199,7 @@ export function computed<T>(
   }
 ): Cell<T> {
   return new Cell(
-    createMemo((t) => expr(trackCell(t)), options?.comparator, initial)
+    createMemo((t) => expr(createTrackFn(t)), options?.comparator, initial)
   );
 }
 

@@ -6,8 +6,9 @@
     "declaration": true,
     "strict": true,
     "types": ["node"],
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "stripInternal": true
   },
-  "exclude": ["**/*.spec.ts"],
+  "exclude": ["**/*.spec.ts", "**/spec-shared.ts"],
   "include": ["**/*.ts"]
 }

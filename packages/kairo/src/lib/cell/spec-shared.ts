@@ -1,6 +1,6 @@
 /* istanbul ignore file: for test only */
 
-import { Cell, Reaction } from './cell';
+import { Cell, Reaction, Track } from './cell';
 import { BitFlags, Memo } from './internal';
 
 const toCleanup: Function[] = [];
@@ -10,7 +10,7 @@ export function cleanup() {
   toCleanup.length = 0;
 }
 
-export function effect(fn: ($: Function) => any) {
+export function effect(fn: (x:Track)=>any) {
   const callback = () => {
     r.track(fn);
   };

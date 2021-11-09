@@ -26,20 +26,20 @@ describe('cell', () => {
     globalThis.Observable = undefined;
   });
 
-  it('do not evaluate if dependencies are unchanged', ()=>{
-    const [a,ma] = mutable(0);
-    const [b,mb] = mutable(0);
-    const c = computed($=>$(a)+$(b));
-    const d = c.map(x=>x);
+  it('do not evaluate if dependencies are unchanged', () => {
+    const [a, ma] = mutable(0);
+    const [b, mb] = mutable(0);
+    const c = computed(($) => $(a) + $(b));
+    const d = c.map((x) => x);
     let run = false;
-    effect($=>{
-      if(run){
+    effect(($) => {
+      if (run) {
         throw 'Not expected effect';
       }
       $(d);
       run = true;
     });
-    batch(()=>{
+    batch(() => {
       ma(1);
       mb(-1);
     });
@@ -228,11 +228,7 @@ describe('cell', () => {
         return $(a);
       }, 0);
       const cleanEffect = effect(($) => {
-        try {
-          $(b);
-        } catch {
-          // ignore
-        }
+        $.error(b);
       });
       ma(1);
       expect(b.current).toBe(1);

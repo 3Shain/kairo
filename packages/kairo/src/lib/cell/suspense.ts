@@ -1,5 +1,6 @@
 import { noop } from '../misc';
 import { Cell } from './cell';
+import type { Track } from './cell';
 import {
   createMemo,
   createData,
@@ -25,30 +26,48 @@ const DEFER_SUSPENSION = new CellSuspended(
   /* istanbul ignore next: not used */ () => new Promise(noop)
 );
 
-type Track = <T>(cell: Cell<T>) => T;
-type SuspendedTrack = <T>(cell: SuspendedCell<T, any>) => T;
+type SuspendedTrack = Track & {
+  suspend<T>(cell: SuspendedCell<T, any>): T;
+};
+
+function createTrackFn<T>($: (data: Data<T>) => T) {
+  const ret = (cell: Cell<T>) => $(cell.internal);
+  Object.defineProperties(ret, {
+    error: {
+      value: (cell: Cell<T>) => {
+        try {
+          ret(cell);
+          return null;
+        } catch (e) {
+          return e;
+        }
+      },
+    },
+    suspend: {
+      value: (cell: SuspendedCell<T, any>) => {
+        const value = ret(cell);
+        if (cell._currentSuspension !== null) {
+          throw DEFER_SUSPENSION;
+        }
+        return value;
+      },
+    },
+  });
+  return ret as SuspendedTrack;
+}
 
 export class SuspendedCell<T, F> extends Cell<T | F> {
-  private _notifier: Data<number>;
-  private _currentSuspension: CellSuspended | null = null;
-
-  private _executing: AbortController | null = null;
+  /** @internal */
+  _notifier: Data<number>;
+  /** @internal */
+  _currentSuspension: CellSuspended | null = null;
+  /** @internal */
+  _executing: AbortController | null = null;
 
   [Symbol.toStringTag] = 'SuspendedCell';
-
-  private static strack<C>(
-    t: <D>(data: Data<D>) => D,
-    cell: SuspendedCell<C, any>
-  ): C {
-    const value = t(cell.internal);
-    if (cell._currentSuspension !== null) {
-      throw DEFER_SUSPENSION;
-    }
-    return value;
-  }
-
+  /** @internal */
   constructor(
-    expr: (track: Track, read: SuspendedTrack) => T,
+    expr: (track: SuspendedTrack) => T,
     options?: Partial<SuspendedCellOptions<T, F>>
   ) {
     super(
@@ -56,14 +75,15 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
         ($) => {
           try {
             $(this._notifier);
-            const value = expr(track($), strack($));
+            const value = expr(createTrackFn($));
             this._currentSuspension = null;
             return value;
           } catch (e) {
             if (e instanceof CellSuspended) {
               this._currentSuspension = e;
               //
-              if ((this.internal.flags & BitFlags.Stale) === 0) { // TODO: isn't it abusing?
+              if ((this.internal.flags & BitFlags.Stale) === 0) {
+                // TODO: isn't it abusing?
                 // estimate or propagate
                 this.cancelLatest();
                 this.forkCurrent(e);
@@ -79,16 +99,8 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
     );
     this._notifier = createData(0);
     const fallback = options?.fallback as any;
-    const track =
-      (t: <D>(data: Data<D>) => D) =>
-      <C>(cell: Cell<C>) =>
-        SuspendedCell.track(t, cell);
-    const strack =
-      (t: <D>(data: Data<D>) => D) =>
-      <C>(cell: SuspendedCell<C, any>) =>
-        SuspendedCell.strack(t, cell);
   }
-
+  /** @internal */
   private cancelLatest() {
     if (this._executing !== null) {
       // cancel current?
@@ -96,7 +108,7 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
       this._executing = null;
     }
   }
-
+  /** @internal */
   private forkCurrent(s: CellSuspended) {
     if (s === DEFER_SUSPENSION) {
       return; // control by upstream
@@ -111,7 +123,7 @@ export class SuspendedCell<T, F> extends Cell<T | F> {
 }
 
 export function suspended<T, F = undefined>(
-  expr: ($: Track, read: SuspendedTrack) => T,
+  expr: ($: SuspendedTrack) => T,
   options?: Partial<SuspendedCellOptions<T, F>>
 ) {
   return new SuspendedCell(expr, options);
