@@ -1,15 +1,26 @@
 import {
   Type,
   ɵComponentDef as ComponentDef,
+  ɵComponentType as ComponentType,
   ɵɵdirectiveInject,
   NgZone,
   InjectFlags,
   ChangeDetectorRef,
   Injector,
-  SimpleChanges,
-  ɵDirectiveDef as DirectiveDef,
   ɵivyEnabled as ivyEnabled,
   ElementRef,
+  Injectable,
+  ɵɵProvidersFeature as useProvidersFeature,
+  ɵɵdefineComponent as defineComponent,
+  ɵɵelement as element,
+  ɵɵproperty as property,
+  ViewEncapsulation,
+  ɵAttributeMarker,
+  ViewContainerRef,
+  ComponentFactoryResolver,
+  ɵɵdirectiveInject as directiveInject,
+  InjectionToken,
+  Inject,
 } from '@angular/core';
 import {
   isCell,
@@ -23,6 +34,12 @@ import {
   isReferenceSetter,
   Track,
 } from 'kairo';
+import {
+  appendProviders,
+  hookFactory,
+  overrideLifecyleAppend,
+  overrideLifecylePrepend,
+} from './hoc';
 import { KairoScopeRefImpl } from './kairo.service';
 import { NG_INJECTOR } from './tokens';
 
@@ -31,11 +48,124 @@ interface KairoDirectiveInstance {
   ɵɵinjector: Injector;
   ɵɵzone: NgZone;
   ɵɵlifecycleScope: LifecycleScope;
-  ɵɵinit: boolean;
   ngSetup: Function;
   // ɵɵeffectQueue: LayoutQueue;
   ɵɵreferenceMap: { name: string; reference: SetReference }[];
 }
+
+// let createNumber = 0;
+// let rcd = 0;
+
+// export function createComponent(component: Type<any>) {
+//   const directiveDefinition = component['ɵcmp'] as ComponentDef<unknown>;
+//   // assert: no extra selectors:
+//   const targetComponentSelector = directiveDefinition.selectors[0][0] as string;
+
+//   const FakeComponent: ComponentType<any> = class {
+//     constructor() {
+//       console.log('a fake component created');
+//     }
+//   } as any;
+//   const bindings = [
+//     ...Object.keys(directiveDefinition.inputs),
+//     ...Object.keys(directiveDefinition.outputs),
+//   ];
+//   FakeComponent.ɵcmp = defineComponent({
+//     type: FakeComponent,
+//     selectors: [[`fake-component-${createNumber++}`]],
+//     features: [],
+//     decls: 1,
+//     inputs: directiveDefinition.inputs,
+//     outputs: directiveDefinition.outputs,
+//     vars: bindings.length,
+//     consts: [[ɵAttributeMarker.Bindings, ...bindings]],
+//     template: function Template(rf, ctx) {
+//       if (rf & 1) {
+//         element(0, targetComponentSelector, 0);
+//       }
+//       if (rf & 2) {
+//         bindings.forEach((x) => {
+//           property(x, ctx[x]);
+//         });
+//       }
+//     },
+//     directives: [component],
+//     styles: [],
+//     encapsulation: ViewEncapsulation.None,
+//   });
+//   (FakeComponent as any).ɵfac = function factory(t: Type<any>) {
+//     return new (t || FakeComponent)();
+//   };
+//   return FakeComponent as typeof component;
+// }
+
+// export function createComponent22(Component: Type<any>) {
+//   class DoubleComponent extends Component {
+//     static ɵcmp = {
+//       ...Component['ɵcmp'],
+//       type: DoubleComponent,
+//       id: 'kairo_' + rcd++,
+//     };
+//     static ɵfac = () => Component['ɵfac'](DoubleComponent);
+
+//     constructor(...args: any[]) {
+//       super(...args);
+//     }
+
+//     // to avoid ngc error
+//     ['ngAfterViewInit']() {
+//       // init
+//       super.ngAfterViewInit();
+//     }
+
+//     // to avoid ngc error
+//     ['ngOnDestroy']() {
+//       super.ngOnDestroy();
+//       // des
+//     }
+//   }
+//   Object.defineProperty(DoubleComponent, 'name', { value: Component.name });
+//   appendProviders(DoubleComponent.ɵcmp, [
+
+//   ]);
+//   return DoubleComponent as typeof Component;
+// }
+
+// export function createComponent2(Component: Type<any>) {
+//   // assert: no extra selectors:
+//   const DoubleComponent: ComponentType<any> = class {
+//     constructor(vcr: ViewContainerRef, cfr: ComponentFactoryResolver) {
+//       const fac = cfr.resolveComponentFactory(Component);
+//       vcr.createComponent(fac, undefined, vcr.injector).instance;
+//     }
+
+//     ngOnDestroy() {
+//       console.log('imfine')
+//     }
+//   } as any;
+
+//   DoubleComponent.ɵcmp = defineComponent({
+//     type: DoubleComponent,
+//     selectors: [[`kairo-component-outlet`]],
+//     features: [
+//       useProvidersFeature(
+//         []
+//       ),
+//     ],
+//     decls: 1,
+//     vars: 0,
+//     template: function Template(rf) {},
+//     styles: [],
+//     encapsulation: ViewEncapsulation.None,
+//   });
+//   (DoubleComponent as any).ɵfac = function factory(t: Type<any>) {
+//     return new (t || DoubleComponent)(
+//       directiveInject(ViewContainerRef),
+//       directiveInject(ComponentFactoryResolver)
+//     );
+//   };
+//   return DoubleComponent as typeof Component;
+// }
 
 export function WithKairo() {
   return <T>(componentType: Type<T>) => {
@@ -46,159 +176,124 @@ export function WithKairo() {
       );
     }
 
-    const directiveDefinition =
-      (componentType['ɵcmp'] as ComponentDef<unknown>) ??
-      (componentType['ɵdir'] as DirectiveDef<unknown>);
-    const factoryOld = componentType['ɵfac'];
     /** Override component factory */
-    Object.defineProperty(componentType, 'ɵfac', {
-      get:
-        () =>
-        (...args: any) => {
-          const instance = factoryOld(...args) as KairoDirectiveInstance;
-          instance.ɵɵkairoScope = ɵɵdirectiveInject(
-            KairoScopeRefImpl,
-            InjectFlags.Optional
-          );
-          instance.ɵɵinjector = ɵɵdirectiveInject(Injector, InjectFlags.Self);
-          instance.ɵɵzone = ɵɵdirectiveInject(NgZone);
-          instance.ɵɵinit = false;
-          instance.ɵɵreferenceMap = [];
-          return instance;
-        },
-    });
-    /**
-     * Setup kairo
-     */
-    ((def: ComponentDef<unknown> | DirectiveDef<unknown>) => {
-      if ('onPush' in def) {
-        (def.onPush as any) = true; // component default onPush
+    hookFactory<KairoDirectiveInstance>(componentType as any, (instance) => {
+      const kairoScope = (instance.ɵɵkairoScope = ɵɵdirectiveInject(
+        KairoScopeRefImpl,
+        InjectFlags.Optional
+      ));
+      const injector = (instance.ɵɵinjector = ɵɵdirectiveInject(
+        Injector,
+        InjectFlags.Self
+      ));
+      const zone = (instance.ɵɵzone = ɵɵdirectiveInject(NgZone));
+      const referenceMap = (instance.ɵɵreferenceMap = []);
+
+      /* istanbul ignore if  */
+      if (typeof instance.ngSetup !== 'function') {
+        console.error(`ngSetup is not declared.`);
+        return;
       }
-    })(directiveDefinition);
+      const changeDetector = injector.get(ChangeDetectorRef);
 
-    const hasInputs = Object.keys(directiveDefinition.inputs).length > 0;
+      const localProviders = {
+        [NG_INJECTOR]: injector,
+        // [LAYOUT_QUEUE]: this.ɵɵeffectQueue
+      };
 
-    // ensure these method exist in prototype cuz ivy will store them.
-    const ngOnChangesOld = (
-      hasInputs
-        ? componentType.prototype.ngOnChanges
-        : componentType.prototype.ngOnInit
-    ) as Function;
-    const ngOnDestroyOld = componentType.prototype.ngOnDestroy as Function;
-    componentType.prototype.ngOnDestroy = function (
-      this: KairoDirectiveInstance
-    ) {
-      this.ɵɵzone.runOutsideAngular(() => {
-        this.ɵɵlifecycleScope.detach();
-      });
-      ngOnDestroyOld?.call(this);
-    };
+      const context =
+        kairoScope?.context.inherit(localProviders) ??
+        new Context().build(() => localProviders);
 
-    const onChangesOrOnInit = function (
-      this: KairoDirectiveInstance,
-      changes: SimpleChanges
-    ) {
-      if (!this.ɵɵinit) {
-        /* istanbul ignore if  */
-        if (typeof this.ngSetup !== 'function') {
-          console.error(`ngSetup is not declared.`);
-          return;
-        }
-        const changeDetector = this.ɵɵinjector.get(ChangeDetectorRef);
+      zone.runOutsideAngular(() => {
+        const exitScope = collectScope();
+        const exitContext = context.runInContext();
 
-        const localProviders = {
-          [NG_INJECTOR]: this.ɵɵinjector,
-          // [LAYOUT_QUEUE]: this.ɵɵeffectQueue
-        };
-
-        const context =
-          this.ɵɵkairoScope?.context.inherit(localProviders) ??
-          new Context().build(() => localProviders);
-
-        this.ɵɵzone.runOutsideAngular(() => {
-          const exitScope = collectScope();
-          const exitContext = context.runInContext();
-
-          try {
-            const resolve = this.ngSetup(this);
-            if (resolve === undefined) {
-              return {};
-            }
-            /* istanbul ignore if  */
-            if (typeof resolve !== 'object') {
-              throw Error(
-                `ngSetup() is expected to return an object, but it got ${typeof resolve}`
-              );
-            }
-            const cells = new Map<string, Cell<any>>();
-            for (const [key, value] of Object.entries(resolve)) {
-              if (isCell(value)) {
-                cells.set(key, value);
-              } else if (isReferenceSetter(value)) {
-                this.ɵɵreferenceMap.push({
-                  name: key,
-                  reference: value,
-                });
-              } else {
-                this[key] = value;
-              }
-            }
-            const syncChanges = ($:Track) => {
-              for (let [key, cell] of cells) {
-                this[key] = $(cell);
-              }
-            };
-            const r = new Reaction(() => {
-              syncChanges(x=>x.current);
-              changeDetector.markForCheck();
-            });
-            syncChanges(x=>x.current);
-            lifecycle(() => {
-              r.track(syncChanges);
-              return () => r.dispose();
-            });
-          } finally {
-            exitContext();
-            this.ɵɵlifecycleScope = exitScope();
+        try {
+          const resolve = instance.ngSetup(instance);
+          if (resolve === undefined) {
+            return {};
           }
-        });
-        this.ɵɵinit = true;
-      }
-      ngOnChangesOld?.call(this, changes);
-    };
-
-    if (hasInputs) componentType.prototype.ngOnChanges = onChangesOrOnInit;
-    else componentType.prototype.ngOnInit = onChangesOrOnInit;
-
-    const ngAfterViewInitOld = componentType.prototype
-      .ngAfterViewInit as Function;
-    const afterViewInit = function (this: KairoDirectiveInstance) {
-      for (const entry of this.ɵɵreferenceMap) {
-        const target = this[entry.name];
-        if (target instanceof ElementRef) {
-          entry.reference(target.nativeElement);
-        } else {
-          entry.reference(target);
+          /* istanbul ignore if  */
+          if (typeof resolve !== 'object') {
+            throw Error(
+              `ngSetup() is expected to return an object, but it got ${typeof resolve}`
+            );
+          }
+          const cells = new Map<string, Cell<any>>();
+          for (const [key, value] of Object.entries(resolve)) {
+            if (isCell(value)) {
+              cells.set(key, value);
+            } else if (isReferenceSetter(value)) {
+              referenceMap.push({
+                name: key,
+                reference: value,
+              });
+            } else {
+              instance[key] = value;
+            }
+          }
+          const syncChanges = () => {
+            r.track(($) => {
+              for (let [key, cell] of cells) {
+                instance[key] = $(cell);
+              }
+            });
+          };
+          const r = new Reaction(() => {
+            syncChanges();
+            changeDetector.markForCheck();
+          });
+          syncChanges();
+          lifecycle(() => {
+            return () => r.dispose();
+          });
+        } finally {
+          exitContext();
+          instance.ɵɵlifecycleScope = exitScope();
         }
-      }
-      this.ɵɵlifecycleScope.attach();
-      ngAfterViewInitOld?.call(this);
-    };
-    componentType.prototype.ngAfterViewInit = afterViewInit;
+      });
+      return instance;
+    });
 
-    const ngAfterViewCheckedOld = componentType.prototype
-      .ngAfterViewChecked as Function;
-    const afterViewChecked = function (this: KairoDirectiveInstance) {
-      for (const entry of this.ɵɵreferenceMap) {
-        const target = this[entry.name];
-        if (target instanceof ElementRef) {
-          entry.reference(target.nativeElement);
-        } else {
-          entry.reference(target);
-        }
+    overrideLifecylePrepend<KairoDirectiveInstance>(
+      componentType as any as Type<KairoDirectiveInstance>,
+      {
+        ngAfterViewInit: function () {
+          for (const entry of this.ɵɵreferenceMap) {
+            const target = this[entry.name];
+            if (target instanceof ElementRef) {
+              entry.reference(target.nativeElement);
+            } else {
+              entry.reference(target);
+            }
+          }
+          this.ɵɵzone.runOutsideAngular(() => {
+            this.ɵɵlifecycleScope.attach();
+          });
+        },
+        ngAfterViewChecked: function () {
+          for (const entry of this.ɵɵreferenceMap) {
+            const target = this[entry.name];
+            if (target instanceof ElementRef) {
+              entry.reference(target.nativeElement);
+            } else {
+              entry.reference(target);
+            }
+          }
+        },
       }
-      ngAfterViewCheckedOld?.call(this);
-    };
-    componentType.prototype.ngAfterViewChecked = afterViewChecked;
+    );
+
+    overrideLifecyleAppend<KairoDirectiveInstance>(
+      componentType as any as Type<KairoDirectiveInstance>,
+      {
+        ngOnDestroy: function () {
+          this.ɵɵzone.runOutsideAngular(() => {
+            this.ɵɵlifecycleScope.detach();
+          });
+        },
+      }
+    );
   };
 }
