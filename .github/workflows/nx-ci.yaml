@@ -21,7 +21,7 @@ jobs:
       - name: Unit test
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: kairo,angular,vue,react,svelte,solid,preact
+          projects: kairo,angular,vue,react,svelte,solid,preact,router
           targets: test
           affected: true
           args: --codeCoverage
