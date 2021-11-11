@@ -10,7 +10,7 @@
     "url": "https://github.com/3Shain/kairo"
   },
   "description": "A framework.",
-  "version": "0.6.0-rc.0",
+  "version": "0.8.0-alpha.0",
   "license": "MIT",
   "scripts": {
     "ng": "nx",
