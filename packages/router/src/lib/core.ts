@@ -1,4 +1,4 @@
-import type { Route, Matcher, Matched, MatchResult, Query } from './types';
+import type { Route, Matcher, Matched, MatchResult, Search } from './types';
 
 function getSegments(path: string) {
   return path
@@ -139,13 +139,13 @@ export function resolvePath(to: string, from: string) {
   );
 }
 
-export function parseQuery(query: string): Query {
+export function parseQuery(query: string): Search {
   return Object.fromEntries(
     query.split('&').map((x) => x.split('=') as [string, string])
   );
 }
 
-export function stringfyQuery(query: Query) {
+export function stringfyQuery(query: Search) {
   return Object.entries(query)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');

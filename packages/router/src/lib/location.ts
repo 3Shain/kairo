@@ -14,8 +14,8 @@ import { Location, LocationChangePayload, MatchResult } from './types';
 import type { History } from 'history';
 import { parseQuery, resolvePath } from './core';
 
-export const LocationId = Identifier.of<Location>('router location');
-export const HistoryId = Identifier.of<History>('router history');
+export const LOCATION = Identifier.of<Location>('KairoRouterLocation');
+export const HISTORY = Identifier.of<History>('KairoRouterHistroy');
 
 function reduced<T, R>(
   eventStream: EventStream<T>,
@@ -57,11 +57,10 @@ function rootLocation(history: History): Location {
     hash,
   });
 
-  const query = locationState.map((x) => parseQuery(x.search.substring(1)));
   return {
     pathname: locationState.map((x) => x.pathname),
     basepath: Cell.of('/'),
-    query,
+    search: locationState.map((x) => parseQuery(x.search.substring(1))),
     hash: locationState.map((x) => x.hash),
     change,
     params: Cell.of({}),
@@ -69,7 +68,7 @@ function rootLocation(history: History): Location {
 }
 
 export function derivedLocation(result: Cell<MatchResult>): Location {
-  const { query, hash, change, basepath }: Location = injected(LocationId);
+  const { search, hash, change, basepath }: Location = injected(LOCATION);
 
   const currentBasepath = computed(($) =>
     resolvePath('.' + $(result).basepath, $(basepath))
@@ -77,7 +76,7 @@ export function derivedLocation(result: Cell<MatchResult>): Location {
   return {
     pathname: result.map((x) => x.pathname),
     basepath: currentBasepath,
-    query,
+    search,
     hash,
     change,
     params: result.map((x) => x.params),
@@ -86,10 +85,9 @@ export function derivedLocation(result: Cell<MatchResult>): Location {
 
 export function configureLocation(history: History): Concern {
   return () => {
-    window['_history'] = history;
     return {
-      [LocationId]: rootLocation(history),
-      [HistoryId]: history,
+      [LOCATION]: rootLocation(history),
+      [HISTORY]: history,
     };
   };
 }

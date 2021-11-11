@@ -43,7 +43,7 @@ export type Location = {
    */
   pathname: Cell<string>;
   basepath: Cell<string>;
-  query: Cell<Query>;
+  search: Cell<Search>;
   hash: Cell<string>;
   params: Cell<Record<string, string>>;
   /**
@@ -53,14 +53,14 @@ export type Location = {
 };
 
 export type NavigateHandler = (
-  path: { path: string; query?: Query },
+  path: { path: string; search?: Search },
   options?: {
     replace?: boolean;
-    preserveQuery?: boolean;
+    preserveSearch?: boolean;
   }
 ) => void;
 
-export type Query = Record<string, string>;
+export type Search = Record<string, string>;
 
 export type LocationChangePayload = {
   pathname: string;

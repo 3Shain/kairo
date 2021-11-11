@@ -1,7 +1,7 @@
 export {
   useRoutes,
   useParam,
-  useQuery,
+  useSearchParam,
   useNavigate,
   useLocation,
 } from './lib/use-routes';
@@ -12,5 +12,5 @@ export type {
   MatchResult,
   Matcher,
   Matched,
-  Query,
+  Search,
 } from './lib/types';

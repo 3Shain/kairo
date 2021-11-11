@@ -1,14 +1,14 @@
 import {
   Cell,
   computed,
-  Concern,
   effect,
   injected,
   suspended,
   CellSuspended,
+  CONCERN_HOC_FACTORY,
 } from 'kairo';
 import { compareMatch, findMatch, resolvePath, stringfyQuery } from './core';
-import { derivedLocation, HistoryId, LocationId } from './location';
+import { derivedLocation, HISTORY, LOCATION } from './location';
 import { Route, MatchResult, NavigateHandler, Location } from './types';
 import { memo } from './utils';
 
@@ -25,11 +25,14 @@ function readComponent(x: () => Promise<any>) {
 
 const FOREVER_PENDING_PROMISE = new Promise(() => {});
 
+type UseRoutesOptions = {};
+
 export function useRoutes(
   routes: Cell<Route[]>,
-  bind: (concern: Concern, x: any) => any
+  options?: Partial<UseRoutesOptions>
 ) {
-  const location = injected(LocationId);
+  const location = injected(LOCATION);
+  const hocFactory = injected(CONCERN_HOC_FACTORY);
   const navigate = useNavigate();
 
   const _matched = computed(($) => findMatch($(routes), $(location.pathname)));
@@ -41,11 +44,17 @@ export function useRoutes(
   effect(($) => {
     const filtered = $(matchedRouteAndParams);
     if (filtered.route.redirectTo) {
-      console.log(filtered.route.redirectTo);
-      navigate({
-        path: filtered.route.redirectTo,
-      }, {
-        replace: true
+      // in case `history` hasn't been `listen`ed yet.
+      // TODO: potential bug
+      setTimeout(() => {
+        navigate(
+          {
+            path: filtered.route.redirectTo!,
+          },
+          {
+            replace: true,
+          }
+        );
       });
     }
   });
@@ -64,7 +73,7 @@ export function useRoutes(
         : route.component;
       return _memo(
         () =>
-          (bind(() => {
+          hocFactory(() => {
             const _result: Cell<MatchResult> = computed((get) => {
               const __matched = get(_matched);
               return compareMatch(matched, __matched)
@@ -72,9 +81,9 @@ export function useRoutes(
                 : get(_result);
             }, result);
             return {
-              [LocationId]: derivedLocation(_result),
+              [LOCATION]: derivedLocation(_result),
             };
-          }, component)),
+          })(component),
         [
           route.load,
           route.component,
@@ -99,7 +108,7 @@ export function useParam(
   name: string,
   options?: { parse: (value: string) => any }
 ): Cell<any> {
-  const location = injected(LocationId);
+  const location = injected(LOCATION);
 
   return computed(($) => {
     const result = $(location.params)[name];
@@ -110,21 +119,21 @@ export function useParam(
   });
 }
 
-export function useQuery<T>(
+export function useSearchParam<T>(
   name: string,
   options: { parse: (value: string) => T; stringfy: (value: T) => string }
 ): [Cell<T>, (value: T) => void];
-export function useQuery(name: string): [Cell<string>, (value: string) => void];
-export function useQuery(
+export function useSearchParam(name: string): [Cell<string>, (value: string) => void];
+export function useSearchParam(
   name: string,
   options?: { parse: (value: string) => any; stringfy: (value: any) => string }
 ): [Cell<any>, (value: any) => void] {
-  const location = injected(LocationId);
+  const location = injected(LOCATION);
   const navigate = useNavigate();
 
   return [
     computed(($) => {
-      const result = $(location.query)[name];
+      const result = $(location.search)[name];
       if (options?.parse) {
         return options.parse(result);
       }
@@ -134,13 +143,13 @@ export function useQuery(
       navigate(
         {
           path: '.',
-          query: {
+          search: {
             [name]: options?.stringfy ? options.stringfy(value) : value,
           },
         },
         {
           replace: true,
-          preserveQuery: true,
+          preserveSearch: true,
         }
       );
     },
@@ -148,20 +157,20 @@ export function useQuery(
 }
 
 export function useLocation(): Location {
-  return injected(LocationId);
+  return injected(LOCATION);
 }
 
 export function useNavigate(): NavigateHandler {
-  const location = injected(LocationId);
-  const history = injected(HistoryId);
+  const location = injected(LOCATION);
+  const history = injected(HISTORY);
 
   return function navigate(to, options) {
-    const _query = options?.preserveQuery
+    const _query = options?.preserveSearch
       ? {
-          ...location.query.current,
-          ...to.query,
+          ...location.search.current,
+          ...to.search,
         }
-      : to.query;
+      : to.search;
     const search = _query
       ? Object.keys(_query).length > 0
         ? `?${stringfyQuery(_query ?? {})}`
