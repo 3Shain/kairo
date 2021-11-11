@@ -4,17 +4,12 @@ import {
   lifecycle,
   Cell,
   Context,
-  LifecycleScope,
   CONCERN_HOC_FACTORY,
 } from 'kairo';
 import type { Track } from 'kairo';
 import {
   DefineComponent,
   inject,
-  onActivated,
-  onDeactivated,
-  onMounted,
-  onUnmounted,
   SetupContext,
   defineComponent,
   VNodeChild,
@@ -23,6 +18,7 @@ import {
 } from 'vue';
 import { CONTEXT } from './context';
 import { withConcern } from './application';
+import { useScopeController } from './scope-controller';
 
 Object.defineProperty(Cell.prototype, '__v_isRef', {
   value: true,
@@ -35,33 +31,6 @@ Object.defineProperty(Cell.prototype, 'value', {
 
 let ctx_track: Track | null = null;
 
-export function useScopeController(scope: LifecycleScope) {
-  let detachHandler: Function | null = null;
-
-  onMounted(() => {
-    detachHandler = scope.attach();
-  });
-  onUnmounted(() => {
-    if (insideKeepAlive) return;
-    detachHandler!();
-    detachHandler = null;
-  });
-
-  let insideKeepAlive = false;
-  let deactivating = false;
-  onActivated(() => {
-    insideKeepAlive = true;
-    if (deactivating) {
-      detachHandler = scope.attach();
-      deactivating = false;
-    }
-  });
-  onDeactivated(() => {
-    detachHandler!();
-    detachHandler = null;
-    deactivating = true;
-  });
-}
 
 export function withKairo<Props>(
   component: (

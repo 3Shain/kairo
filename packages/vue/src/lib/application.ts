@@ -8,7 +8,7 @@ import {
   getCurrentInstance,
 } from 'vue';
 import { CONTEXT } from './context';
-import { useScopeController } from './with-kairo';
+import { useScopeController } from './scope-controller';
 
 export function withConcern<ComponentType extends DefineComponent>(
   concern: Concern
