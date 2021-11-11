@@ -11,7 +11,7 @@ export function isEventStream<T>(value: unknown): value is EventStream<T> {
 
 export * from './cell';
 export { mutable as mut } from './cell';
-export { EventStream, stream, never, merged } from './stream';
+export { EventStream, stream, merged } from './stream';
 export * from './lifecycle-scope';
 export * from './context';
 export * from './schedule';

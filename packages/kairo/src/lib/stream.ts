@@ -128,11 +128,6 @@ export function stream<T = any, S = T>(
   return EventStream.create<T, S>(transformer);
 }
 
-export function never<T = never>() {
-  const [stream] = EventStream.create<T>();
-  return stream;
-}
-
 type ExtractEventStream<T> = {
   [P in keyof T]: T[P] extends EventStream<infer C> ? C : unknown;
 };
