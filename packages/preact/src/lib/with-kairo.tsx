@@ -1,4 +1,4 @@
-import { Reaction, collectScope, LifecycleScope, Cell } from 'kairo';
+import { Reaction, collectScope, LifecycleScope, Cell, CONCERN_HOC_FACTORY } from 'kairo';
 import type { Track } from 'kairo';
 import {
   useContext,
@@ -11,6 +11,7 @@ import { h } from 'preact';
 import type { FunctionComponent, RenderableProps, VNode, Ref } from 'preact';
 import type { ForwardFn } from 'preact/compat';
 import { KairoContext } from './context';
+import { withConcern } from './application';
 
 type Render<T> = (track: Track, props: RenderableProps<T>) => VNode<any> | null;
 type RenderWithRef<R, T> = (
@@ -51,7 +52,9 @@ function useKairoComponent<Props, Render>(
   const [, forceUpdate] = useReducer(inc, 0);
   const [instance] = useState(() => {
     const exitScope = collectScope();
-    const exitContext = parentContext.runInContext();
+    const exitContext = parentContext.inherit({
+      [CONCERN_HOC_FACTORY]: withConcern
+    }).runInContext();
     let renderFunction: Render;
     let scope: LifecycleScope;
     try {

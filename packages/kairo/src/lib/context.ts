@@ -24,6 +24,10 @@ class Context {
   static EMPTY = new Context();
 
   get<T>(token: Identifier<T>, options?: any): T {
+    if ((token as unknown) === CONTEXT) {
+      // FIXME: wrong type
+      return this as any;
+    }
     if (this.entries.has(token)) {
       return this.entries.get(token);
     }
@@ -57,8 +61,8 @@ class Context {
 
   /**
    * Build a new context based on current from concern.
-   * @param concern 
-   * @returns 
+   * @param concern
+   * @returns
    */
   build(concern: Concern) {
     const exitContext = this.runInContext();
@@ -134,6 +138,18 @@ function reduceConcerns(concerns: Concerns): Concern {
   };
 }
 
+const CONTEXT = Identifier.of<Context>('Context');
+
+// so loooooong
+type ConcernHighOrderComponentFactory = {
+  (concern: Concern): <TComponent>(component: TComponent) => TComponent;
+};
+
+const CONCERN_HOC_FACTORY =
+  Identifier.of<ConcernHighOrderComponentFactory>(
+    'ConcernHighOrderComponentFactory'
+  );
+
 export {
   injected,
   reduceConcerns,
@@ -142,5 +158,8 @@ export {
   Concern,
   Concerns,
   ConcernExport,
-  IdentifierNotFoundError
+  IdentifierNotFoundError,
+  CONTEXT,
+  CONCERN_HOC_FACTORY,
+  ConcernHighOrderComponentFactory,
 };

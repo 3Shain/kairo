@@ -5,6 +5,7 @@ import {
   Cell,
   Context,
   LifecycleScope,
+  CONCERN_HOC_FACTORY,
 } from 'kairo';
 import type { Track } from 'kairo';
 import {
@@ -21,6 +22,7 @@ import {
   ref,
 } from 'vue';
 import { CONTEXT } from './context';
+import { withConcern } from './application';
 
 Object.defineProperty(Cell.prototype, '__v_isRef', {
   value: true,
@@ -88,7 +90,9 @@ export function patchComponent<T extends DefineComponent>(component: T) {
     ) {
       const stopCollecting = collectScope();
       const context = inject(CONTEXT, Context.EMPTY);
-      const exitContext = context.runInContext();
+      const exitContext = context.inherit({
+        [CONCERN_HOC_FACTORY]: withConcern
+      }).runInContext();
       try {
         const bindings = setup(props, setupContext);
         /* istanbul ignore if: unexpected use cases */ if (

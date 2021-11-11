@@ -7,7 +7,7 @@ import {
   Type,
 } from '@angular/core';
 
-export function appendProviders<T>(
+export function prependProviders<T>(
   def: DirectiveDef<T>,
   providers: Provider[]
 ) {
@@ -17,7 +17,7 @@ export function appendProviders<T>(
   const monkeyPatch = def.providersResolver;
   def.providersResolver = (def, proc) => {
     monkeyPatch(def, (_providers) => {
-      const extendedProviders = [..._providers, ...providers];
+      const extendedProviders = [...providers, ..._providers];
       return proc ? proc(extendedProviders) : extendedProviders;
     });
   };

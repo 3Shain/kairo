@@ -2,7 +2,7 @@
   <div>
     <button @click="onClick">{{ count }}</button>
     <case-1-child :count="doubled">
-      <p :ref="bindpara.bind">{{ viewProp }}</p>
+      <p :ref="bindpara">{{ viewProp }}</p>
     </case-1-child>
   </div>
 </template>
@@ -23,7 +23,7 @@ export default {
     viewPropChanged: Function,
   },
   components: {
-    Case1Child: withConcern(()=>{},Case1Child as any )
+    Case1Child: withConcern(()=>{})(Case1Child as any )
   },
   setup: ((prop) => {
     const [para,bindpara] = reference<HTMLParagraphElement>(null);

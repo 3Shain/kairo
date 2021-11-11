@@ -12,7 +12,7 @@ describe('@kairo/solid', () => {
 
     const [signal, setSignal] = createSignal('Hello');
 
-    const WithConcern = withConcern(() => {}, Case1);
+    const WithConcern = withConcern(() => {})(Case1);
 
     const w = render(() => (
       <WithConcern

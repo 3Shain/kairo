@@ -21,7 +21,7 @@ describe('@kairo/preact', () => {
         appInit();
         return appClean;
       });
-    }, Case1);
+    })(Case1);
 
     const w = render(
       <Case1Concern

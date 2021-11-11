@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { ngSetup, WithKairo, provideConcerns } from '../src';
+import { ngSetup, WithKairo } from '../src';
 import {
   Component,
   ElementRef,
   Input,
   NgModule,
   SimpleChanges,
+  Type,
   ViewChild,
 } from '@angular/core';
 import { mut, lifecycle, computed, reference } from 'kairo';
@@ -109,7 +110,6 @@ export class Case1Child extends ngSetup(() => {}) {
 @WithKairo()
 @Component({
   selector: 'case1',
-  providers: [provideConcerns([() => {}])],
   template: `<p #para>{{ viewProp }}</p>
     <button (click)="onClick()">{{ count }}</button>
     <case1-child #child [count]="doubled"></case1-child>`,

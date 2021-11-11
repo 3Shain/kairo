@@ -7,9 +7,9 @@ import React, {
   forwardRef as reactForwardRef,
   useState,
 } from 'react';
-import type { Track } from 'kairo';
-import { Cell, collectScope, LifecycleScope, Reaction } from 'kairo';
+import { Cell, collectScope, CONCERN_HOC_FACTORY, LifecycleScope, Reaction } from 'kairo';
 import { KairoContext } from './context';
+import { withConcern } from './application';
 
 type UseCell = <T>(cell: Cell<T>) => T;
 type Render<T> = (
@@ -67,7 +67,9 @@ function useConcurrentKairoComponent<Props, Render>(
   const parentContext = useContext(KairoContext);
   const [[render, scope]] = useState(() => {
     const exitScope = collectScope();
-    const exitContext = parentContext.runInContext();
+    const exitContext = parentContext.inherit({
+      [CONCERN_HOC_FACTORY]: withConcern
+    }).runInContext();
     let renderFunction: Render;
     let scope: LifecycleScope;
     try {

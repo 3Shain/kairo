@@ -25,7 +25,7 @@ describe('@kairo/svelte in ssr mode', () => {
         return () => appCleanCallback();
       });
       return {};
-    }, Case1) as unknown as {
+    })(Case1) as unknown as {
       render: (props: any) => {
         html: string;
         css: {

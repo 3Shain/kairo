@@ -10,10 +10,11 @@ import {
   untrack,
   PropsWithChildren,
 } from 'solid-js';
-import { Cell, collectScope, Reaction } from 'kairo';
+import { Cell, collectScope, CONCERN_HOC_FACTORY, Reaction } from 'kairo';
 import type { Track } from 'kairo';
 import type { JSX } from 'solid-js';
 import { KairoContext } from './context';
+import { withConcern } from './application';
 
 // function patchedTrack<T>(
 //   cell: Cell<T> & {
@@ -128,7 +129,9 @@ function withKairo<Props>(
     const context = useContext(KairoContext);
 
     const exitScope = collectScope();
-    const exitContext = context.runInContext();
+    const exitContext = context.inherit({
+      [CONCERN_HOC_FACTORY]: withConcern
+    }).runInContext();
     let Component: (
       track: Track,
       props: PropsWithChildren<Props>

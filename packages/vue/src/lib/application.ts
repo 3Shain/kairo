@@ -1,4 +1,4 @@
-import { collectScope, Concern, Context } from 'kairo';
+import { collectScope, Concern, CONCERN_HOC_FACTORY, Context } from 'kairo';
 import {
   DefineComponent,
   defineComponent,
@@ -11,22 +11,25 @@ import { CONTEXT } from './context';
 import { useScopeController } from './with-kairo';
 
 export function withConcern<ComponentType extends DefineComponent>(
-  concern: Concern,
-  component: ComponentType
+  concern: Concern
 ) {
-  return defineComponent({
-    props: component['props'],
-    setup: () => {
-      const instance = getCurrentInstance();
-      const parentContext = inject(CONTEXT, Context.EMPTY);
-      const stopCollecting = collectScope();
-      try {
-        const context = parentContext.build(concern);
-        provide(CONTEXT, context);
-      } finally {
-        useScopeController(stopCollecting());
-      }
-      return () => h(component, instance.vnode.props, instance.slots);
-    },
-  }) as ComponentType;
+  return (component: ComponentType) => {
+    return defineComponent({
+      props: component['props'],
+      setup: () => {
+        const instance = getCurrentInstance();
+        const parentContext = inject(CONTEXT, Context.EMPTY);
+        const stopCollecting = collectScope();
+        try {
+          const context = parentContext.inherit({
+            [CONCERN_HOC_FACTORY]: withConcern
+          }).build(concern);
+          provide(CONTEXT, context);
+        } finally {
+          useScopeController(stopCollecting());
+        }
+        return () => h(component, instance.vnode.props, instance.slots);
+      },
+    }) as ComponentType;
+  };
 }

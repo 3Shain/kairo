@@ -22,7 +22,7 @@ describe('@kairo/react', () => {
         appInit();
         return appClean;
       });
-    }, Case1);
+    })(Case1);
 
     const w = render(
       <React.StrictMode>

@@ -51,7 +51,7 @@ describe('@kairo/vue', () => {
 });
 
 async function case1(cComponent: any) {
-  const Component = withConcern(() => {}, cComponent);
+  const Component = withConcern(() => {})(cComponent);
 
   const initCallback = jest.fn();
   const cleanCallback = jest.fn();

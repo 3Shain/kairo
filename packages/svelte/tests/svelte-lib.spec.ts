@@ -27,7 +27,7 @@ describe('@kairo/svelte', () => {
         return () => appCleanCallback();
       });
       return {};
-    }, Case1);
+    })(Case1);
 
     const w = render(App, {
       initialize: initCallback,

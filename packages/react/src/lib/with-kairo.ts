@@ -1,4 +1,4 @@
-import { Reaction, collectScope, LifecycleScope, Cell } from 'kairo';
+import { Reaction, collectScope, LifecycleScope, Cell, CONCERN_HOC_FACTORY } from 'kairo';
 import type { Track } from 'kairo';
 import React, {
   useContext,
@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { KairoContext } from './context';
+import { withConcern } from './application';
 
 type Render<T> = (
   track: Track,
@@ -54,7 +55,9 @@ function useKairoComponent<Props, Render>(
   const [, forceUpdate] = useReducer(inc, 0);
   const [instance] = useState(() => {
     const exitScope = collectScope();
-    const exitContext = parentContext.runInContext();
+    const exitContext = parentContext.inherit({
+      [CONCERN_HOC_FACTORY]: withConcern
+    }).runInContext();
     let renderFunction: Render;
     let scope: LifecycleScope;
     try {

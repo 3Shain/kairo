@@ -22,7 +22,7 @@ describe('@kairo/react in concurrent mode', () => {
         appInit();
         return appClean;
       });
-    }, Case1);
+    })(Case1);
 
     const w = render(
       <React.StrictMode>
@@ -117,7 +117,7 @@ describe('@kairo/react in concurrent mode', () => {
         appInit();
         return appClean;
       });
-    }, Case1CM);
+    })(Case1CM);
 
     const w = render(
       <React.StrictMode>
