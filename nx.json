@@ -74,6 +74,9 @@
     },
     "router": {
       "tags": []
+    },
+    "concurrency": {
+      "tags": []
     }
   },
   "targetDependencies": {

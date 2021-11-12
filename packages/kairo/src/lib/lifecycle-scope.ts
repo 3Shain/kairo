@@ -1,14 +1,7 @@
-import { AbortedError, AbortablePromise } from './concurrency';
 import { Cleanable } from './types';
 import { doCleanup, noop } from './misc';
 
 type LifecycleLogic = () => Cleanable;
-
-function filterAbortedError(x: unknown) {
-  if (!(x instanceof AbortedError)) {
-    throw x;
-  }
-}
 
 let currentCollecting: LifecycleLogic[] | null = null;
 
@@ -37,9 +30,6 @@ class LifecycleScope {
     this.attached = true;
     const cleanups = this.onmountLogics.map((x) => {
       const cleanup = x();
-      if (cleanup instanceof AbortablePromise) {
-        cleanup.catch(filterAbortedError);
-      }
       return cleanup;
     });
     return (this.detach = () => {

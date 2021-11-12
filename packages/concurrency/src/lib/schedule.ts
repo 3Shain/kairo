@@ -1,6 +1,5 @@
-import { lifecycle } from './lifecycle-scope';
 import { EventStream, stream } from './stream';
-import { TeardownLogic } from './types';
+import { TeardownLogic, lifecycle } from 'kairo';
 
 interface Scheduler<T, R = T> {
   (next: (payload: R) => void): (payload: T) => void | TeardownLogic;

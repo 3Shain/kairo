@@ -2,8 +2,6 @@
 
 import { Cleanable } from './types';
 
-export class ObjectDisposedError extends Error {}
-
 export const noop = () => {};
 
 export const identity = <T>(x: T) => x;

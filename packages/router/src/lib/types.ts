@@ -1,4 +1,4 @@
-import type { Cell, EventStream } from 'kairo';
+import type { Cell } from 'kairo';
 
 export type Matcher = (pathname: string) => null | MatchResult;
 
@@ -46,10 +46,6 @@ export type Location = {
   search: Cell<Search>;
   hash: Cell<string>;
   params: Cell<Record<string, string>>;
-  /**
-   * @deprecated UNSTABLE
-   */
-  change: EventStream<LocationChangePayload>;
 };
 
 export type NavigateHandler = (

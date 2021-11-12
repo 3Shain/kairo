@@ -1,4 +1,4 @@
-import type { Subscribable } from '../types';
+import type { Subscribable } from 'kairo';
 import {
   resolve,
   TaskSuspended,

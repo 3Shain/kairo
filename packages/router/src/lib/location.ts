@@ -4,9 +4,7 @@ import {
   injected,
   lifecycle,
   mut,
-  stream,
   batch,
-  EventStream,
   Cell,
   Concern,
 } from 'kairo';
@@ -17,29 +15,11 @@ import { parseQuery, resolvePath } from './core';
 export const LOCATION = Identifier.of<Location>('KairoRouterLocation');
 export const HISTORY = Identifier.of<History>('KairoRouterHistroy');
 
-function reduced<T, R>(
-  eventStream: EventStream<T>,
-  reducer: (current: R, event: T) => R,
-  init: R
-) {
-  const [state, setState] = mut(init);
-
-  lifecycle(() =>
-    eventStream.listen((x) => {
-      setState((v) => reducer(v, x));
-    })
-  );
-
-  return state;
-}
-
 function rootLocation(history: History): Location {
-  const [change, onchange] = stream<LocationChangePayload>();
-
   lifecycle(() =>
     history.listen(({ location }) => {
       batch(() => {
-        onchange({
+        setLocationState({
           pathname: location.pathname,
           search: location.search,
           hash: location.hash,
@@ -48,27 +28,21 @@ function rootLocation(history: History): Location {
     })
   );
 
-  const {
-    location: { pathname, search, hash },
-  } = history;
-  const locationState = reduced(change, (_, x) => x, {
-    pathname,
-    search,
-    hash,
-  });
+  const { location } = history;
+  const [locationState, setLocationState] =
+    mut<LocationChangePayload>(location);
 
   return {
     pathname: locationState.map((x) => x.pathname),
     basepath: Cell.of('/'),
     search: locationState.map((x) => parseQuery(x.search.substring(1))),
     hash: locationState.map((x) => x.hash),
-    change,
     params: Cell.of({}),
   };
 }
 
 export function derivedLocation(result: Cell<MatchResult>): Location {
-  const { search, hash, change, basepath }: Location = injected(LOCATION);
+  const { search, hash, basepath }: Location = injected(LOCATION);
 
   const currentBasepath = computed(($) =>
     resolvePath('.' + $(result).basepath, $(basepath))
@@ -78,7 +52,6 @@ export function derivedLocation(result: Cell<MatchResult>): Location {
     basepath: currentBasepath,
     search,
     hash,
-    change,
     params: result.map((x) => x.params),
   };
 }

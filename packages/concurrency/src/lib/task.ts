@@ -1,5 +1,5 @@
-import { Symbol_observable, Subscribable, Cleanable } from '../types';
-import { noop, doCleanup } from '../misc';
+import { Symbol_observable, Subscribable, Cleanable } from 'kairo';
+import { noop, doCleanup } from 'kairo';
 import type {
   Runnable,
   TaskYieldable,

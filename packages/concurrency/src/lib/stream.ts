@@ -1,7 +1,6 @@
-import type { RunnableGenerator } from './concurrency/types';
-import { Cleanable, TeardownLogic } from './types';
-import { doCleanup, identity } from './misc';
-import { __fulfill, TaskSuspended } from './concurrency/task';
+import type { RunnableGenerator } from './types';
+import { Cleanable, TeardownLogic, doCleanup, identity } from 'kairo';
+import { __fulfill, TaskSuspended } from './task';
 
 interface SubscriptionNode {
   next: SubscriptionNode | null;

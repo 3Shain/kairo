@@ -1,4 +1,4 @@
-import { AbortedError } from '.';
+import { AbortedError } from './public-api';
 import { all, allSettled, any, race } from './combinators';
 import { neverFulfill } from './spec-shared';
 import { timeout, delay, executeRunnableTask, TaskSuspended, task } from './task';

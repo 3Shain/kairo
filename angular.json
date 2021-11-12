@@ -584,6 +584,29 @@
           }
         }
       }
+    },
+    "concurrency": {
+      "root": "packages/concurrency",
+      "sourceRoot": "packages/concurrency/src",
+      "projectType": "library",
+      "architect": {
+        "build": {
+          "builder": "./tools/executors/rollup:package",
+          "options": {
+            "externals": [],
+            "bundleName": "index",
+            "copy": []
+          }
+        },
+        "test": {
+          "builder": "@nrwl/jest:jest",
+          "outputs": ["coverage/packages/concurrency"],
+          "options": {
+            "jestConfig": "packages/concurrency/jest.config.js",
+            "passWithNoTests": true
+          }
+        }
+      }
     }
   }
 }

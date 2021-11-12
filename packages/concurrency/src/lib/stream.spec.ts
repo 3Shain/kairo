@@ -1,6 +1,5 @@
-import { noop } from './misc';
+import { noop } from 'kairo';
 import { EventStream, merged, stream } from './stream';
-import { delay } from './concurrency';
 
 describe('stream', () => {
   it('should be lazy', () => {
