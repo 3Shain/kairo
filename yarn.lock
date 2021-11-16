@@ -3936,6 +3936,11 @@
   dependencies:
     "@types/jest" "*"
 
+"@types/use-sync-external-store@^0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@types/use-sync-external-store/-/use-sync-external-store-0.0.3.tgz#b6725d5f4af24ace33b36fafd295136e75509f43"
+  integrity sha512-EwmlvuaxPNej9+T4v5AuBPJa2x2UOJVdjCtDHgcDqitUeOtjnJKJ+apYjVcAoBEMjKW1VVFGZLUb5+qqa09XFA==
+
 "@types/webpack-sources@^0.1.5":
   version "0.1.8"
   resolved "https://registry.yarnpkg.com/@types/webpack-sources/-/webpack-sources-0.1.8.tgz"
@@ -12895,14 +12900,14 @@ raw-loader@3.1.0:
     loader-utils "^1.1.0"
     schema-utils "^2.0.1"
 
-"react-dom-experimental@npm:react-dom@experimental":
-  version "0.0.0-experimental-9c8161ba8-20211028"
-  resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-0.0.0-experimental-9c8161ba8-20211028.tgz#4cc17d8364ab3714871510140f95428c42f7fb04"
-  integrity sha512-MP2TmB7it4dXxRNWJSFUMslCu8O9l7f7rYcz9qGzR3YiTL4EdZuQjv2mJtEOzEJzGx/1A9b6KvX3ESnLn7waGQ==
+"react-dom-experimental@npm:react-dom@1.0.0-beta-96ca8d915-20211115":
+  version "18.0.0-beta-96ca8d915-20211115"
+  resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-18.0.0-beta-96ca8d915-20211115.tgz#511a754eddbb760c83d85251249fe9c52522326e"
+  integrity sha512-ISFQGQ0lHt+fz/Ch9K9coggTWzp9ScfuvzdshGJ73z5AI7mi9i6mVjVekMDnx0wiECjHP1s87rxNDQGGj9XnHw==
   dependencies:
     loose-envify "^1.1.0"
     object-assign "^4.1.1"
-    scheduler "0.0.0-experimental-9c8161ba8-20211028"
+    scheduler "0.21.0-beta-96ca8d915-20211115"
 
 react-dom@17.0.1:
   version "17.0.1"
@@ -12913,10 +12918,10 @@ react-dom@17.0.1:
     object-assign "^4.1.1"
     scheduler "^0.20.1"
 
-"react-experimental@npm:react@experimental":
-  version "0.0.0-experimental-9c8161ba8-20211028"
-  resolved "https://registry.yarnpkg.com/react/-/react-0.0.0-experimental-9c8161ba8-20211028.tgz#51fb2c44e35ce04d9395848cd7b334106ffa301f"
-  integrity sha512-hOjvILua+M57LAwpvbxYsZ6btREzixit3bWVzIfqN/jHxleaa5DH6OBqEmiQth9+urKZTVhxl/v8rvY+NcE0tw==
+"react-experimental@npm:react@1.0.0-beta-96ca8d915-20211115":
+  version "18.0.0-beta-96ca8d915-20211115"
+  resolved "https://registry.yarnpkg.com/react/-/react-18.0.0-beta-96ca8d915-20211115.tgz#0b2a0cd808b85fdce987a0c254e0fab979a3828d"
+  integrity sha512-Io6qvToVSO1UWNWbJSH16gbgYTkseSbfpQvLaB7JPutt0QVvjpUlEE0nfmww77CFdawxGkyfm/x4zvNTlMkHsw==
   dependencies:
     loose-envify "^1.1.0"
     object-assign "^4.1.1"
@@ -13531,10 +13536,10 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-scheduler@0.0.0-experimental-9c8161ba8-20211028:
-  version "0.0.0-experimental-9c8161ba8-20211028"
-  resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.0.0-experimental-9c8161ba8-20211028.tgz#7154fbbbc43972c28c38a140f4b6cf5f383794d3"
-  integrity sha512-p3HOunBHs8lHjWKQQZzLfEeor/WGM1tbyFX3QV7GmTYsj3OyexIPoxxUqtsPkPk7nX+/ZX6gffDKIOFwHGJnOw==
+scheduler@0.21.0-beta-96ca8d915-20211115:
+  version "0.21.0-beta-96ca8d915-20211115"
+  resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.21.0-beta-96ca8d915-20211115.tgz#b15758da1f33734ab1219aa5147ea79037a42013"
+  integrity sha512-gm2zVVyjuIHlcqdAv57Tk/lFBf7+RDhYvIEaOZiKf3/YpIZbsiMnfy6yP6+VR3pS//V2LY5Mv8bf6fS+4IOWbg==
   dependencies:
     loose-envify "^1.1.0"
     object-assign "^4.1.1"
@@ -15136,6 +15141,11 @@ url@^0.11.0:
   dependencies:
     punycode "1.3.2"
     querystring "0.2.0"
+
+use-sync-external-store@^1.0.0-beta-96ca8d915-20211115:
+  version "1.0.0-beta-96ca8d915-20211115"
+  resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.0.0-beta-96ca8d915-20211115.tgz#80777c497f60b57ca23f52de760ff22080814a3c"
+  integrity sha512-Xkzd7SoZv29jYc95GO0k1v69oSHUdC+4nNaBQ309zvFFyvzYn+I87ee+OD1RKF8SGRwkEJQxjyFzYRcncdpSSg==
 
 use@^3.1.0:
   version "3.1.1"

@@ -1,6 +1,6 @@
 import { fireEvent, render, cleanup, act } from '@testing-library/react';
 import React, { useEffect } from 'react';
-import { forwardRef, withKairo, withConcern, ConcurrentMode } from '../src';
+import { forwardRef, withKairo, withConcern, useCell } from '../src';
 import { computed, lifecycle, mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 
@@ -256,7 +256,7 @@ const Case2 = forwardRef<{}, HTMLDivElement>(() => {
   return (_, __, ref) => <div ref={ref}>TARGET</div>;
 });
 
-export const Case1CM = ConcurrentMode.withKairo<{
+export const Case1CM = withKairo<{
   intialize: Function;
   clean: Function;
   viewProp: string;
@@ -280,7 +280,7 @@ export const Case1CM = ConcurrentMode.withKairo<{
 
   const doubled = computed(($) => $(count) * 2);
 
-  return (useCell, { viewProp, viewPropChanged }) => {
+  return (_, { viewProp, viewPropChanged }) => {
     useEffect(() => viewPropChanged(), [viewProp]);
     const count_ = useCell(count);
     const freeCell_ = useCell(freeCell);
@@ -297,8 +297,8 @@ export const Case1CM = ConcurrentMode.withKairo<{
   };
 });
 
-const Case2CM = ConcurrentMode.forwardRef<{}, HTMLDivElement>(() => {
-  return (useCell, __, ref) => {
+const Case2CM = forwardRef<{}, HTMLDivElement>(() => {
+  return (_, __, ref) => {
 
     useCell(freeCell);
 

@@ -15,6 +15,7 @@ import {
   Reaction as _Reaction,
   setData,
   accessReferenceValue,
+  BitFlags,
 } from './internal';
 
 export class Cell<T> {
@@ -247,4 +248,19 @@ export function combined(obj: any) {
         } is provided.`
       : undefined
   );
+}
+
+export function isCellCurrentEqualTo(
+  cell: Cell<unknown>,
+  value: any,
+  checkError: boolean = false
+) {
+  if (checkError) {
+    return cell.internal.flags & BitFlags.ValueIsError
+      ? Object.is(cell.internal.value, value)
+      : value === null;
+  }
+  return cell.internal.flags & BitFlags.ValueIsError
+    ? false
+    : cell.internal.cp(cell.internal.value, value);
 }

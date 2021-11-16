@@ -1,3 +1,2 @@
-export { withKairo, forwardRef } from './lib/with-kairo';
+export { withKairo, forwardRef, useCell } from './lib/with-kairo-safe';
 export * from './lib/application';
-export { ConcurrentMode } from './lib/concurrent';

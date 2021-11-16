@@ -270,7 +270,7 @@
         "build": {
           "builder": "./tools/executors/rollup:package",
           "options": {
-            "externals": ["kairo", "react"],
+            "externals": ["kairo", "react", "use-sync-external-store/shim"],
             "bundleName": "kairo-react",
             "copy": []
           }
