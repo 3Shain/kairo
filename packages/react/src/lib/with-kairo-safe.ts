@@ -5,6 +5,7 @@ import {
   Cell,
   CONCERN_HOC_FACTORY,
   UNSTABLE_isCellCurrentEqualTo,
+  lifecycle,
 } from 'kairo';
 import type { Track } from 'kairo';
 import React, {
@@ -60,13 +61,18 @@ function useKairoComponent<Props, Render extends Function>(
 ) {
   const parentContext = useContext(KairoContext);
 
-  const [[subscribe, getVersion, track, renderFn, scope]] = useState(() => {
+  const [, forceUpdate] = useReducer(inc, 0);
+
+  const [[track, renderFn, scope]] = useState(() => {
     const exitScope = collectScope();
     const exitContext = parentContext
       .inherit({
         [CONCERN_HOC_FACTORY]: withConcern,
       })
       .runInContext();
+    let reaction: Reaction = new Reaction(forceUpdate);
+    lifecycle(() => () => reaction.dispose()); // https://github.com/reactwg/react-18/discussions/18
+    // won't non-symmetric operation make troubles?
     let renderFunction: Render;
     let scope: LifecycleScope;
     try {
@@ -75,49 +81,36 @@ function useKairoComponent<Props, Render extends Function>(
       exitContext();
       scope = exitScope();
     }
-    let version = 0;
-    let reaction: Reaction | null = null;
-    const subscribe = (onchange: any) => {
-      reaction = new Reaction(() => {
-        version++;
-        onchange();
-      });
-      return () => {
-        reaction.dispose();
-        reaction = null;
-      };
-    };
-    const getVersion = () => version;
-    const track = <T>(program: ($: Track) => T) => reaction!.track(program);
 
-    return [subscribe, getVersion, track, renderFunction, scope] as const;
+    const track = <T>(program: ($: Track) => T) => reaction.track(program);
+
+    return [track, renderFunction, scope] as const;
   });
 
   useEffect(() => scope.attach(), []);
 
-  const version = useSyncExternalStore(subscribe, getVersion, getVersion);
-
   const [result, readLogs] = useTrack(renderFn as any, props, ...args);
 
-  const [, forceUpdate] = useReducer(inc, 0);
-
-  // TODO: switch to useLayoutEffect? seems not work with uSES
-  useEffect(
+  useLayoutEffect(
     () =>
       track(($) => {
-        let bailout = false;
+        let tearing = false;
         for (let i = 0; i < readLogs.length; i += 3) {
           $(readLogs[i]); // log deps
-          bailout =
-            bailout ||
-            !UNSTABLE_isCellCurrentEqualTo(readLogs[i], readLogs[i + 1], readLogs[i + 2]);
+          tearing =
+            tearing ||
+            !UNSTABLE_isCellCurrentEqualTo(
+              readLogs[i],
+              readLogs[i + 1],
+              readLogs[i + 2]
+            );
         }
-        if (bailout) forceUpdate();
+        if (tearing) forceUpdate();
       }),
     // TODO: optimizable dependency list?
-    // desired: [id,...props] but props is not a stable object...
+    // desired: [...props] but props is not a stable object...
     // desired: [...readLogs] but the length varies
-    [version, props, ...args]
+    [props, ...args]
     // it's abnormal to use the whole props object as dependency (almost useless?)
     // but seems like it could skip `forceUpdate`
   );
@@ -134,11 +127,10 @@ export function useCell<T>(cell: Cell<T>) {
     },
     [cell]
   );
-  return useSyncExternalStore(
-    subscribe,
-    () => cell.current,
-    () => cell.current
-  );
+  const getSnapshot = useCallback(() => {
+    return cell.current;
+  }, [cell]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 // TODO: correct types
