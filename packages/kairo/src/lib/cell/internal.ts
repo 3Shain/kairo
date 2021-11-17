@@ -144,12 +144,6 @@ class TrackContext {
 class EvalContext {
   toCleanup: SourceLinked<Data>[] = [];
 
-  cleanup() {
-    for (const c of this.toCleanup) {
-      cleanupSources(c, null);
-    }
-  }
-
   /**
    * Evaluate the expression and track (refresh) dependencies.
    * @param observer
@@ -165,7 +159,36 @@ class EvalContext {
     } finally {
       observer.flags &= ~BitFlags.Evalutating;
       const clean = ctx.cleanup();
-      if (clean) this.toCleanup.push(clean);
+      if (clean) this.toCleanup.push(null!, clean);
+    }
+  }
+
+  cleanup() {
+    const array = this.toCleanup;
+    while (array.length > 0) {
+      let last: SourceLinked<Data> = array.pop()!,
+        until: SourceLinked<Data> | null = array.pop()!;
+      do {
+        const {
+          source,
+          observer_ref: { next, prev },
+        } = last; /* no first source so do nothing */
+        last.observer_ref.observer = null; // not necessary (but might be gc friendly)
+        (next ? (next.prev = prev) : (source.lo = prev))
+          ? (prev!.next = next)
+          : null;
+        if (isUnusedMemo(source)) {
+          source.flags =
+            (source.flags | BitFlags.Stale) & ~BitFlags.MarkForCheck;
+          source.dc = 0; // not usable...
+          source.value = null;
+          if (source.ls) {
+            array.push(null!, source.ls!);
+            source.ls = null;
+            source.fs = null;
+          }
+        }
+      } while ((last = last.prev!) !== until);
     }
   }
 }
@@ -224,43 +247,15 @@ function estimate<T>(memo: Memo<T>) {
   ctx.cleanup(); //should be just no-op
 }
 
-function cleanupObserver(memo: Observer) {
-  if (memo.ls === null) {
-    return;
-  }
-  cleanupSources(memo.ls, null);
-  memo.fs = null;
-  memo.ls = null;
-}
-
-function cleanupSources(
-  last: SourceLinked<Data>,
-  until: SourceLinked<Data> | null
-) {
-  do {
-    const {
-      source,
-      observer_ref: { next, prev },
-    } = last; /* no first source so do nothing */
-    // last.observer_ref.observer = null; // not necessary (but might be gc friendly)
-    (next ? (next.prev = prev) : (source.lo = prev))
-      ? (prev!.next = next)
-      : null;
-    if (
-      (source.flags & BitFlags.ManagedMemo) === BitFlags.ManagedMemo &&
-      source.lo === null
-    ) {
-      source.flags = (source.flags | BitFlags.Stale) & ~BitFlags.MarkForCheck;
-      (source as Memo).dc = 0; // not usable...
-      (source as Memo).value = null;
-      // it's last observer // but propagation might tackle this.
-      cleanupObserver(source as Memo);
-    }
-  } while ((last = last.prev!) !== until);
-}
-
 function isMemo(node: Observer): node is Memo {
   return (node.flags & BitFlags.Memo) === BitFlags.Memo;
+}
+
+function isUnusedMemo(source: Data): source is Memo {
+  return (
+    (source.flags & BitFlags.ManagedMemo) === BitFlags.ManagedMemo &&
+    source.lo === null
+  );
 }
 
 function markObserversForCheck(stack: Data[]) {
@@ -294,9 +289,12 @@ class TransactionContext {
     ct = this;
     let retValue = null;
     try {
-      retValue = fn();
-      this.flush();
+      retValue = fn(); // setData and markObserversForCheck will (should) not throw
+      // if an error occured it should be caused by user
     } finally {
+      // flush even if there is an error. otherwise a bad state is left
+      // and effects will not be commited but preserved
+      this.flush(); // will (should) not throw
       ct = stored;
     }
     controlOnCommit(() => this.commit());
@@ -318,7 +316,15 @@ class TransactionContext {
        * should catch error here?
        * no. and unrecoverable.
        */
-      x.e();
+      if (x.fs) {
+        try {
+          x.e(); //in case it's disposed
+        } catch (e) {
+          setTimeout(() => {
+            throw e;
+          }); //hostErrorReports
+        }
+      }
     }
   }
 
@@ -368,7 +374,8 @@ class TransactionContext {
                   observer.flags & BitFlags.ValueIsError
                 ) {
                   observer.flags =
-                    (observer.flags | BitFlags.Changed) & ~BitFlags.ValueIsError;
+                    (observer.flags | BitFlags.Changed) &
+                    ~BitFlags.ValueIsError;
                   observer.value = currentValue;
                 }
               } catch (e) {
@@ -512,8 +519,6 @@ export {
   accessCurrent as accessReferenceValue,
   createData,
   createMemo,
-  // untrack,
   createReaction,
   executeReaction,
-  cleanupObserver,
 };

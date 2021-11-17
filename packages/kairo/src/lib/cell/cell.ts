@@ -1,4 +1,4 @@
-import { identity } from '../misc';
+import { identity, noop } from '../misc';
 import {
   Subscribable,
   Symbol_observable,
@@ -6,7 +6,6 @@ import {
   PartialObserver,
 } from '../types';
 import {
-  cleanupObserver,
   createMemo,
   createReaction,
   createData,
@@ -132,7 +131,7 @@ export class Reaction {
   }
 
   dispose() {
-    cleanupObserver(this.internal);
+    executeReaction(this.internal, noop);
   }
 }
 
@@ -166,7 +165,7 @@ export class IncrementalReaction {
   }
 
   dispose() {
-    cleanupObserver(this.internal);
+    executeReaction(this.internal, noop);
   }
 }
 
