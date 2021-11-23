@@ -7,7 +7,7 @@ import {
   IncrementalReaction,
   Reaction,
 } from './cell';
-import { batch, BitFlags, Memo } from './internal';
+import { batch, BitFlags, Memo, transaction } from './internal';
 import {
   effect,
   countObservers,
@@ -375,6 +375,94 @@ describe('cell', () => {
         });
       });
       expect(g).toBe(2);
+    });
+  });
+
+  describe('transaction', () => {
+    it('atomicity: not update early', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => $(a));
+
+      let g = 0;
+      effect(($) => (g = $(b)));
+
+      transaction(() => {
+        ma(1);
+        expect(b.current).toBe(0);
+        expect(a.current).toBe(0);
+      });
+      expect(b.current).toBe(1);
+      expect(a.current).toBe(1);
+      expect(g).toBe(1);
+    });
+
+    it('atomicity: catch error and rollback', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => $(a));
+
+      let g = 0;
+      effect(($) => (g = $(b)));
+
+      let err = {};
+
+      try {
+        transaction(() => {
+          ma(1);
+          expect(b.current).toBe(0);
+          expect(a.current).toBe(0);
+          throw err;
+        });
+      } catch (e) {
+        expect(e).toBe(err);
+      }
+      expect(b.current).toBe(0);
+      expect(a.current).toBe(0);
+      expect(g).toBe(0);
+    });
+
+    it('atomicity: no duplicate write', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => $(a));
+
+      let g = 0;
+      effect(($) => (g = $(b)));
+
+      try {
+        transaction(() => {
+          ma(1);
+          ma(1);
+          expect(b.current).toBe(0);
+          expect(a.current).toBe(0);
+        });
+      } catch (e) {
+        expect(e.message).toBe('Second mutation in a transaction is not allowed');
+      }
+      expect(b.current).toBe(0);
+      expect(a.current).toBe(0);
+      expect(g).toBe(0);
+    });
+
+    it('flush current batch', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => $(a));
+
+      let g = 0;
+      effect(($) => (g = $(b)));
+
+      batch(() => {
+        ma(2);
+        transaction(() => {
+          transaction(() => {
+            ma(1);
+            expect(b.current).toBe(2);
+            expect(a.current).toBe(2);
+          });
+        });
+        expect(g).toBe(0);
+      });
+      expect(b.current).toBe(1);
+      expect(a.current).toBe(1);
+      expect(g).toBe(1);
     });
   });
 

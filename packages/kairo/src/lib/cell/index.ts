@@ -11,5 +11,6 @@ export type { Track } from './cell';
 
 export {
   batch,
+  transaction,
   takeControlOnCommit as UNSTABLE_takeControlOnCommit,
 } from './internal';

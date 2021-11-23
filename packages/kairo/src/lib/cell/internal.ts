@@ -275,9 +275,9 @@ function markObserversForCheck(stack: Data[]) {
   }
 }
 
-let ct: TransactionContext | null = null;
+let ct: BatchContext | null = null;
 
-class TransactionContext {
+class BatchContext {
   dirty: Data[] = [];
   effects: Reaction[] = [];
   flushing: boolean = false;
@@ -409,12 +409,52 @@ class TransactionContext {
   }
 }
 
-const nt = new TransactionContext();
-function batch(fn: Function) {
+class Transaction extends BatchContext {
+  map = new Map();
+
+  start<T>(fn: () => T) {
+    const stored = ct;
+    ct = this;
+    let ret = null;
+    try {
+      ret = fn();
+      super.start(() => {
+        for (let [k, v] of this.map) {
+          super.setData(k, v);
+        }
+      });
+    } finally {
+      this.map.clear();
+      ct = stored;
+    }
+
+    return ret;
+  }
+
+  setData<T>(data: Data, value: T): void {
+    if (this.map.has(data)) {
+      throw new Error('Second mutation in a transaction is not allowed');
+    }
+    this.map.set(data, value);
+  }
+}
+
+const nt = new BatchContext();
+function batch<T>(fn: () => T) {
   if (ct !== null) {
     return fn();
   }
-  return nt.start(fn as any);
+  return nt.start(fn);
+}
+
+function transaction<T>(fn: () => T) {
+  if (ct !== null) {
+    if (ct instanceof Transaction) {
+      return fn();
+    }
+    ct.flush(); // make a stable environment
+  }
+  return new Transaction().start(fn);
 }
 
 function insertNewSource(observer: Observer, source: Data): void {
@@ -515,6 +555,7 @@ export {
   Memo,
   Reaction,
   batch,
+  transaction,
   setData,
   accessCurrent as accessReferenceValue,
   createData,
