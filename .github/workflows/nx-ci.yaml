@@ -18,10 +18,12 @@ jobs:
         with:
           projects: svelte-preprocess
           targets: build
+      - name: Unit test (with --expose-gc)
+        run: yarn node --expose-gc $(yarn bin nx) test kairo --codeCoverage
       - name: Unit test
         uses: mansagroup/nrwl-nx-action@v2.0.4
         with:
-          projects: kairo,angular,vue,react,svelte,solid,preact,router,concurrency
+          projects: angular,vue,react,svelte,solid,preact,router,concurrency
           targets: test
           affected: true
           args: --codeCoverage

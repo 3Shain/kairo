@@ -12,3 +12,4 @@ export * from './reference';
 export { reference as ref } from './reference';
 export * from './effect';
 export * from './misc';
+export * from './memoize';
