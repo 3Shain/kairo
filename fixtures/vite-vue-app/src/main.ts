@@ -1,9 +1,8 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-import 'kairo'; // bug solved by import kairo first (you don't need to do so if install from npm)
-// weird.
-// import { createKairoApp } from '@kairo/vue';
+import 'kairo'; // vite can't resolve indirect tsconfig path import..
+import { setupVueIntegration } from '@kairo/vue';
+
+setupVueIntegration();
 
 createApp(App).mount('#app');
-
-import { mut } from 'kairo';

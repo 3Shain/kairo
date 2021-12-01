@@ -1,3 +1,5 @@
+
+/** @type {import('@jest/types').Config.InitialOptions} */
 module.exports = {
   displayName: 'vue',
   preset: '../../jest.preset.js',
@@ -10,6 +12,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'vue', 'js', 'json'],
   coverageDirectory: '../../coverage/packages/vue',
   coverageReporters: [['lcov', { projectRoot: './' }]],
+  setupFiles: ['./tests/setup.ts'],
   globals: {
     'ts-jest': {
       babelConfig: '<rootDir>/babel.config.js',
