@@ -49,9 +49,9 @@ describe('stream', () => {
     unsub();
   });
 
-  it('.filter() should work', () => {
+  it('.select() should work', () => {
     const [source, emitSource] = stream<number>();
-    const transformed = source.filter((x) => x % 2 === 0);
+    const transformed = source.select((x) => x % 2 === 0);
     const unsub = transformed.listen((x) => {
       expect(x % 2).toBe(0);
     });

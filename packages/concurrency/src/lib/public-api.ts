@@ -21,4 +21,4 @@ export type { Task } from './task';
 export { all, any, race, allSettled } from './combinators';
 export { ControlStatements } from './control-statements';
 export * from './types';
-export { EventStream, stream, merged } from './stream';
+export { EventStream, stream, merged, reduced, held } from './stream';

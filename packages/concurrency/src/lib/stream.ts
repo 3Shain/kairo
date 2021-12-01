@@ -1,5 +1,12 @@
 import type { RunnableGenerator } from './types';
-import { Cleanable, TeardownLogic, doCleanup, identity } from 'kairo';
+import {
+  Cleanable,
+  TeardownLogic,
+  doCleanup,
+  identity,
+  mut,
+  lifecycle,
+} from 'kairo';
 import { __fulfill, TaskSuspended } from './task';
 
 interface SubscriptionNode {
@@ -9,6 +16,7 @@ interface SubscriptionNode {
 }
 
 export class EventStream<T> {
+  /** @internal */
   constructor(private producer: (next: (value: T) => void) => Cleanable) {}
 
   *[Symbol.iterator](): RunnableGenerator<T> {
@@ -83,6 +91,7 @@ export class EventStream<T> {
     this.propagating = false;
   }
 
+  /** @internal */
   listen(handler: (value: T) => Cleanable): TeardownLogic {
     let lastDisposer: Cleanable = undefined;
     const unsubscribe = this.__internal_subscribe((value) => {
@@ -101,7 +110,7 @@ export class EventStream<T> {
     });
   }
 
-  filter(filterFn: (value: T) => boolean) {
+  select(filterFn: (value: T) => boolean) {
     return new EventStream<T>((next) => {
       return this.__internal_subscribe((v) => {
         if (filterFn(v)) {
@@ -138,4 +147,20 @@ export function merged<A extends Array<EventStream<any>>>(
     const listeners = array.map((stream) => stream.listen(next));
     return () => listeners.forEach((x) => x());
   });
+}
+
+// istanbul ignore next: simple composite
+export function reduced<T, E>(
+  event: EventStream<E>,
+  reducer: (current: T, event: E) => T,
+  initial: T
+) {
+  const [state, update] = mut(initial);
+  lifecycle(() => event.listen((value) => update((e) => reducer(e, value))));
+  return state;
+}
+
+// istanbul ignore next: simple composite
+export function held<T>(event: EventStream<T>, initial: T) {
+  return reduced(event, (_, e) => e, initial);
 }
