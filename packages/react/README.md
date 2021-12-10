@@ -2,21 +2,13 @@
 
 React integration for kairo.
 
-## Component `KairoApp`
+## Installation
 
-First of all, you need to wrap your `<App/>` inside `<KairoApp>`
+```sh
+npm i kairo @kairo/react
 
-```tsx
-function globalSetup() {
-  // write your global reactive logic, provide services here.
-}
-
-render(
-  <KairoApp globalSetup={globalSetup}>
-    <App />
-  </KairoApp>,
-  document.getElementById('root')
-);
+# or yarn
+yarn add kairo @kairo/react
 ```
 
 If you know how dependency injection can be effective in a frontend project, then probably you've known what can you do with `provide/inject` api. But in case you've never heared about this, you can think of Context, kairo provides a similar mechanism and you can and should heavily rely on this.

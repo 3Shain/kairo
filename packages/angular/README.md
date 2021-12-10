@@ -1,10 +1,8 @@
 # @kairo/angular
 
-Angular integration for kairo.
+Angular (Ivy) integration for kairo.
 
-> Currently for angular version >=11, below are not tested (and likely not work as it dependes ivy `features`). Pull requests are always welcomed.
-
-## Install
+## Installation
 
 ```sh
 yarn add @kairo/angular kairo
