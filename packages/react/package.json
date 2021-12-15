@@ -7,6 +7,6 @@
     "kairo": "0.0.0"
   },
   "dependencies": {
-    "use-sync-external-store": "^1.0.0-beta.0"
+    "use-sync-external-store": "1.0.0-rc.0"
   }
 }
