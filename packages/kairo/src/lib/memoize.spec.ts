@@ -12,10 +12,6 @@ function fn2(a, b) {
   return { a, b };
 }
 
-if(typeof global.gc === 'undefined'){
-  global.gc = ()=>{};
-}
-
 describe('memoize', () => {
   it('should work 1', async () => {
     let memoized = memoize(fn);

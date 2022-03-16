@@ -289,6 +289,37 @@ describe('cell', () => {
     });
   });
 
+  describe('existing bugs', () => {
+    it('this breaks', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => {
+        return $(a) > 0 ? $(c) : 6535;
+      }) as Cell<number>;
+      const c = computed(($) => $(b));
+      effect(($) => $(c));
+      expect(c.current).toBe(6535);
+      ma(1);
+      expect(hasFlag(b, BitFlags.MarkForCheck)).toBeFalsy(); // bad state!
+      expect(b.internal['dc']).toBe(0);
+    });
+
+    it('this also breaks', () => {
+      const [a, ma] = mutable(0);
+      const b = computed(($) => {
+        return $(a) > 0 ? $(c) : 6535;
+      }) as Cell<number>;
+      const c = computed(($) => {
+        return $(a) > 0 ? $(b) : 6535;
+      });
+      effect(($) => ($(c), $(b)));
+      expect(b.current).toBe(6535);
+      expect(c.current).toBe(6535);
+      ma(1);
+      expect(hasFlag(b, BitFlags.MarkForCheck)).toBeFalsy();
+      expect(b.internal['dc']).toBe(0);
+    });
+  });
+/*  */
   describe('Cell.subscribe()', () => {
     it('interop observable', () => {
       const [a, ma] = mutable(0);
@@ -435,7 +466,9 @@ describe('cell', () => {
           expect(a.current).toBe(0);
         });
       } catch (e) {
-        expect(e.message).toBe('Second mutation in a transaction is not allowed');
+        expect(e.message).toBe(
+          'Second mutation in a transaction is not allowed'
+        );
       }
       expect(b.current).toBe(0);
       expect(a.current).toBe(0);
