@@ -9,7 +9,7 @@ import {
   Type,
   ViewChild,
 } from '@angular/core';
-import { mut, lifecycle, computed, reference } from 'kairo';
+import { defineState as mut, lifecycle, defineMemo as computed, reference } from 'kairo';
 import '@testing-library/jest-dom';
 import { fireEvent } from '@testing-library/dom';
 

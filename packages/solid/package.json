@@ -4,6 +4,6 @@
   "description": "Solid.js integration for kairo",
   "peerDependencies": {
     "kairo": "0.0.0",
-    "solid-js": ">=0.24.0"
+    "solid-js": ">=1.3.0"
   }
 }

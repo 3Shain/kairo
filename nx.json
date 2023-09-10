@@ -78,6 +78,9 @@
     "concurrency": {
       "tags": []
     }
+    // "testing": {
+    //   "tags": []
+    // }
   },
   "targetDependencies": {
   }

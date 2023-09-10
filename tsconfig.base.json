@@ -26,7 +26,8 @@
       "@kairo/svelte": ["packages/svelte/src/index.ts"],
       "@kairo/preact": ["packages/preact/src/index.ts"],
       "@kairo/router": ["packages/router/src/index.ts"],
-      "@kairo/concurrency": ["packages/concurrency/src/index.ts"]
+      "@kairo/concurrency": ["packages/concurrency/src/index.ts"],
+      "@kairo/testing": ["packages/testing/src/index.ts"]
     }
   },
   "include": ["**/*.d.ts"],

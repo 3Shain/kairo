@@ -6,6 +6,7 @@ import {
   CONCERN_HOC_FACTORY,
   UNSTABLE_isCellCurrentEqualTo,
   lifecycle,
+  EffectScope,
 } from 'kairo';
 import type { Track } from 'kairo';
 import React, {
@@ -63,7 +64,7 @@ function useKairoComponent<Props, Render extends Function>(
 
   const [, forceUpdate] = useReducer(inc, 0);
 
-  const [[track, renderFn, scope]] = useState(() => {
+  const [[track, renderFn, scope, effectQueue]] = useState(() => {
     const exitScope = collectScope();
     const exitContext = parentContext
       .inherit({
@@ -81,16 +82,25 @@ function useKairoComponent<Props, Render extends Function>(
       exitContext();
       scope = exitScope();
     }
+    const effectQueue = [];
 
-    const track = <T>(program: ($: Track) => T) => reaction.track(program);
+    const dscope = new EffectScope({
+      schedule: (callback)=>{
+        effectQueue.push(callback);
+      }
+    });
 
-    return [track, renderFunction, scope] as const;
+    return [reaction.track, renderFunction, scope, effectQueue] as const;
   });
 
   useEffect(() => scope.attach(), []);
 
   const [result, readLogs] = useTrack(renderFn as any, props, ...args);
-
+  useLayoutEffect(()=>{
+    const dio = effectQueue.map(s=>s());
+    effectQueue.length = 0;
+    return ()=> dio.forEach(x=>x());
+  });
   useLayoutEffect(
     () =>
       track(($) => {
@@ -128,7 +138,7 @@ export function useCell<T>(cell: Cell<T>) {
     [cell]
   );
   const getSnapshot = useCallback(() => {
-    return cell.current;
+    return cell();
   }, [cell]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
@@ -137,14 +147,14 @@ export function useCell<T>(cell: Cell<T>) {
 function useTrack<T>(program: ($: Track, ...args: any[]) => T, ...args: any[]) {
   const logs = [];
   const track = (cell: Cell<any>) => {
-    const ret = cell.current;
+    const ret = cell();
     logs.push(cell, ret, false);
     return ret;
   };
   Object.defineProperty(track, 'error', {
     value: (cell: Cell<any>) => {
       try {
-        cell.current;
+        cell();
         logs.push(cell, null, true);
         return null;
       } catch (e) {

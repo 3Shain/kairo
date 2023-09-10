@@ -1,0 +1,9 @@
+{
+    "name": "@kairo/testing",
+    "version": "0.0.0",
+    "description": "Testing harness for kairo",
+    "peerDependencies": {
+      "kairo": "0.0.0"
+    }
+  }
+  

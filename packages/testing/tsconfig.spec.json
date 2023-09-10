@@ -3,15 +3,13 @@
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
     "module": "commonjs",
-    "strict": true,
-    "types": ["jest", "node"],
+    "types": ["jest", "node"]
   },
   "include": [
     "**/*.spec.ts",
     "**/*.spec.tsx",
     "**/*.spec.js",
     "**/*.spec.jsx",
-    "**/*.d.ts",
-    "**/spec-shared.ts"
-, "src/lib/lifecycle-scope._spec.ts"  ]
+    "**/*.d.ts"
+  ]
 }

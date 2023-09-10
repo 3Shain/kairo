@@ -1,7 +1,7 @@
 import { fireEvent, render, cleanup, act } from '@testing-library/react';
 import React, { useEffect } from 'react';
 import { forwardRef, withKairo, withConcern } from '../src';
-import { computed, lifecycle, mut, reference } from 'kairo';
+import { defineMemo as computed, lifecycle, defineState as mut, reference } from 'kairo';
 import '@testing-library/jest-dom';
 
 const [freeCell, setFreeCell] = mut(0);

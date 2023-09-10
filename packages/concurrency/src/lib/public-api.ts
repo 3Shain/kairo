@@ -7,7 +7,7 @@ export function isEventStream<T>(value: unknown): value is EventStream<T> {
 }
 
 export {
-  task,
+  task as defTask,
   delay,
   timeout,
   nextAnimationFrame,
@@ -21,4 +21,4 @@ export type { Task } from './task';
 export { all, any, race, allSettled } from './combinators';
 export { ControlStatements } from './control-statements';
 export * from './types';
-export { EventStream, stream, merged, reduced, held } from './stream';
+export { EventStream, stream as defEvent, merged, reduced, held } from './stream';
